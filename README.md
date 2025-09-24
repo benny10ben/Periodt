@@ -1,4 +1,4 @@
-# PeriodT: Track & Predict Cycles
+# Periodt: Track & Predict Cycles
 
 PeriodT is a privacy‑first Android app that keeps cycle data on the device and uses on‑device logic to predict upcoming periods, fertile windows, and ovulation estimates.
 
