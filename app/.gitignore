@@ -1,0 +1,23 @@
+/build
+# Gradle/Build
+.gradle/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Keystores
+*.jks
+*.keystore
+
+# Outputs
+*.apk
+*.aab
+*.ap_
+*.log
+captures/
+
+# Native
+.externalNativeBuild/
