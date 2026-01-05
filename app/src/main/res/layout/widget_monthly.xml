@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root_card"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp"
+    android:background="@drawable/bg_widget_card">
+
+    <LinearLayout
+        android:id="@+id/root"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <!-- Header -->
+        <LinearLayout
+            android:id="@+id/header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:id="@+id/btn_prev"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:text="‹"
+                android:textColor="@color/widget_text"
+                android:textSize="18sp" />
+
+            <TextView
+                android:id="@+id/title_month"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Month YYYY"
+                android:textColor="@color/widget_text"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:letterSpacing="0.02" />
+
+            <TextView
+                android:id="@+id/btn_next"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:gravity="center"
+                android:text="›"
+                android:textColor="@color/widget_text"
+                android:textSize="18sp" />
+        </LinearLayout>
+
+        <!-- Weekday labels -->
+        <LinearLayout
+            android:id="@+id/weekdays"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingLeft="4dp"
+            android:paddingRight="4dp"
+            android:paddingBottom="4dp">
+
+            <TextView style="@style/WidgetLabelSmall" android:text="SUN" android:textColor="@color/widget_text"/>
+            <TextView style="@style/WidgetLabelSmall" android:text="MON" android:textColor="@color/widget_text"/>
+            <TextView style="@style/WidgetLabelSmall" android:text="TUE" android:textColor="@color/widget_text"/>
+            <TextView style="@style/WidgetLabelSmall" android:text="WED" android:textColor="@color/widget_text"/>
+            <TextView style="@style/WidgetLabelSmall" android:text="THU" android:textColor="@color/widget_text"/>
+            <TextView style="@style/WidgetLabelSmall" android:text="FRI" android:textColor="@color/widget_text"/>
+            <TextView style="@style/WidgetLabelSmall" android:text="SAT" android:textColor="@color/widget_text"/>
+        </LinearLayout>
+
+        <!-- Grid container grows to fill -->
+        <LinearLayout
+            android:id="@+id/grid_container"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:divider="@android:color/transparent"
+            android:showDividers="none"
+            android:paddingTop="2dp" />
+    </LinearLayout>
+</FrameLayout>

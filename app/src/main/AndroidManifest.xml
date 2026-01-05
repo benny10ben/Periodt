@@ -1,0 +1,63 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Boot reschedule + runtime notifications (API 33+) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /> <!-- reschedule after reboot --> <!-- [web:6] -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- Android 13+ runtime permission --> <!-- [web:6] -->
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PeriodT">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.PeriodT">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Posts notifications (internal only) -->
+        <receiver
+            android:name=".uiux.shared.ReminderReceiver"
+            android:exported="false" /> <!-- [web:6] -->
+
+        <!-- Daily checker scheduled by AlarmManager (internal only) -->
+        <receiver
+            android:name=".uiux.shared.DailyPredictionChecker"
+            android:exported="false" /> <!-- [web:6] -->
+
+        <!-- Reschedule after device reboot -->
+        <receiver
+            android:name=".uiux.shared.BootReceiver"
+            android:exported="true"
+            android:enabled="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".widget.MonthlyWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.appwidget.action.APPWIDGET_OPTIONS_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/periodt_monthly_widget_info" />
+        </receiver>\
+    </application>
+</manifest>
