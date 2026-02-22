@@ -1,6 +1,26 @@
-# Periodt: Track & Predict Cycles
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2368da5c-68f4-483f-93a1-10183757a214" width="180" alt="Periodt Logo" />
+</p>
 
-PeriodT is a privacy‑first Android app that keeps cycle data on the device and uses on‑device logic to predict upcoming periods, fertile windows, and ovulation estimates.
+<h1 align="center">Periodt: Track & Predict Cycles</h1>
+
+<p align="center">
+  Periodt is a privacy‑first Android app that keeps cycle data on the device and uses on‑device logic to predict upcoming periods, fertile windows, and ovulation estimates.
+</p>
+
+<br />
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/f3eac4f3-e533-445f-8e52-94c6751a4a40" width="23%" />
+  &nbsp;
+  <img src="https://github.com/user-attachments/assets/ccd4c9cd-6813-47ed-afea-997574ae62b5" width="23%" />
+  &nbsp;
+  <img src="https://github.com/user-attachments/assets/1c19911c-f106-4267-95f3-e7c52cd53df9" width="23%" />
+  &nbsp;
+  <img src="https://github.com/user-attachments/assets/419c5aa0-bdf2-4125-beb9-ccfb5bdcffdc" width="23%" />
+</p>
+
+<br />
 
 ## Highlights
 - Private by design: data stays on the device; no analytics, no ads, no cloud sync.
