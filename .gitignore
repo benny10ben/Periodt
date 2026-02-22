@@ -1,31 +1,37 @@
-# Android Standard
-*.iml
-.gradle
-.idea
-local.properties
-.DS_Store
-captures/
-.externalNativeBuild
-.cxx
-build/
-
-# Gradle/Build (Recursive)
-.gradle/
+# --- Build Outputs ---
+# Excludes all build folders and generated binaries
 **/build/
-**/release/
-
-# IDE
-.idea/
-
-# Secrets (CRITICAL)
-*.jks
-*.keystore
-google-services.json
-key.properties
-
-# Outputs & binaries
 *.apk
 *.aab
 *.ap_
-*.log
+*.dex
 
+# --- Android Studio / IntelliJ ---
+# Excludes IDE-specific configuration and local paths
+.idea/
+*.iml
+.gradle/
+local.properties
+captures/
+.externalNativeBuild
+.cxx/
+*.stackdump
+
+# --- Secrets & Signing (CRITICAL) ---
+# Never share these; they are required for publishing and private keys
+*.jks
+*.keystore
+*.gpg
+key.properties
+google-services.json
+
+# --- OS Specific ---
+# Clean up system files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# --- Kotlin/Kapt ---
+# Excludes temporary files generated during Kotlin/Kapt compilation
+.kotlin/
