@@ -1,6 +1,5 @@
 package com.ben.periodt.uiux.overview
 
-import android.R
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
@@ -19,6 +18,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -33,10 +33,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
@@ -44,19 +42,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,10 +62,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -83,7 +75,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
@@ -1004,25 +995,35 @@ private fun ScrollableLineChart(
                 .fillMaxHeight()
         )
 
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(hScroll)
+        // 1. Measure the exact available screen space FIRST (no scroll modifier here)
+        BoxWithConstraints(
+            modifier = Modifier.weight(1f)
         ) {
-            LineChartContent(
-                points = points,
-                dates = dates,
-                lineColor = lineColor,
-                yMax = yMax,
-                showArea = showArea,
-                gridColor = gridColor,
-                axisColor = axisColor,
-                labelColor = labelColor,
-                surface = surface,
+            // This 'maxWidth' is explicitly pulling from the BoxWithConstraints scope
+            val minChartWidth = this.maxWidth
+            val dynamicWidth = (points.size * 64.dp)
+
+            // 2. Apply the scrolling INSIDE the bounded area
+            Box(
                 modifier = Modifier
-                    .width(maxOf(280.dp, points.size * 48.dp))
-                    .fillMaxHeight()
-            )
+                    .fillMaxSize()
+                    .horizontalScroll(hScroll)
+            ) {
+                LineChartContent(
+                    points = points,
+                    dates = dates,
+                    lineColor = lineColor,
+                    yMax = yMax,
+                    showArea = showArea,
+                    gridColor = gridColor,
+                    axisColor = axisColor,
+                    labelColor = labelColor,
+                    surface = surface,
+                    modifier = Modifier
+                        .width(maxOf(minChartWidth, dynamicWidth))
+                        .fillMaxHeight()
+                )
+            }
         }
     }
 }
@@ -1081,18 +1082,21 @@ private fun LineChartContent(
 ) {
     val density = LocalDensity.current
     Canvas(modifier) {
-        val padding = 8.dp.toPx()
+        // --- UPDATED PADDING MATH ---
+        val horizontalPadding = 32.dp.toPx() // Pulls chart inwards so text doesn't clip
         val bottomPadding = 48.dp.toPx()
-        val xLabelPadding = 16.dp.toPx()
-        val chartWidth = size.width - padding * 2 - xLabelPadding
-        val chartHeight = size.height - padding - bottomPadding
-        val chartLeft = padding
-        val chartTop = padding
-        val chartRight = chartLeft + chartWidth
-        val chartBottom = chartTop + chartHeight
+        val topPadding = 16.dp.toPx()
+
+        val chartLeft = horizontalPadding
+        val chartRight = size.width - horizontalPadding
+        val chartWidth = chartRight - chartLeft
+        val chartTop = topPadding
+        val chartBottom = size.height - bottomPadding
+        val chartHeight = chartBottom - chartTop
 
         drawRect(color = surface, topLeft = Offset.Zero, size = size)
 
+        // Horizontal Grid Lines
         val ySteps = 4
         repeat(ySteps + 1) { i ->
             val y = chartBottom - (i.toFloat() / ySteps) * chartHeight
@@ -1102,7 +1106,7 @@ private fun LineChartContent(
 
         val denom = (points.size - 1).coerceAtLeast(1).toFloat()
 
-        // Vertical guides + X labels (now in sorted chronological order because data was sorted up front)
+        // Vertical guides + X labels
         points.forEachIndexed { index, (x, _) ->
             val xPos = chartLeft + (x / denom) * chartWidth
             drawLine(gridColor.copy(alpha = 0.7f), Offset(xPos, chartTop), Offset(xPos, chartBottom), 1.dp.toPx())
@@ -1113,11 +1117,11 @@ private fun LineChartContent(
                     textSize = with(density) { 10.sp.toPx() }
                     textAlign = android.graphics.Paint.Align.CENTER
                 }
-                val clampedX = xPos.coerceIn(chartLeft, chartRight + xLabelPadding * 0.5f)
+                // No more clamping needed because of horizontalPadding
                 drawContext.canvas.nativeCanvas.drawText(
                     dates[index],
-                    clampedX,
-                    chartBottom + 18.dp.toPx(),
+                    xPos,
+                    chartBottom + 22.dp.toPx(),
                     paint
                 )
             }
@@ -1125,20 +1129,46 @@ private fun LineChartContent(
 
         val linePath = Path()
         val areaPath = Path()
+
+        var prevXPos = 0f
+        var prevYPos = 0f
+
         points.forEachIndexed { index, (x, y) ->
-            val xPos = chartLeft + ((denom - x) / denom) * chartWidth
+            val xPos = chartLeft + (x / denom) * chartWidth
             val yPos = chartBottom - (y / yMax) * chartHeight
+
             if (index == 0) {
                 linePath.moveTo(xPos, yPos)
-                if (showArea) { areaPath.moveTo(xPos, chartBottom); areaPath.lineTo(xPos, yPos) }
+                if (showArea) {
+                    areaPath.moveTo(xPos, chartBottom)
+                    areaPath.lineTo(xPos, yPos)
+                }
             } else {
-                linePath.lineTo(xPos, yPos)
-                if (showArea) areaPath.lineTo(xPos, yPos)
+                val controlPointX = (prevXPos + xPos) / 2f
+
+                linePath.cubicTo(
+                    x1 = controlPointX, y1 = prevYPos,
+                    x2 = controlPointX, y2 = yPos,
+                    x3 = xPos, y3 = yPos
+                )
+
+                if (showArea) {
+                    areaPath.cubicTo(
+                        x1 = controlPointX, y1 = prevYPos,
+                        x2 = controlPointX, y2 = yPos,
+                        x3 = xPos, y3 = yPos
+                    )
+                }
             }
+            prevXPos = xPos
+            prevYPos = yPos
         }
-        if (showArea) {
-            val lastX = chartLeft + ((denom - points.last().first) / denom) * chartWidth
-            areaPath.lineTo(lastX, chartBottom); areaPath.close()
+
+        if (showArea && points.isNotEmpty()) {
+            val lastX = chartLeft + (points.last().first / denom) * chartWidth
+            areaPath.lineTo(lastX, chartBottom)
+            areaPath.close()
+
             drawPath(
                 areaPath,
                 brush = Brush.verticalGradient(
@@ -1148,11 +1178,13 @@ private fun LineChartContent(
                 )
             )
         }
+
         drawPath(linePath, color = lineColor, style = Stroke(width = 2.5.dp.toPx()))
 
         points.forEach { (x, y) ->
-            val xPos = chartLeft + ((denom - x) / denom) * chartWidth
+            val xPos = chartLeft + (x / denom) * chartWidth
             val yPos = chartBottom - (y / yMax) * chartHeight
+
             drawCircle(lineColor.copy(alpha = 0.18f), 8.dp.toPx(), Offset(xPos, yPos))
             drawCircle(lineColor, 3.5.dp.toPx(), Offset(xPos, yPos))
             drawCircle(Color.White, 2.dp.toPx(), Offset(xPos, yPos))

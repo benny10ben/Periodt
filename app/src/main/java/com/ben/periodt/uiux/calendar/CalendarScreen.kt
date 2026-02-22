@@ -12,17 +12,54 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +78,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ben.periodt.R
 import com.ben.periodt.viewmodel.PeriodViewModel
@@ -50,9 +89,11 @@ import com.kizitonwose.calendar.core.DayPosition
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.absoluteValue
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -325,6 +366,7 @@ fun CalendarScreen() {
 
         val listState = rememberLazyListState()
 
+        var cycleToEdit by remember { mutableStateOf<PeriodViewModel.Cycle?>(null) }
         LaunchedEffect(cycles.size) {
             if (cycles.isNotEmpty()) {
                 listState.animateScrollToItem(0)
@@ -340,7 +382,7 @@ fun CalendarScreen() {
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(
                 top = 8.dp,
-                bottom = 105.dp
+                bottom = 115.dp
             )
         ){
             items(cycles, key = { it.id }) { cycle ->
@@ -362,10 +404,26 @@ fun CalendarScreen() {
                         soft = entrySoft,
                         text = entryText,
                         sub = entrySub,
-                        accent = entryAccent
+                        accent = entryAccent,
+                        onEditClick = { cycleToEdit = cycle } // <-- TRIGGER EDIT
                     )
                 }
             }
+        }
+
+        if (cycleToEdit != null) {
+            EditCycleDialog(
+                cycle = cycleToEdit!!,
+                surface = entrySurface,
+                text = entryText,
+                sub = entrySub,
+                accent = entryAccent,
+                onDismiss = { cycleToEdit = null },
+                onSave = { updatedCycle ->
+                    viewModel.updateCycle(updatedCycle) // Make sure to implement this in ViewModel!
+                    cycleToEdit = null
+                }
+            )
         }
     }
 }
@@ -497,6 +555,289 @@ fun SwipeToDeleteCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditCycleDialog(
+    cycle: PeriodViewModel.Cycle,
+    surface: Color,
+    text: Color,
+    sub: Color,
+    accent: Color,
+    onDismiss: () -> Unit,
+    onSave: (PeriodViewModel.Cycle) -> Unit
+) {
+    // Local state for all editable fields
+    var startDate by remember { mutableStateOf(cycle.startDate) }
+    var endDate by remember { mutableStateOf(cycle.endDate) }
+    var bleeding by remember { mutableStateOf(cycle.bleeding) }
+    var bloodColor by remember { mutableStateOf(cycle.bloodColor) }
+    var painLevel by remember { mutableIntStateOf(cycle.painLevel) }
+
+    // State for showing date pickers
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+
+    val formatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
+
+    // Theme colors matching AddCycleDialog
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
+    val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
+    val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
+    val onGradient = Color.White
+    val contentBg = if (isDark) Color.Black else Color.White
+    val textPrimary = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
+    val textSub = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
+
+    val bleedingOptions = listOf("Heavy", "Medium", "Light", "Spotting")
+    val colorOptions = listOf("Bright Red", "Dark Red", "Brown")
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = true)
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
+                    .background(Color.White.copy(alpha = 0.06f))
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+
+                    // --- CENTERED TITLE ---
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 18.dp, start = 22.dp, end = 22.dp, bottom = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Edit Entry",
+                            color = onGradient,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp
+                            ),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    // Content Box
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(contentBg)
+                            .padding(20.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // --- DATES SECTION ---
+                            Column {
+                                Text("Dates", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Spacer(Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Start", color = textSub, fontSize = 12.sp)
+                                        Spacer(Modifier.height(4.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(textPrimary.copy(alpha = 0.05f))
+                                                .clickable { showStartDatePicker = true }
+                                                .padding(12.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(startDate.format(formatter), color = textPrimary, fontSize = 13.sp)
+                                        }
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("End", color = textSub, fontSize = 12.sp)
+                                        Spacer(Modifier.height(4.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(textPrimary.copy(alpha = 0.05f))
+                                                .clickable { showEndDatePicker = true }
+                                                .padding(12.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(endDate?.format(formatter) ?: "Ongoing", color = textPrimary, fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // --- BLEEDING INTENSITY (Segmented Style) ---
+                            Text("Bleeding", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                bleedingOptions.forEach { option ->
+                                    val isSelected = bleeding.equals(option, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) gradBottom else textPrimary.copy(alpha = 0.05f))
+                                            .clickable { bleeding = option }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = option,
+                                            color = if (isSelected) onGradient else textPrimary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            // --- BLOOD COLOR (Segmented Style) ---
+                            Text("Blood Color", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                colorOptions.forEach { option ->
+                                    val isSelected = bloodColor.equals(option, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) gradBottom else textPrimary.copy(alpha = 0.05f))
+                                            .clickable { bloodColor = option }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = option,
+                                            color = if (isSelected) onGradient else textPrimary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            // --- PAIN LEVEL ---
+                            Text("Cramps / Pain", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text("Level: $painLevel / 10", color = textPrimary, fontSize = 14.sp)
+                            Slider(
+                                value = painLevel.toFloat(),
+                                onValueChange = { painLevel = it.toInt() },
+                                valueRange = 0f..10f,
+                                steps = 9,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = gradBottom,
+                                    activeTrackColor = gradBottom,
+                                    inactiveTrackColor = textPrimary.copy(alpha = 0.1f)
+                                )
+                            )
+                        }
+                    }
+
+                    // --- BOTTOM ACTIONS ---
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp)
+                                .clip(RoundedCornerShape(26.dp))
+                                .background(Color.White.copy(alpha = 0.15f)),
+                            colors = ButtonDefaults.textButtonColors(contentColor = onGradient)
+                        ) {
+                            Text("Close", fontWeight = FontWeight.Medium)
+                        }
+
+                        Button(
+                            onClick = {
+                                onSave(
+                                    cycle.copy(
+                                        startDate = startDate,
+                                        endDate = endDate,
+                                        bleeding = bleeding,
+                                        bloodColor = bloodColor,
+                                        painLevel = painLevel
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = contentBg,
+                                contentColor = if (isDark) Color.White else Color.Black
+                            ),
+                            shape = RoundedCornerShape(26.dp)
+                        ) {
+                            Text("Save", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Reuse pickers
+    if (showStartDatePicker) {
+        MinimalDatePickerDialog(
+            title = "Pick Start Date",
+            brand = MaterialTheme.colorScheme.primary,
+            gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+            onGradient = onGradient,
+            buttonContainer = if (isDark) Color.Black else Color.White,
+            buttonContent = if (isDark) Color.White else Color.Black,
+            onDismiss = { showStartDatePicker = false },
+            onConfirm = { ms ->
+                millisToLocalDate(ms)?.let { startDate = it }
+                showStartDatePicker = false
+            }
+        )
+    }
+    if (showEndDatePicker) {
+        MinimalDatePickerDialog(
+            title = "Pick End Date",
+            brand = MaterialTheme.colorScheme.primary,
+            gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+            onGradient = onGradient,
+            buttonContainer = if (isDark) Color.Black else Color.White,
+            buttonContent = if (isDark) Color.White else Color.Black,
+            onDismiss = { showEndDatePicker = false },
+            onConfirm = { ms ->
+                millisToLocalDate(ms)?.let {
+                    if (!it.isBefore(startDate)) {
+                        endDate = it
+                    }
+                }
+                showEndDatePicker = false
+            }
+        )
+    }
+}
+
 @Composable
 private fun EntryRow(
     monthLabel: String,
@@ -510,7 +851,8 @@ private fun EntryRow(
     soft: Color,
     text: Color,
     sub: Color,
-    accent: Color
+    accent: Color,
+    onEditClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "arrowRotation")
@@ -554,6 +896,17 @@ private fun EntryRow(
                     )
                     Text("$monthLabel $dayNumber", color = sub, fontSize = 12.sp)
                 }
+
+                // <-- EDIT BUTTON -->
+                IconButton(onClick = onEditClick) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Entry",
+                        tint = sub,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+
                 IconButton(onClick = { expanded = !expanded }) {
                     Icon(
                         imageVector = Icons.Filled.ArrowDropDown,

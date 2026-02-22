@@ -70,6 +70,23 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // NEW: Update function maps the UI state back to the Entity and saves to DB
+    fun updateCycle(cycle: Cycle) {
+        val entity = PeriodCycleEntity(
+            id = cycle.id, // Must pass the ID so Room updates the existing row instead of making a new one
+            startDate = cycle.startDate.toString(),
+            endDate = cycle.endDate?.toString() ?: "",
+            bleeding = cycle.bleeding,
+            bloodColor = cycle.bloodColor,
+            painLevel = cycle.painLevel
+        )
+        viewModelScope.launch {
+            dao.updateCycle(entity)
+            // Refresh widgets after database change
+            MonthlyWidgetProvider.refreshAll(appContext)
+        }
+    }
+
     fun deleteCycle(id: Int) = viewModelScope.launch {
         dao.deleteCycleById(id)
         // Refresh widgets after database change
@@ -79,13 +96,16 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
     private fun ymd(date: LocalDate): Int = date.year * 10000 + date.monthValue * 100 + date.dayOfMonth
 
     private fun prefs() = appContext.getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
+
     private fun readLastTarget(): Int? {
         val v = prefs().getInt("last_target_yyyymmdd", 0)
         return if (v == 0) null else v
     }
+
     private fun writeLastTarget(value: Int) {
         prefs().edit().putInt("last_target_yyyymmdd", value).apply()
     }
+
     private fun clearTwoDayDeliveredForAll() {
         // Safest: clear all two_day_notif_for_* keys
         val all = prefs().all
@@ -130,6 +150,6 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             writeLastTarget(newYmd)
         }
         // Schedule both daily windows
-        ReminderScheduler.scheduleAllDailyChecks(appContext) // [web:6]
+        ReminderScheduler.scheduleAllDailyChecks(appContext)
     }
 }

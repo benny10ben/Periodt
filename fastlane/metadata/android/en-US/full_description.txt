@@ -1,0 +1,7 @@
+Periodt is a privacy-first cycle tracker designed to live entirely on your device.
+
+Features:
+• Track your period dates, bleeding intensity, blood color, and pain levels.
+• View intelligent predictions for upcoming cycles and fertile windows.
+• Beautiful, interactive charts to visualize your cycle history.
+• 100% offline and private. No analytics, no ads, and no data leaves your phone.

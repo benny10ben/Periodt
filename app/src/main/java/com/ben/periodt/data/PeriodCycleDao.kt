@@ -3,6 +3,7 @@ package com.ben.periodt.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -22,6 +23,10 @@ interface PeriodCycleDao {
 
     @Insert
     suspend fun insertCycle(entity: PeriodCycleEntity)
+
+    // NEW: Update an existing cycle
+    @Update
+    suspend fun updateCycle(entity: PeriodCycleEntity)
 
     @Query("DELETE FROM period_cycles WHERE id = :id")
     suspend fun deleteCycleById(id: Int)
