@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("org.jetbrains.kotlin.kapt") // ✅ enable kapt for Room
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
@@ -14,8 +14,8 @@ android {
         applicationId = "com.ben.periodt"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
@@ -24,10 +24,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Required for Reproducible Builds on F-Droid
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Strip debug symbols to keep the F-Droid build clean
+            ndk.debugSymbolLevel = "NONE"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -80,7 +88,7 @@ dependencies {
     // Room (with Flow support)
     implementation("androidx.room:room-runtime:2.6.0")
     implementation("androidx.room:room-ktx:2.6.0")
-    kapt("androidx.room:room-compiler:2.6.0") // ✅ kapt instead of annotationProcessor
+    kapt("androidx.room:room-compiler:2.6.0")
 
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
@@ -94,7 +102,7 @@ dependencies {
 
     implementation("com.kizitonwose.calendar:compose:2.6.0")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("net.zetetic:sqlcipher-android:4.10.0@aar")  // ✅ Modern SQLCipher with 16 KB support
+    implementation("net.zetetic:sqlcipher-android:4.10.0@aar")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("androidx.sqlite:sqlite:2.4.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
