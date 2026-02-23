@@ -87,6 +87,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -107,8 +108,28 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.Healing
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Spa
+import androidx.compose.material.icons.rounded.Update
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontStyle
+import com.ben.periodt.uiux.shared.CycleRegularity
+import com.ben.periodt.uiux.shared.Prediction
+import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
+import com.ben.periodt.uiux.shared.getDisplayName
+import com.ben.periodt.uiux.shared.pretty
 import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -120,7 +141,12 @@ fun CalendarScreen() {
     val prediction by viewModel.prediction.collectAsState()
     val isDark = isSystemInDarkTheme()
 
-    // Gradient palette
+    // --- SORTING LOGIC: Latest at top, Oldest at bottom ---
+    val sortedCycles = remember(cycles) {
+        cycles.sortedByDescending { it.startDate }
+    }
+
+    // Gradient palette (Shared for Calendar and Banner)
     val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
     val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
     val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
@@ -131,86 +157,64 @@ fun CalendarScreen() {
     val currentMonth = remember { YearMonth.now() }
     val currentDate = remember { LocalDate.now() }
 
-    // Month State
+    // Calendar States
     val state = rememberCalendarState(
         startMonth = currentMonth.minusMonths(12),
         endMonth = currentMonth.plusMonths(12),
         firstVisibleMonth = currentMonth
     )
-
-    // Week State
     val weekState = rememberWeekCalendarState(
         startDate = currentDate.minusWeeks(52),
         endDate = currentDate.plusWeeks(52),
         firstVisibleWeekDate = currentDate
     )
 
-    // --- NEW: Custom Scroll Tracking ---
+    // Scroll & Collapse Logic
     val listState = rememberLazyListState()
     var isCollapsed by remember { mutableStateOf(false) }
 
-    // This intercepts swipe gestures anywhere on the screen, even if the list has only 1 item
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
-                // If swiping UP, collapse the calendar
-                if (delta < -15f) {
-                    isCollapsed = true
-                }
-                // If swiping DOWN and at the very top of the list, expand the calendar
+                if (delta < -15f) isCollapsed = true
                 if (delta > 15f && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
                     isCollapsed = false
                 }
-                // Return Offset.Zero so the LazyColumn can still scroll normally
                 return Offset.Zero
             }
         }
     }
 
-    // Sync Week view to Month view when Month changes
+    // Sync effects
     LaunchedEffect(state.firstVisibleMonth) {
         if (!isCollapsed) {
             val targetMonth = state.firstVisibleMonth.yearMonth
-            // Look at Thursday (day 3) to determine the "dominant" month of the current week
             val dominantDate = weekState.firstVisibleWeek.days.getOrNull(3)?.date ?: weekState.firstVisibleWeek.days.first().date
-            if (YearMonth.from(dominantDate) != targetMonth) {
-                weekState.scrollToWeek(targetMonth.atDay(1))
-            }
+            if (YearMonth.from(dominantDate) != targetMonth) weekState.scrollToWeek(targetMonth.atDay(1))
         }
     }
-
-    // Sync Month view to Week view when Week changes
     LaunchedEffect(weekState.firstVisibleWeek) {
         if (isCollapsed) {
             val dominantDate = weekState.firstVisibleWeek.days.getOrNull(3)?.date ?: weekState.firstVisibleWeek.days.first().date
             val targetMonth = YearMonth.from(dominantDate)
-            if (state.firstVisibleMonth.yearMonth != targetMonth) {
-                state.scrollToMonth(targetMonth)
-            }
+            if (state.firstVisibleMonth.yearMonth != targetMonth) state.scrollToMonth(targetMonth)
         }
     }
 
-    // Entry palette
+    // UI Palettes
     val entrySurface = if (isDark) Color(0xFF141820) else Color(0xFFF5F7F9)
     val entrySoft    = if (isDark) Color(0xFF1B2029) else Color(0xFFE6EAF0)
     val entryText    = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
     val entrySub     = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
     val entryAccent  = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F1114)
 
-    // Helper Composable for Day Cells (Shared by Month and Week calendars)
     @Composable
     fun DayCell(date: LocalDate, isCurrentMonth: Boolean) {
         val isToday = date == LocalDate.now()
-
-        val inCycle = cycles.any { c ->
-            !date.isBefore(c.startDate) &&
-                    (c.endDate?.let { !date.isAfter(it) } ?: true)
-        }
-
+        val inCycle = cycles.any { c -> !date.isBefore(c.startDate) && (c.endDate?.let { !date.isAfter(it) } ?: true) }
         val isFertile = prediction?.fertileWindow?.let { date in it } == true
         val isOvulation = prediction?.ovulationDay == date
-
         val isPredictedPeriod = prediction?.let { pred ->
             val start = pred.mostLikelyPeriodStart
             val len = pred.periodLength ?: 5
@@ -218,306 +222,125 @@ fun CalendarScreen() {
         } == true
 
         val accentFill = if (isDark) Color.Black else Color.White
-        val numberText = Color.White
         val numberTextToday = if (isDark) Color.White else Color(0xFF000000)
 
         Column(
-            modifier = Modifier
-                .size(40.dp)
-                .padding(vertical = 6.dp, horizontal = 2.dp),
+            modifier = Modifier.size(40.dp).padding(vertical = 6.dp, horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             when {
                 isToday -> {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(accentFill),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            date.dayOfMonth.toString(),
-                            color = numberTextToday,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    Box(Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)).background(accentFill), contentAlignment = Alignment.Center) {
+                        Text(date.dayOfMonth.toString(), color = numberTextToday, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 isOvulation -> {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFF4081))
-                            .size(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            date.dayOfMonth.toString(),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFFFF4081)).size(32.dp), contentAlignment = Alignment.Center) {
+                        Text(date.dayOfMonth.toString(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 isFertile -> {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFF4081).copy(alpha = 0.25f))
-                            .size(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            date.dayOfMonth.toString(),
-                            color = numberText.copy(alpha = 0.9f),
-                            fontSize = 13.sp
-                        )
+                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xFFFF4081).copy(alpha = 0.25f)).size(32.dp), contentAlignment = Alignment.Center) {
+                        Text(date.dayOfMonth.toString(), color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp)
                     }
                 }
                 isPredictedPeriod && isCurrentMonth -> {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Red.copy(alpha = 0.2f))
-                            .size(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            date.dayOfMonth.toString(),
-                            color = Color.White,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(Color.Red.copy(alpha = 0.2f)).size(32.dp), contentAlignment = Alignment.Center) {
+                        Text(date.dayOfMonth.toString(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                 }
                 inCycle && isCurrentMonth -> {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(accentFill.copy(alpha = 0.10f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            date.dayOfMonth.toString(),
-                            color = numberText,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(accentFill.copy(alpha = 0.10f)).padding(horizontal = 6.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
+                        Text(date.dayOfMonth.toString(), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                 }
                 else -> {
                     val alpha = if (isCurrentMonth) 1f else 0.35f
-                    Text(
-                        date.dayOfMonth.toString(),
-                        color = numberText.copy(alpha = alpha),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text(date.dayOfMonth.toString(), color = Color.White.copy(alpha = alpha), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-            .padding(top = 4.dp)
-            .padding(horizontal = 16.dp)
-            .nestedScroll(nestedScrollConnection) // Attach the scroll interceptor here
+        modifier = Modifier.fillMaxSize().background(Color.Transparent).padding(top = 4.dp).padding(horizontal = 16.dp).nestedScroll(nestedScrollConnection)
     ) {
-        // Calendar card
+        // --- 1. Calendar Section ---
         Card(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
-                    .background(Color.White.copy(alpha = 0.06f))
-            ) {
+            Box(Modifier.clip(RoundedCornerShape(24.dp)).background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom))).background(Color.White.copy(alpha = 0.06f))) {
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-
-                    // Month header
                     val scope = rememberCoroutineScope()
-
                     val headerText = if (isCollapsed) {
                         val currentWeek = weekState.firstVisibleWeek
                         val dominantDate = currentWeek.days.getOrNull(3)?.date ?: currentWeek.days.first().date
-                        val formatter = DateTimeFormatter.ofPattern("MMM yyyy")
-                        dominantDate.format(formatter).replaceFirstChar {
-                            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                        }
+                        dominantDate.format(DateTimeFormatter.ofPattern("MMM yyyy")).replaceFirstChar { it.titlecase(Locale.getDefault()) }
                     } else {
-                        state.firstVisibleMonth.yearMonth.month.getDisplayName(
-                            TextStyle.FULL, Locale.getDefault()
-                        ).replaceFirstChar {
-                            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                        } + " " + state.firstVisibleMonth.yearMonth.year
+                        state.firstVisibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()).replaceFirstChar { it.titlecase(Locale.getDefault()) } + " " + state.firstVisibleMonth.yearMonth.year
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            "‹",
-                            color = onGradientMuted,
-                            fontSize = 20.sp,
-                            modifier = Modifier
-                                .width(36.dp)
-                                .padding(vertical = 6.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    scope.launch {
-                                        if (isCollapsed) {
-                                            weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.minusWeeks(1))
-                                        } else {
-                                            state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.minusMonths(1))
-                                        }
-                                    }
-                                },
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = headerText,
-                            color = onGradient,
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            "›",
-                            color = onGradientMuted,
-                            fontSize = 20.sp,
-                            modifier = Modifier
-                                .width(36.dp)
-                                .padding(vertical = 6.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    scope.launch {
-                                        if (isCollapsed) {
-                                            weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.plusWeeks(1))
-                                        } else {
-                                            state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.plusMonths(1))
-                                        }
-                                    }
-                                },
-                            textAlign = TextAlign.Center
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text("‹", color = onGradientMuted, fontSize = 20.sp, modifier = Modifier.width(36.dp).clickable(null, null) {
+                            scope.launch { if (isCollapsed) weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.minusWeeks(1)) else state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.minusMonths(1)) }
+                        }, textAlign = TextAlign.Center)
+                        Text(text = headerText, color = onGradient, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        Text("›", color = onGradientMuted, fontSize = 20.sp, modifier = Modifier.width(36.dp).clickable(null, null) {
+                            scope.launch { if (isCollapsed) weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.plusWeeks(1)) else state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.plusMonths(1)) }
+                        }, textAlign = TextAlign.Center)
                     }
 
                     Spacer(Modifier.height(10.dp))
-
-                    // Weekday labels
                     val weekdayLabels = listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
-                    Row(Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 2.dp)
-                    ) {
-                        weekdayLabels.forEach {
-                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                Text(
-                                    it,
-                                    color = onGradientMuted,
-                                    fontSize = 11.sp,
-                                    letterSpacing = 0.5.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp)) {
+                        weekdayLabels.forEach { Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Text(it, color = onGradientMuted, fontSize = 11.sp) } }
                     }
-
                     Spacer(Modifier.height(8.dp))
-
-                    // Animated Calendar Switcher
-                    AnimatedContent(
-                        targetState = isCollapsed,
-                        transitionSpec = {
-                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                        },
-                        label = "calendar_collapse"
-                    ) { collapsed ->
-                        if (collapsed) {
-                            WeekCalendar(
-                                state = weekState,
-                                dayContent = { day ->
-                                    DayCell(date = day.date, isCurrentMonth = true)
-                                }
-                            )
-                        } else {
-                            HorizontalCalendar(
-                                state = state,
-                                dayContent = { day ->
-                                    DayCell(
-                                        date = day.date,
-                                        isCurrentMonth = day.position == DayPosition.MonthDate
-                                    )
-                                }
-                            )
-                        }
+                    AnimatedContent(targetState = isCollapsed, label = "calendar_collapse") { collapsed ->
+                        if (collapsed) WeekCalendar(state = weekState, dayContent = { DayCell(it.date, true) })
+                        else HorizontalCalendar(state = state, dayContent = { DayCell(it.date, it.position == DayPosition.MonthDate) })
                     }
-
                     Spacer(Modifier.height(6.dp))
                 }
             }
         }
 
+        // --- 2. Personalized Banner Section ---
+        PredictionBanner(
+            prediction = prediction,
+            cycles = cycles,
+            surface = entrySurface,
+            text = entryText,
+            subText = entrySub
+        )
+
         Spacer(Modifier.height(8.dp))
 
+        // --- 3. Cycle History List ---
         var cycleToEdit by remember { mutableStateOf<PeriodViewModel.Cycle?>(null) }
-        LaunchedEffect(cycles.size) {
-            if (cycles.isNotEmpty()) {
-                listState.animateScrollToItem(0)
-            }
-        }
+        LaunchedEffect(sortedCycles.size) { if (sortedCycles.isNotEmpty()) listState.animateScrollToItem(0) }
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .clip(RoundedCornerShape(24.dp)),
+            modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(24.dp)),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(
-                top = 8.dp,
-                bottom = 115.dp
-            )
+            contentPadding = PaddingValues(top = 8.dp, bottom = 115.dp)
         ){
-            items(cycles, key = { it.id }) { cycle ->
-                SwipeToDeleteCard(
-                    onDelete = { viewModel.deleteCycle(cycle.id) }
-                ) {
+            items(sortedCycles, key = { it.id }) { cycle ->
+                SwipeToDeleteCard(onDelete = { viewModel.deleteCycle(cycle.id) }) {
                     EntryRow(
-                        monthLabel = cycle.startDate.month.getDisplayName(
-                            TextStyle.SHORT,
-                            Locale.getDefault()
-                        ).uppercase(),
+                        monthLabel = cycle.startDate.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase(),
                         dayNumber = cycle.startDate.dayOfMonth.toString(),
                         startDate = cycle.startDate.toString(),
                         endDate = cycle.endDate?.toString() ?: "",
                         bleeding = cycle.bleeding,
                         bloodColor = cycle.bloodColor,
                         crampsPain = cycle.painLevel,
-                        surface = entrySurface,
-                        soft = entrySoft,
-                        text = entryText,
-                        sub = entrySub,
-                        accent = entryAccent,
+                        surface = entrySurface, soft = entrySoft, text = entryText, sub = entrySub, accent = entryAccent,
                         onEditClick = { cycleToEdit = cycle }
                     )
                 }
@@ -527,15 +350,8 @@ fun CalendarScreen() {
         if (cycleToEdit != null) {
             EditCycleDialog(
                 cycle = cycleToEdit!!,
-                surface = entrySurface,
-                text = entryText,
-                sub = entrySub,
-                accent = entryAccent,
                 onDismiss = { cycleToEdit = null },
-                onSave = { updatedCycle ->
-                    viewModel.updateCycle(updatedCycle)
-                    cycleToEdit = null
-                }
+                onSave = { viewModel.updateCycle(it); cycleToEdit = null }
             )
         }
     }
@@ -668,190 +484,182 @@ fun SwipeToDeleteCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditCycleDialog(
     cycle: PeriodViewModel.Cycle,
-    surface: Color,
-    text: Color,
-    sub: Color,
-    accent: Color,
     onDismiss: () -> Unit,
     onSave: (PeriodViewModel.Cycle) -> Unit
 ) {
-    // Local state for all editable fields
+    // --- State (Initialized with existing cycle data) ---
+    var showStartPicker by remember { mutableStateOf(false) }
+    var showEndPicker by remember { mutableStateOf(false) }
+
     var startDate by remember { mutableStateOf(cycle.startDate) }
     var endDate by remember { mutableStateOf(cycle.endDate) }
     var bleeding by remember { mutableStateOf(cycle.bleeding) }
     var bloodColor by remember { mutableStateOf(cycle.bloodColor) }
     var painLevel by remember { mutableIntStateOf(cycle.painLevel) }
 
-    // State for showing date pickers
-    var showStartDatePicker by remember { mutableStateOf(false) }
-    var showEndDatePicker by remember { mutableStateOf(false) }
-
-    val formatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
-
-    // Theme colors matching AddCycleDialog
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
-    val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
-    val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
-    val onGradient = Color.White
-    val contentBg = if (isDark) Color.Black else Color.White
-    val textPrimary = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
-    val textSub = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
-
+    // --- Resources ---
     val bleedingOptions = listOf("Heavy", "Medium", "Light", "Spotting")
     val colorOptions = listOf("Bright Red", "Dark Red", "Brown")
 
+    // --- Aesthetic Palette (Matches AddCycleDialog) ---
+    val isDark = isSystemInDarkTheme()
+    val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
+    val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
+    val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
+
+    val onGradient = Color.White
+    val contentSurface = if (isDark) Color.Black else Color.White
+    val textPrimary = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
+    val textSub = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
+
+    val formatter = remember { DateTimeFormatter.ofPattern("MMM dd") }
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = true)
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        // --- MAIN CARD ---
         Card(
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            modifier = Modifier.fillMaxWidth()
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
-                    .background(Color.White.copy(alpha = 0.06f))
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
+                    .background(Color.White.copy(alpha = 0.08f))
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
 
-                    // --- CENTERED TITLE ---
+                    // --- HEADER ---
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 18.dp, start = 22.dp, end = 22.dp, bottom = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
+                            .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Edit Cycle",
-                            color = onGradient,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            ),
-                            textAlign = TextAlign.Center
+                            text = "Edit Cycle", // Updated Title
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = onGradient
                         )
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .clickable(onClick = onDismiss),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = onGradient,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
 
-                    // Content Box
-                    Box(
+                    // --- CONTENT AREA ---
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(contentBg)
-                            .padding(20.dp)
+                            .weight(1f, fill = false)
+                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                            .background(contentSurface)
+                            .padding(24.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            // --- DATES SECTION ---
-                            Column {
-                                Text("Dates", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Spacer(Modifier.height(10.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Start", color = textSub, fontSize = 12.sp)
-                                        Spacer(Modifier.height(4.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(textPrimary.copy(alpha = 0.05f))
-                                                .clickable { showStartDatePicker = true }
-                                                .padding(12.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(startDate.format(formatter), color = textPrimary, fontSize = 13.sp)
-                                        }
-                                    }
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("End", color = textSub, fontSize = 12.sp)
-                                        Spacer(Modifier.height(4.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(textPrimary.copy(alpha = 0.05f))
-                                                .clickable { showEndDatePicker = true }
-                                                .padding(12.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(endDate?.format(formatter) ?: "Ongoing", color = textPrimary, fontSize = 13.sp)
-                                        }
-                                    }
-                                }
-                            }
 
-                            // --- BLEEDING INTENSITY (Segmented Style) ---
-                            Text("Bleeding", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // 1. Date Selectors
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            DateGlassCard(
+                                label = "Started",
+                                date = startDate.format(formatter),
+                                icon = Icons.Rounded.CalendarToday,
+                                textColor = textPrimary,
+                                subColor = textSub,
+                                onClick = { showStartPicker = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                            DateGlassCard(
+                                label = "Ended",
+                                date = endDate?.format(formatter) ?: "Ongoing",
+                                icon = if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable,
+                                textColor = if (endDate == null) gradBottom else textPrimary,
+                                subColor = textSub,
+                                onClick = { showEndPicker = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        HorizontalDivider(color = textSub.copy(alpha = 0.1f))
+
+                        // 2. Bleeding
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SectionLabel("Flow Intensity", Icons.Rounded.WaterDrop, gradBottom)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 bleedingOptions.forEach { option ->
-                                    val isSelected = bleeding.equals(option, ignoreCase = true)
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) gradBottom else textPrimary.copy(alpha = 0.05f))
-                                            .clickable { bleeding = option }
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = option,
-                                            color = if (isSelected) onGradient else textPrimary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
+                                    ModernSelectionPill(
+                                        text = option,
+                                        isSelected = bleeding.equals(option, ignoreCase = true),
+                                        activeColor = gradBottom,
+                                        textColor = textPrimary,
+                                        onClick = { bleeding = option }
+                                    )
                                 }
                             }
+                        }
 
-                            // --- BLOOD COLOR (Segmented Style) ---
-                            Text("Blood Color", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // 3. Color
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SectionLabel("Color", Icons.Rounded.Palette, gradBottom)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 colorOptions.forEach { option ->
-                                    val isSelected = bloodColor.equals(option, ignoreCase = true)
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(if (isSelected) gradBottom else textPrimary.copy(alpha = 0.05f))
-                                            .clickable { bloodColor = option }
-                                            .padding(vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = option,
-                                            color = if (isSelected) onGradient else textPrimary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
+                                    ModernSelectionPill(
+                                        text = option,
+                                        isSelected = bloodColor.equals(option, ignoreCase = true),
+                                        activeColor = gradBottom,
+                                        textColor = textPrimary,
+                                        onClick = { bloodColor = option }
+                                    )
                                 }
                             }
+                        }
 
-                            // --- PAIN LEVEL ---
-                            Text("Cramps / Pain", color = textPrimary, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Text("Level: $painLevel / 10", color = textPrimary, fontSize = 14.sp)
+                        HorizontalDivider(color = textSub.copy(alpha = 0.1f))
+
+                        // 4. Pain Slider
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                SectionLabel("Pain Level", Icons.Rounded.Healing, gradBottom)
+                                Text(
+                                    text = "$painLevel / 10",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = gradBottom
+                                )
+                            }
                             Slider(
                                 value = painLevel.toFloat(),
                                 onValueChange = { painLevel = it.toInt() },
@@ -860,31 +668,14 @@ fun EditCycleDialog(
                                 colors = SliderDefaults.colors(
                                     thumbColor = gradBottom,
                                     activeTrackColor = gradBottom,
-                                    inactiveTrackColor = textPrimary.copy(alpha = 0.1f)
+                                    inactiveTrackColor = textSub.copy(alpha = 0.2f)
                                 )
                             )
                         }
-                    }
 
-                    // --- BOTTOM ACTIONS ---
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TextButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .background(Color.White.copy(alpha = 0.15f)),
-                            colors = ButtonDefaults.textButtonColors(contentColor = onGradient)
-                        ) {
-                            Text("Close", fontWeight = FontWeight.Medium)
-                        }
+                        Spacer(Modifier.height(4.dp))
 
+                        // 5. Update Button
                         Button(
                             onClick = {
                                 onSave(
@@ -898,15 +689,26 @@ fun EditCycleDialog(
                                 )
                             },
                             modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = contentBg,
-                                contentColor = if (isDark) Color.White else Color.Black
-                            ),
-                            shape = RoundedCornerShape(26.dp)
+                                .fillMaxWidth()
+                                .height(54.dp)
+                                .shadow(8.dp, RoundedCornerShape(34.dp), ambientColor = gradBottom.copy(alpha = 0.5f), spotColor = gradBottom.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            contentPadding = PaddingValues(0.dp),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Text("Save", fontWeight = FontWeight.Bold)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Brush.horizontalGradient(listOf(gradTop, gradBottom))),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Update Entry", // Updated Text
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -914,39 +716,27 @@ fun EditCycleDialog(
         }
     }
 
-    // Reuse pickers
-    if (showStartDatePicker) {
+    // --- Reuse Date Pickers ---
+    if (showStartPicker) {
         MinimalDatePickerDialog(
-            title = "Pick Start Date",
-            brand = MaterialTheme.colorScheme.primary,
-            gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-            onGradient = onGradient,
-            buttonContainer = if (isDark) Color.Black else Color.White,
-            buttonContent = if (isDark) Color.White else Color.Black,
-            onDismiss = { showStartDatePicker = false },
-            onConfirm = { ms ->
-                millisToLocalDate(ms)?.let { startDate = it }
-                showStartDatePicker = false
-            }
+            title = "Start Date",
+            brand = gradBottom, gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+            onGradient = Color.White,
+            buttonContainer = contentSurface,
+            buttonContent = textPrimary,
+            onDismiss = { showStartPicker = false },
+            onConfirm = { ms -> millisToLocalDate(ms)?.let { startDate = it }; showStartPicker = false }
         )
     }
-    if (showEndDatePicker) {
+    if (showEndPicker) {
         MinimalDatePickerDialog(
-            title = "Pick End Date",
-            brand = MaterialTheme.colorScheme.primary,
-            gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-            onGradient = onGradient,
-            buttonContainer = if (isDark) Color.Black else Color.White,
-            buttonContent = if (isDark) Color.White else Color.Black,
-            onDismiss = { showEndDatePicker = false },
-            onConfirm = { ms ->
-                millisToLocalDate(ms)?.let {
-                    if (!it.isBefore(startDate)) {
-                        endDate = it
-                    }
-                }
-                showEndDatePicker = false
-            }
+            title = "End Date",
+            brand = gradBottom, gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+            onGradient = Color.White,
+            buttonContainer = contentSurface,
+            buttonContent = textPrimary,
+            onDismiss = { showEndPicker = false },
+            onConfirm = { ms -> millisToLocalDate(ms)?.let { endDate = it }; showEndPicker = false }
         )
     }
 }
@@ -970,21 +760,13 @@ fun EntryRow(
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "arrowRotation")
 
-    // Theme Gradient for Progress Bar
     val isDark = isSystemInDarkTheme()
     val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
     val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
     val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
     val themeGradient = remember { Brush.horizontalGradient(listOf(gradTop, gradMid, gradBottom)) }
 
-    // --- Formatters & Helpers ---
-    fun pretty(d: String): String = runCatching {
-        if (d.isBlank()) return@runCatching "Not set"
-        val date = LocalDate.parse(d)
-        val m = date.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
-        "$m ${date.dayOfMonth}, ${date.year}"
-    }.getOrElse { d }
-
+    // --- Helpers ---
     fun shortPretty(d: String): String = runCatching {
         if (d.isBlank()) return@runCatching "?"
         val date = LocalDate.parse(d)
@@ -999,84 +781,47 @@ fun EntryRow(
         else -> "Very severe ($p/10)"
     }
 
-    // --- Precise Time-Based Progress Calculation ---
     val startDt = remember(startDate) { runCatching { LocalDate.parse(startDate) }.getOrNull() }
     val endDt = remember(endDate) { runCatching { if (endDate.isNotBlank()) LocalDate.parse(endDate) else null }.getOrNull() }
-
-    // Grab the exact current time down to the minute
     val now = LocalDateTime.now()
     val today = now.toLocalDate()
 
     var progTarget = 0f
     var statusText = "Status unknown"
     var totalDaysForBar = 0L
-    var elapsedDays = 0L
     var compliment = ""
+    val isOngoing = endDt == null || !today.isAfter(endDt)
 
     if (startDt != null) {
-        val startDateTime = startDt.atStartOfDay() // Assumes cycle starts at midnight
-
+        val startDateTime = startDt.atStartOfDay()
         if (endDt == null) {
-            // ONGOING CYCLE
-            elapsedDays = ChronoUnit.DAYS.between(startDt, today) + 1
+            val elapsedDays = ChronoUnit.DAYS.between(startDt, today) + 1
             statusText = "Day $elapsedDays • Ongoing"
-            totalDaysForBar = maxOf(6L, elapsedDays + 2L) // Dynamic projection for dots
-
-            // Calculate exact progress smoothly using minutes instead of whole days
+            totalDaysForBar = maxOf(6L, elapsedDays + 2L)
             val elapsedMinutes = ChronoUnit.MINUTES.between(startDateTime, now)
-            val totalMinutesForBar = totalDaysForBar * 24f * 60f
-            progTarget = (elapsedMinutes.toFloat() / totalMinutesForBar).coerceIn(0f, 0.95f)
-
-            compliment = when (elapsedDays) {
-                1L -> "Take it easy today. You've got this! 💙"
-                2L -> "Be kind to yourself today. 🍵"
-                3L -> "You're doing great, keep resting. ✨"
-                4L -> "Almost through the toughest part! 💪"
-                5L -> "Home stretch! Keep it up! 🌸"
-                else -> "Listen to your body. You're doing great! 🙌"
-            }
+            progTarget = (elapsedMinutes.toFloat() / (totalDaysForBar * 1440f)).coerceIn(0f, 0.95f)
+            compliment = "Listen to your body. You're doing great! 🙌"
         } else {
-            // BOUNDED / COMPLETED CYCLE
             totalDaysForBar = ChronoUnit.DAYS.between(startDt, endDt) + 1
-
             if (today.isAfter(endDt)) {
                 statusText = "$totalDaysForBar Days • Completed"
                 progTarget = 1f
                 compliment = "Cycle completed. Awesome job! 🌟"
-            } else if (today.isBefore(startDt)) {
-                statusText = "Upcoming"
-                progTarget = 0f
-                compliment = "Coming up soon! Prepare your comfort kit. 🎒"
             } else {
-                val daysLeft = ChronoUnit.DAYS.between(today, endDt)
-                statusText = if (daysLeft == 0L) "Ends today" else "$daysLeft days left"
-                elapsedDays = ChronoUnit.DAYS.between(startDt, today) + 1
-
-                // Calculate exact progress smoothly using minutes
+                val elapsedDays = ChronoUnit.DAYS.between(startDt, today) + 1
+                statusText = "${ChronoUnit.DAYS.between(today, endDt)} days left"
                 val elapsedMinutes = ChronoUnit.MINUTES.between(startDateTime, now)
-                val totalMinutesForBar = totalDaysForBar * 24f * 60f
-                progTarget = (elapsedMinutes.toFloat() / totalMinutesForBar).coerceIn(0f, 1f)
-
-                compliment = when (elapsedDays) {
-                    1L -> "Day 1: Take it easy today. You've got this! 💙"
-                    2L -> "Day 2: Remember to stay hydrated. 🍵"
-                    totalDaysForBar -> "Final day! You're almost at the finish line. 🎉"
-                    else -> "Day $elapsedDays: You're doing great! ✨"
-                }
+                progTarget = (elapsedMinutes.toFloat() / (totalDaysForBar * 1440f)).coerceIn(0f, 1f)
+                compliment = "Day $elapsedDays: You're doing great! ✨"
             }
         }
     }
 
-    val animatedProgress by animateFloatAsState(
-        targetValue = progTarget,
-        animationSpec = tween(1200),
-        label = "progressAnim"
-    )
+    val animatedProgress by animateFloatAsState(targetValue = progTarget, animationSpec = tween(1200))
 
-    // --- UI Render ---
     Card(
         colors = CardDefaults.cardColors(containerColor = surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -1087,145 +832,106 @@ fun EntryRow(
             )
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            // Header Row
+            // Header Row: Minimalist Floating Icons
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 BleedingIcon(bleeding = bleeding)
-                Spacer(Modifier.width(12.dp))
+
+                Spacer(Modifier.width(14.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = when (bleeding.lowercase(Locale.getDefault())) {
-                            "heavy" -> "Heavy Bleeding"
-                            "medium" -> "Moderate Bleeding"
-                            "light" -> "Light Bleeding"
-                            else -> "Spotting"
-                        },
+                        text = bleeding.replaceFirstChar { it.uppercase() },
                         color = text,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text("$monthLabel $dayNumber", color = sub, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text("$monthLabel $dayNumber", color = sub, fontSize = 12.sp)
                 }
 
-                IconButton(onClick = onEditClick) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit Entry", tint = text, modifier = Modifier.size(18.dp))
-                }
-
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowDropDown,
-                        contentDescription = if (expanded) "Collapse" else "Expand",
-                        tint = text,
-                        modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = rotation }
-                    )
-                }
+                // Naked Chevron
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = text.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(24.dp)
+                        .graphicsLayer { rotationZ = rotation }
+                )
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // Progress Header Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            // Meta Info (Always visible Status and Color)
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Text(statusText, color = text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    MetaPill("Color", bloodColor, text, sub, soft)
-                }
+                MetaPill("Color", bloodColor, text, sub, soft)
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            // Custom Dotted Canvas Progress Bar
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp)
-                    .clip(CircleShape)
-            ) {
-                val width = size.width
-                val height = size.height
-
-                // 1. Draw background track
-                drawRect(color = soft, size = size)
-
-                // 2. Draw gradient fill based on smoothly animated progress
-                drawRect(
-                    brush = themeGradient,
-                    size = Size(animatedProgress * width, height)
-                )
-
-                // 3. Draw small dots for daily break points
-                if (totalDaysForBar > 1) {
-                    val segmentWidth = width / totalDaysForBar
-                    val dotRadius = 2.dp.toPx()
-
-                    for (i in 1 until totalDaysForBar.toInt()) {
-                        val xPos = i * segmentWidth
-                        drawCircle(
-                            color = surface,
-                            radius = dotRadius,
-                            center = Offset(xPos, height / 2f)
-                        )
+            // Progress Bar (Visible if Ongoing or Expanded)
+            AnimatedVisibility(visible = isOngoing || expanded) {
+                Column {
+                    Spacer(Modifier.height(12.dp))
+                    Canvas(Modifier.fillMaxWidth().height(20.dp).clip(CircleShape)) {
+                        drawRect(color = soft, size = size)
+                        drawRect(brush = themeGradient, size = Size(animatedProgress * size.width, size.height))
+                        if (totalDaysForBar > 1) {
+                            val seg = size.width / totalDaysForBar
+                            for (i in 1 until totalDaysForBar.toInt()) {
+                                drawCircle(color = surface, radius = 2.dp.toPx(), center = Offset(i * seg, size.height / 2f))
+                            }
+                        }
+                    }
+                    if (compliment.isNotEmpty()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(text = compliment, color = gradTop, fontSize = 12.sp, fontStyle = FontStyle.Italic)
                     }
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
-
-            // Motivational Compliment
-            if (compliment.isNotEmpty()) {
-                Text(
-                    text = compliment,
-                    color = gradTop,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontStyle = FontStyle.Italic
-                )
-            }
-
-            // Expanded Content (Info Grid)
+            // Expanded content
             AnimatedVisibility(visible = expanded) {
                 Column {
                     Spacer(Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(soft)
-                                .padding(12.dp)
-                        ) {
-                            Text("Duration", color = sub, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "${shortPretty(startDate)} - ${if(endDate.isNotBlank()) shortPretty(endDate) else "Ongoing"}",
-                                color = text,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(soft)
-                                .padding(12.dp)
-                        ) {
-                            Text("Cramps / Pain", color = sub, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = painLabel(crampsPain),
-                                color = text,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                    Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
+                        InfoBox("Duration", "${shortPretty(startDate)} - ${if(endDate.isNotBlank()) shortPretty(endDate) else "Ongoing"}", soft, sub, text)
+                        InfoBox("Cramps / Pain", painLabel(crampsPain), soft, sub, text)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onEditClick,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, sub.copy(alpha = 0.3f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = text)
+                    ) {
+                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Edit Entry", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun RowScope.InfoBox(
+    label: String,
+    value: String,
+    bg: Color,
+    sub: Color,
+    text: Color
+) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(bg)
+            .padding(12.dp)
+    ) {
+        Text(label, color = sub, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Text(value, color = text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -1261,19 +967,73 @@ fun BleedingIcon(bleeding: String) {
         else -> R.drawable.spotting
     }
 
-    // Wrapped in a soft background box to make the icon pop
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(Color.Gray.copy(alpha = 0.1f)),
-        contentAlignment = Alignment.Center
+    Image(
+        painter = painterResource(id = resId),
+        contentDescription = "Bleeding level",
+        modifier = Modifier.size(28.dp),
+        contentScale = ContentScale.Fit
+    )
+}
+
+@Composable
+fun PredictionBanner(
+    prediction: Prediction?,
+    cycles: List<PeriodViewModel.Cycle>,
+    surface: Color,
+    text: Color,
+    subText: Color
+) {
+    if (prediction == null) return
+    val today = LocalDate.now()
+    val isBleeding = cycles.any { it.endDate == null || (today >= it.startDate && today <= it.endDate) }
+    if (isBleeding) return
+
+    val daysUntil = ChronoUnit.DAYS.between(today, prediction.mostLikelyPeriodStart)
+
+    val (icon, accentColor, statusTitle, personalMessage) = when {
+        daysUntil < 0 -> Quadruple(Icons.Rounded.Warning, Color(0xFFEF5350), "Late by ${kotlin.math.abs(daysUntil)} days", "Don't panic! 🧘‍♀️")
+        daysUntil == 0L -> Quadruple(Icons.Rounded.WaterDrop, Color(0xFFFF4081), "Starts today", "Have your kit ready! 🍫")
+        daysUntil <= 3 -> Quadruple(Icons.Rounded.Bolt, Color(0xFFFFB74D), "Almost time", "Hydrate and rest up. 💧")
+        daysUntil <= 7 -> Quadruple(Icons.Rounded.CalendarToday, Color(0xFF42A5F5), "Coming soon", "Stock up on snacks? 🍪")
+        else -> Quadruple(Icons.Rounded.Spa, Color(0xFF66BB6A), "$daysUntil days until next cycle", "Relax and enjoy. ✨")
+    }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = surface),
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
     ) {
-        Image(
-            painter = painterResource(id = resId),
-            contentDescription = "Bleeding level",
-            modifier = Modifier.size(24.dp),
-            contentScale = ContentScale.Fit
-        )
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Naked Icon
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(28.dp)
+            )
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(statusTitle, fontWeight = FontWeight.Bold, color = text, fontSize = 15.sp)
+                Text(personalMessage, style = MaterialTheme.typography.bodySmall, color = subText)
+            }
+
+            // Small Pill for the date (Kept this as it adds a nice functional touch)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(subText.copy(alpha = 0.08f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(prediction.mostLikelyPeriodStart.pretty(), color = subText, fontSize = 10.sp)
+            }
+        }
     }
 }
+
+// Simple helper class for the 'when' block return values
+data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

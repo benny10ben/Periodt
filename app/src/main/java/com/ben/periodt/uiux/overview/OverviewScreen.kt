@@ -1,8 +1,5 @@
 package com.ben.periodt.uiux.overview
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -15,12 +12,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -30,29 +27,33 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -72,12 +73,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
 import com.ben.periodt.uiux.shared.getConfidenceLabel
 import com.ben.periodt.uiux.shared.getCycleConfidence
@@ -280,256 +283,224 @@ fun OverviewScreen(
 @Composable
 fun SettingsDialog(
     show: Boolean,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onExport: () -> Unit = {},
+    onImport: () -> Unit = {},
+    onClearData: () -> Unit = {}
 ) {
     if (!show) return
 
-    val isDark = isSystemInDarkTheme()
-    val cs = MaterialTheme.colorScheme
+    // --- State ---
+    var isFaqExpanded by remember { mutableStateOf(false) }
+    var isPrivacyExpanded by remember { mutableStateOf(false) }
+    var isAboutExpanded by remember { mutableStateOf(true) } // Open by default
 
-    // Gradient and theme colors matching AddCycle
+    // --- Aesthetic Palette ---
+    val isDark = isSystemInDarkTheme()
     val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
     val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
     val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
+
     val onGradient = Color.White
-    val surfaceSoft = if (isDark) Color(0xFF1B2029) else Color(0xFFE6EAF0)
+    val contentSurface = if (isDark) Color.Black else Color.White
     val textPrimary = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
     val textSub = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
-    val buttonContainer = if (isDark) Color(0xFF000000) else Color.White
-    val buttonContent = if (isDark) Color(0xFFFFFFFF) else Color.Black
 
-    val scroll = rememberScrollState()
-
-    androidx.compose.material3.BasicAlertDialog(onDismissRequest = onClose) {
-        val cardRadius = 24.dp
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
-            shape = RoundedCornerShape(cardRadius),
-            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
+                .fillMaxWidth(0.9f)
+                .fillMaxHeight(0.85f) // Taller dialog to fit content
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(cardRadius))
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(gradTop, gradMid, gradBottom)
-                        )
-                    )
-                    .background(Color.White.copy(alpha = 0.06f))
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
+                    .background(Color.White.copy(alpha = 0.08f))
             ) {
-                // Title
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 18.dp, start = 22.dp, end = 22.dp, bottom = 6.dp)
-                        .clip(RoundedCornerShape(20.dp)),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "Settings",
-                        color = onGradient,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                    )
-                }
+                Column(modifier = Modifier.fillMaxWidth()) {
 
-                // Scrollable content
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp)
-                        .padding(top = 64.dp, bottom = 90.dp)   // leaves space for footer
-                        .heightIn(max = 560.dp)
-                        .verticalScroll(scroll)
-                ) {
-                    // One unified container for all sections (white in light, black in dark)
-                    val isDark = isSystemInDarkTheme()
-                    val unifiedBg = if (isDark) Color.Black else Color.White
-
-                    Box(
+                    // --- HEADER ---
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(unifiedBg)
-                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                            .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-
-                            // FAQ
-                            var faqExpanded by remember { mutableStateOf(false) }
-                            ExpandableSection(
-                                title = "FAQ",
-                                expanded = faqExpanded,
-                                onToggle = { faqExpanded = !faqExpanded }
-                            ) {
-                                val faqItems = remember {
-                                    listOf(
-                                "What data does the app store?" to "All cycle logs, symptoms, and preferences are stored locally on device; nothing is sent to a server.",
-                                "Is internet required?" to "No — predictions, reminders, and charts work offline; internet is not needed for core features.",
-                                "How are period dates predicted?" to "The app analyzes previously logged cycles to estimate the next period window and fertile days; predictions are estimates, not guarantees.",
-                                "What if cycles are irregular?" to "The app still learns from entries and widens prediction windows to reflect variability; logging consistently improves accuracy.",
-                                "Can fertility and ovulation be tracked?" to "Yes — the app projects a fertile window and likely ovulation day based on recent cycles; these are informational only.",
-                                "Does the app have ads or trackers?" to "No ads and no third‑party analytics; the app is designed to be privacy‑first.",
-                                "Will reminders work without opening the app?" to "Yes — once enabled, local notifications fire on schedule (e.g., a few days before a predicted period).",
-                                "Can past cycles be edited or deleted?" to "Yes — previous entries can be updated or removed, and charts refresh automatically.",
-                                "What symptoms can be tracked?" to "Common options include flow intensity, pain level, mood, and discharge color; additional notes can capture anything unique.",
-                                "How accurate are predictions?" to "Accuracy depends on consistent logging and cycle regularity; the app shows confidence/uncertainty so expectations stay realistic.",
-                                "Does the app support dark mode?" to "Yes — dark and light themes are supported; the setting can be changed in preferences.",
-                                "Can data be backed up?" to "Data is on device by default; backup/restore can be added via an export/import option if enabled in settings.",
-                                "Do notifications respect quiet hours?" to "System Do Not Disturb rules are respected; reminder timing can be adjusted in settings.",
-                                "Will the app share data with other apps?" to "No — sharing only occurs if an explicit export is performed.",
-                                "How does the fertile window help with planning?" to "It highlights higher‑probability days for conception and helps plan activities around symptoms throughout the cycle.",
-                                "Is there a way to track PMS patterns?" to "Yes — symptom logs across cycles reveal recurring pre‑period patterns to prepare proactively.",
-                                "Can multiple profiles be managed?" to "Not currently; one profile per device is supported, though multi‑profile may be considered later.",
-                                "How are averages (cycle length, period length) computed?" to "Averages use completed cycles; including more recent cycles yields more current estimates.",
-                                "What happens if a cycle is missed?" to "Logging can resume anytime; the model adjusts once new data is added.",
-                                "Does the app support exporting to share with a clinician?" to "An export summary (dates, symptoms, averages) can be provided if enabled; otherwise screenshots of charts can be used."
-                                    )
-                                }
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    faqItems.forEach { (q, a) -> ExpandableQA(question = q, answer = a) }
-                                }
-                            }
-
-                            HorizontalDivider(
-                                thickness = 0.5.dp,                          // thinner line
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-                            )
-
-
-                            // Privacy Policy
-                            var privacyExpanded by remember { mutableStateOf(false) }
-                            ExpandableSection(
-                                title = "Privacy Policy",
-                                expanded = privacyExpanded,
-                                onToggle = { privacyExpanded = !privacyExpanded }
-                            ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("No data is collected.", style = MaterialTheme.typography.bodyMedium)
-                                    Text("All cycle logs, symptoms, and preferences are stored locally on device. No analytics, no ads, no third‑party SDKs.", style = MaterialTheme.typography.bodyMedium)
-                                    Text("Export and sharing are fully user‑initiated. Without export, data stays on the device.", style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-
-                            HorizontalDivider(
-                                thickness = 0.5.dp,                          // thinner line
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-                            )
-
-
-                            // Backup (disabled + badge)
-                            DisabledRowWithBadge(
-                                title = "Backup",
-                                badge = "Coming soon"
-                            )
-
-                            HorizontalDivider(
-                                thickness = 0.5.dp,                          // thinner line
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-                            )
-
-                            // Backup (disabled + badge)
-                            DisabledRowWithBadge(
-                                title = "Widgets",
-                                badge = "Coming soon"
-                            )
-
-                            HorizontalDivider(
-                                thickness = 0.5.dp,                          // thinner line
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
-                            )
-
-                            // About
-                            var aboutExpanded by remember { mutableStateOf(false) }
-                            ExpandableSection(
-                                title = "About",
-                                expanded = aboutExpanded,
-                                onToggle = { aboutExpanded = !aboutExpanded }
-                            ) {
-                                val context = LocalContext.current
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Ben", style = MaterialTheme.typography.bodyMedium)
-                                    Text("Open source, designed for on‑device use.", style = MaterialTheme.typography.bodyMedium)
-
-                                    // Clickable GitHub link (label only)
-                                    val githubUrl = "https://github.com/benny10ben/Periodt-Track-Predict-Cycles"
-                                    Text(
-                                        text = "GitHub",
-                                        color = MaterialTheme.colorScheme.primary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.clickable {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(githubUrl))
-                                            context.startActivity(intent)
-                                        }
-                                    )
-
-
-                                    // License line
-                                    Text(
-                                        "License: GNU General Public License (GPL)",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-
-                                    // “Want to connect?” acts as a button (opens email)
-                                    Text(
-                                        text = "Want to connect?",
-                                        color = MaterialTheme.colorScheme.primary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.clickable {
-                                            val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                                data = Uri.parse("mailto:developer.ben10@gmail.com")
-                                                putExtra(Intent.EXTRA_SUBJECT, "PeriodT: Feedback / Inquiry")
-                                            }
-                                            try {
-                                                context.startActivity(intent)
-                                            } catch (_: ActivityNotFoundException) {
-                                                // Optionally show a toast/snackbar if no email app is present
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Column(
-                        modifier = Modifier.fillMaxSize()
-                            .padding(top = 20.dp), // or .fillMaxWidth().height(200.dp)
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Text("Dedicated to my love.", color = onGradient, style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-
-                    // Bottom-centered Close button (sticky footer)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .padding(16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentHeight()
-                            .align(Alignment.Center)
-                    ) {
-                        TextButton(
-                            onClick = onClose,
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = onGradient
+                        )
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                                .background(buttonContainer),
-                            colors = ButtonDefaults.textButtonColors(contentColor = buttonContent)
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .clickable(onClick = onClose),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("Close")
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = onGradient,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
+                    }
+
+                    // --- CONTENT AREA ---
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                            .background(contentSurface)
+                            .padding(horizontal = 24.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Spacer(Modifier.height(24.dp))
+
+                        // 1. DATA MANAGEMENT
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            SectionLabel("Data Management", Icons.Rounded.Storage, textPrimary)
+
+                            SettingsActionCard(
+                                title = "Export Data",
+                                subtitle = "Save your history as CSV",
+                                icon = Icons.Rounded.Upload,
+                                color = textPrimary,
+                                subColor = textSub,
+                                onClick = onExport
+                            )
+
+                            SettingsActionCard(
+                                title = "Import Data",
+                                subtitle = "Restore from backup",
+                                icon = Icons.Rounded.Download,
+                                color = textPrimary,
+                                subColor = textSub,
+                                onClick = onImport
+                            )
+
+                            SettingsActionCard(
+                                title = "Clear All Data",
+                                subtitle = "Permanently delete history",
+                                icon = Icons.Rounded.DeleteForever,
+                                color = Color(0xFFEF5350),
+                                subColor = textSub,
+                                onClick = onClearData,
+                                isDestructive = true
+                            )
+                        }
+
+                        Spacer(Modifier.height(24.dp))
+
+                        // 2. PRIVACY POLICY
+                        ExpandableSection(
+                            title = "Privacy Policy",
+                            expanded = isPrivacyExpanded,
+                            onToggle = { isPrivacyExpanded = !isPrivacyExpanded },
+                            icon = Icons.Rounded.PrivacyTip,
+                            accentColor = textPrimary,
+                            textColor = textPrimary
+                        ) {
+                            Text(
+                                text = "Your privacy is our priority. This app operates completely offline by default.\n\n" +
+                                        "• No data is sent to external servers.\n" +
+                                        "• All your cycle history, notes, and preferences are stored locally on this device.\n" +
+                                        "• If you delete the app, your data is deleted unless you have exported a backup.\n" +
+                                        "• We do not track your location or use analytics cookies.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = textSub,
+                                lineHeight = 20.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // 3. FAQs (Restored)
+                        ExpandableSection(
+                            title = "Frequently Asked Questions",
+                            expanded = isFaqExpanded,
+                            onToggle = { isFaqExpanded = !isFaqExpanded },
+                            icon = Icons.Rounded.HelpOutline,
+                            accentColor = textPrimary,
+                            textColor = textPrimary
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ExpandableQA(
+                                    "How is the prediction calculated?",
+                                    "We use a standard 28-day cycle model that adjusts dynamically based on the average length of your last 3 logged periods.",
+                                    textPrimary, textSub
+                                )
+                                ExpandableQA(
+                                    "How do I edit a past cycle?",
+                                    "Go to the calendar screen, find the cycle in the list below the calendar, expand the card, and tap the 'Edit Entry' button.",
+                                    textPrimary, textSub
+                                )
+                                ExpandableQA(
+                                    "What does the fertile window mean?",
+                                    "This is the estimated time during your cycle when you are most likely to conceive. It is usually 5 days before ovulation and the day of ovulation.",
+                                    textPrimary, textSub
+                                )
+                                ExpandableQA(
+                                    "Can I sync across devices?",
+                                    "Currently, sync is not supported to ensure maximum privacy. Please use the Export feature to transfer data manually.",
+                                    textPrimary, textSub
+                                )
+                                ExpandableQA(
+                                    "What happens if I forget to log?",
+                                    "You can log past dates at any time. Just tap the '+' button and select the dates from the past.",
+                                    textPrimary, textSub
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // 4. ABOUT
+                        ExpandableSection(
+                            title = "About Periodt",
+                            expanded = isAboutExpanded,
+                            onToggle = { isAboutExpanded = !isAboutExpanded },
+                            icon = Icons.Rounded.Info,
+                            accentColor = textPrimary,
+                            textColor = textPrimary
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 4.dp)) {
+                                Text(
+                                    "Periodt v1.0.4",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textPrimary
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Designed to be simple, private, and aesthetic. Thank you for using our app to track your health journey.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = textSub
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "Developed with ❤️ by Ben",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = gradBottom
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(32.dp))
                     }
                 }
             }
@@ -537,118 +508,58 @@ fun SettingsDialog(
     }
 }
 
+// --- HELPER COMPOSABLES ---
+
 @Composable
-private fun SectionContainer(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    val isDark = isSystemInDarkTheme()
-    val container = if (isDark) Color.Black else Color.White   // black in dark, white in light [web:321]
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))                   // round corners first [web:491]
-            .background(container)                              // then apply background [web:491]
-            .padding(14.dp)
-    ) {
-        Column(content = content)
+private fun SectionLabel(text: String, icon: ImageVector, tint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
+        Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = tint)
     }
 }
 
-
-
 @Composable
-private fun DisabledRowWithBadge(
+private fun SettingsActionCard(
     title: String,
-    badge: String
+    subtitle: String,
+    icon: ImageVector,
+    color: Color,
+    subColor: Color,
+    onClick: () -> Unit,
+    isDestructive: Boolean = false
 ) {
-    // Use onSurface at disabled alpha for accessibility-aware “greyed out” content [web:452][web:288]
-    val base = MaterialTheme.colorScheme.onSurface
-    val disabledColor = base.copy(alpha = 0.38f)
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
-            .padding(vertical = 6.dp),
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (isDestructive) color.copy(alpha = 0.08f) else subColor.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = disabledColor,
-            modifier = Modifier.weight(1f)
-        )
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(disabledColor.copy(alpha = 0.16f))
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = badge,
-                style = MaterialTheme.typography.labelMedium,
-                color = disabledColor
-            )
-        }
-    }
-}
-
-
-@Composable
-private fun ExpandableQA(question: String, answer: String) {
-    var expanded by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        label = "qaArrowRotation"
-    )
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = { expanded = !expanded })
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = question,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Filled.ArrowDropDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier
-                    .size(20.dp)
-                    .graphicsLayer { rotationZ = rotation },
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
         }
 
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(
-                animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-                expandFrom = Alignment.Top
-            ) + fadeIn(
-                animationSpec = tween(durationMillis = 150, delayMillis = 50)
-            ),
-            exit = shrinkVertically(
-                animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
-                shrinkTowards = Alignment.Top
-            ) + fadeOut(
-                animationSpec = tween(durationMillis = 100)
-            )
-        ) {
-            Text(
-                text = answer,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
-            )
+        Spacer(Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = color)
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = subColor)
         }
+
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = subColor.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 
@@ -657,52 +568,82 @@ private fun ExpandableSection(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    icon: ImageVector,
+    accentColor: Color,
+    textColor: Color,
     content: @Composable () -> Unit
 ) {
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        label = "arrowRotation"
-    )
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "arrowRotation")
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 44.dp)
-                .padding(vertical = 4.dp)
-                .clickable(onClick = onToggle),
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onToggle)
+                .padding(vertical = 12.dp, horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = accentColor.copy(alpha = 0.8f),
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(12.dp))
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = textColor,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onToggle) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowDropDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    modifier = Modifier.graphicsLayer { rotationZ = rotation }
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                modifier = Modifier.graphicsLayer { rotationZ = rotation },
+                tint = textColor.copy(alpha = 0.5f)
+            )
         }
 
         AnimatedVisibility(
             visible = expanded,
-            enter = expandVertically(
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                expandFrom = Alignment.Top
-            ) + fadeIn(animationSpec = tween(durationMillis = 150, delayMillis = 75)),
-            exit = shrinkVertically(
-                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                shrinkTowards = Alignment.Top
-            ) + fadeOut(animationSpec = tween(durationMillis = 150))
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 8.dp, start = 4.dp, end = 4.dp)
-            ) { content() }
+            Column(modifier = Modifier.padding(start = 36.dp, top = 0.dp, bottom = 12.dp)) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpandableQA(question: String, answer: String, textColor: Color, subColor: Color) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { expanded = !expanded },
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = "• $question",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = textColor.copy(alpha = 0.9f),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Text(
+                text = answer,
+                style = MaterialTheme.typography.bodySmall,
+                color = subColor,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(start = 12.dp, top = 6.dp, bottom = 4.dp)
+            )
         }
     }
 }
