@@ -5,6 +5,7 @@
 *.aab
 *.ap_
 *.dex
+/app/release/
 
 # --- Android Studio / IntelliJ ---
 # Excludes IDE-specific configuration and local paths

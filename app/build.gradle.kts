@@ -14,8 +14,8 @@ android {
         applicationId = "com.ben.periodt"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.3"
+        versionCode = 4
+        versionName = "1.0.4"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
