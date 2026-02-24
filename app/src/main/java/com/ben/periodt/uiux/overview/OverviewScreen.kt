@@ -8,8 +8,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,6 +53,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -69,6 +72,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
@@ -81,6 +86,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
 import com.ben.periodt.uiux.shared.getConfidenceLabel
 import com.ben.periodt.uiux.shared.getCycleConfidence
@@ -278,7 +284,6 @@ fun OverviewScreen(
     )
 }
 
-// ---------- Settings dialog and helpers ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsDialog(
@@ -290,21 +295,22 @@ fun SettingsDialog(
 ) {
     if (!show) return
 
-    // --- State ---
     var isFaqExpanded by remember { mutableStateOf(false) }
     var isPrivacyExpanded by remember { mutableStateOf(false) }
-    var isAboutExpanded by remember { mutableStateOf(true) } // Open by default
+    var isAboutExpanded by remember { mutableStateOf(true) }
 
-    // --- Aesthetic Palette ---
     val isDark = isSystemInDarkTheme()
-    val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
-    val gradMid = if (isDark) Color(0xFF7288A0) else Color(0xFF8799B0)
-    val gradBottom = if (isDark) Color(0xFF5A7396) else Color(0xFF6E87A7)
 
-    val onGradient = Color.White
-    val contentSurface = if (isDark) Color.Black else Color.White
-    val textPrimary = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
-    val textSub = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
+    val dialogBrush = if (isDark) {
+        Brush.linearGradient(listOf(Color(0xFFC8D4E5), Color(0xFF8089D2)))
+    } else {
+        Brush.linearGradient(listOf(Color(0xFF2C3F70), Color(0xFF2C3F70)))
+    }
+
+    val contentSurface = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF1B1B1B)
 
     Dialog(
         onDismissRequest = onClose,
@@ -313,21 +319,24 @@ fun SettingsDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .fillMaxHeight(0.85f) // Taller dialog to fit content
+                .fillMaxHeight(0.85f)
                 .padding(vertical = 24.dp),
             shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(26.dp))
-                    .background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
-                    .background(Color.White.copy(alpha = 0.08f))
+                    .background(dialogBrush)
+                    .padding(0.dp)
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-
-                    // --- HEADER ---
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(contentSurface)
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -337,39 +346,36 @@ fun SettingsDialog(
                     ) {
                         Text(
                             text = "Settings",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = onGradient
+                            fontFamily = BricolageGrotesque,
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = textPrimary
                         )
                         Box(
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f))
+                                .background(textSub.copy(alpha = 0.1f))
                                 .clickable(onClick = onClose),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close",
-                                tint = onGradient,
+                                tint = textPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
                     }
 
-                    // --- CONTENT AREA ---
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                            .background(contentSurface)
                             .padding(horizontal = 24.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
                         Spacer(Modifier.height(24.dp))
 
-                        // 1. DATA MANAGEMENT
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             SectionLabel("Data Management", Icons.Rounded.Storage, textPrimary)
 
@@ -379,6 +385,8 @@ fun SettingsDialog(
                                 icon = Icons.Rounded.Upload,
                                 color = textPrimary,
                                 subColor = textSub,
+                                iconBg = textSub.copy(alpha = 0.1f),
+                                iconTint = textPrimary,
                                 onClick = onExport
                             )
 
@@ -388,6 +396,8 @@ fun SettingsDialog(
                                 icon = Icons.Rounded.Download,
                                 color = textPrimary,
                                 subColor = textSub,
+                                iconBg = textSub.copy(alpha = 0.1f),
+                                iconTint = textPrimary,
                                 onClick = onImport
                             )
 
@@ -397,6 +407,8 @@ fun SettingsDialog(
                                 icon = Icons.Rounded.DeleteForever,
                                 color = Color(0xFFEF5350),
                                 subColor = textSub,
+                                iconBg = Color(0xFFEF5350).copy(alpha = 0.1f),
+                                iconTint = Color(0xFFEF5350),
                                 onClick = onClearData,
                                 isDestructive = true
                             )
@@ -404,13 +416,12 @@ fun SettingsDialog(
 
                         Spacer(Modifier.height(24.dp))
 
-                        // 2. PRIVACY POLICY
                         ExpandableSection(
                             title = "Privacy Policy",
                             expanded = isPrivacyExpanded,
                             onToggle = { isPrivacyExpanded = !isPrivacyExpanded },
                             icon = Icons.Rounded.PrivacyTip,
-                            accentColor = textPrimary,
+                            iconColor = textPrimary,
                             textColor = textPrimary
                         ) {
                             Text(
@@ -419,6 +430,8 @@ fun SettingsDialog(
                                         "• All your cycle history, notes, and preferences are stored locally on this device.\n" +
                                         "• If you delete the app, your data is deleted unless you have exported a backup.\n" +
                                         "• We do not track your location or use analytics cookies.",
+                                fontFamily = BricolageGrotesque,
+                                fontWeight = FontWeight.Normal,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = textSub,
                                 lineHeight = 20.sp,
@@ -428,13 +441,12 @@ fun SettingsDialog(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // 3. FAQs (Restored)
                         ExpandableSection(
                             title = "Frequently Asked Questions",
                             expanded = isFaqExpanded,
                             onToggle = { isFaqExpanded = !isFaqExpanded },
                             icon = Icons.Rounded.HelpOutline,
-                            accentColor = textPrimary,
+                            iconColor = textPrimary,
                             textColor = textPrimary
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -468,34 +480,37 @@ fun SettingsDialog(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // 4. ABOUT
                         ExpandableSection(
                             title = "About Periodt",
                             expanded = isAboutExpanded,
                             onToggle = { isAboutExpanded = !isAboutExpanded },
                             icon = Icons.Rounded.Info,
-                            accentColor = textPrimary,
+                            iconColor = textPrimary,
                             textColor = textPrimary
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 4.dp)) {
                                 Text(
-                                    "Periodt v1.0.4",
+                                    text = "Periodt v1.0.4",
+                                    fontFamily = BricolageGrotesque,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = textPrimary
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    "Designed to be simple, private, and aesthetic. Thank you for using our app to track your health journey.",
+                                    text = "Designed to be simple, private, and aesthetic. Thank you for using our app to track your health journey.",
+                                    fontFamily = BricolageGrotesque,
+                                    fontWeight = FontWeight.Normal,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = textSub
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Text(
-                                    "Developed with ❤️ by Ben",
+                                    text = "Developed with ❤️ by Ben",
+                                    fontFamily = BricolageGrotesque,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = gradBottom
+                                    color = accentColor
                                 )
                             }
                         }
@@ -503,115 +518,6 @@ fun SettingsDialog(
                         Spacer(Modifier.height(32.dp))
                     }
                 }
-            }
-        }
-    }
-}
-
-// --- HELPER COMPOSABLES ---
-
-@Composable
-private fun SectionLabel(text: String, icon: ImageVector, tint: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(imageVector = icon, contentDescription = null, tint = tint.copy(alpha = 0.8f), modifier = Modifier.size(18.dp))
-        Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = tint)
-    }
-}
-
-@Composable
-private fun SettingsActionCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    color: Color,
-    subColor: Color,
-    onClick: () -> Unit,
-    isDestructive: Boolean = false
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isDestructive) color.copy(alpha = 0.08f) else subColor.copy(alpha = 0.08f))
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
-        }
-
-        Spacer(Modifier.width(16.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = color)
-            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = subColor)
-        }
-
-        Icon(
-            imageVector = Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = subColor.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-private fun ExpandableSection(
-    title: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    icon: ImageVector,
-    accentColor: Color,
-    textColor: Color,
-    content: @Composable () -> Unit
-) {
-    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "arrowRotation")
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(onClick = onToggle)
-                .padding(vertical = 12.dp, horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = accentColor.copy(alpha = 0.8f),
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = textColor,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse" else "Expand",
-                modifier = Modifier.graphicsLayer { rotationZ = rotation },
-                tint = textColor.copy(alpha = 0.5f)
-            )
-        }
-
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            Column(modifier = Modifier.padding(start = 36.dp, top = 0.dp, bottom = 12.dp)) {
-                content()
             }
         }
     }
@@ -631,6 +537,7 @@ private fun ExpandableQA(question: String, answer: String, textColor: Color, sub
         ) {
             Text(
                 text = "• $question",
+                fontFamily = BricolageGrotesque,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                 color = textColor.copy(alpha = 0.9f),
                 modifier = Modifier.weight(1f)
@@ -639,6 +546,8 @@ private fun ExpandableQA(question: String, answer: String, textColor: Color, sub
         AnimatedVisibility(visible = expanded) {
             Text(
                 text = answer,
+                fontFamily = BricolageGrotesque,
+                fontWeight = FontWeight.Normal,
                 style = MaterialTheme.typography.bodySmall,
                 color = subColor,
                 lineHeight = 18.sp,
@@ -648,50 +557,190 @@ private fun ExpandableQA(question: String, answer: String, textColor: Color, sub
     }
 }
 
-// ---------- Gradient Stat card ----------
+@Composable
+private fun SectionLabel(text: String, icon: ImageVector, iconTint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+        Text(
+            text = text,
+            fontFamily = BricolageGrotesque,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = iconTint
+        )
+    }
+}
+
+@Composable
+private fun SettingsActionCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    color: Color,
+    subColor: Color,
+    iconBg: Color,
+    iconTint: Color,
+    onClick: () -> Unit,
+    isDestructive: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isDestructive) color.copy(alpha = 0.05f) else subColor.copy(alpha = 0.05f))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(iconBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+        }
+
+        Spacer(Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = color
+            )
+            Text(
+                text = subtitle,
+                fontFamily = BricolageGrotesque,
+                fontWeight = FontWeight.Normal,
+                style = MaterialTheme.typography.labelSmall,
+                color = subColor
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = subColor.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun ExpandableSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    icon: ImageVector,
+    iconColor: Color,
+    textColor: Color,
+    content: @Composable () -> Unit
+) {
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "arrowRotation")
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onToggle)
+                .padding(vertical = 12.dp, horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                text = title,
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = textColor,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                modifier = Modifier.graphicsLayer { rotationZ = rotation },
+                tint = textColor.copy(alpha = 0.5f)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(modifier = Modifier.padding(start = 42.dp, top = 0.dp, bottom = 12.dp)) {
+                content()
+            }
+        }
+    }
+}
+
+
 @Composable
 private fun StatCard(
     title: String,
     value: String,
-    gradTop: Color,
-    gradMid: Color,
-    gradBottom: Color,
-    onGradient: Color,
-    onGradientMuted: Color,
+    gradTop: Color, // Kept for API compatibility but used as Accent
+    gradMid: Color, // Unused
+    gradBottom: Color, // Unused
+    onGradient: Color, // Used as Primary Text
+    onGradientMuted: Color, // Used as Secondary Text
     modifier: Modifier = Modifier
 ) {
-    ElevatedCard(
+    val isDark = isSystemInDarkTheme()
+
+    // AESTHETIC MAPPING
+    // Surface: Dark #1B1B1B / Light White
+    val surfaceColor = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.6f) else Color.White
+
+    // Changed to Card to remove elevation/shadows
+    Card(
         modifier = modifier,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.Transparent),
-        shape = RoundedCornerShape(16.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        shape = RoundedCornerShape(26.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Removed elevation
     ) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
                 .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
-                .background(Color.White.copy(alpha = 0.06f))
-                .padding(16.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(surfaceColor)
+                // Border removed
+                .padding(20.dp)
         ) {
             Column(horizontalAlignment = Alignment.Start) {
                 Text(
                     text = value,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = onGradient
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = if(isDark) Color.White else Color(0xFF0F172A)
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = onGradientMuted
+                    text = title.uppercase(),
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Normal,
+                        letterSpacing = 1.sp
+                    ),
+                    color = if(isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
                 )
             }
         }
     }
 }
 
-// ---------- Minimal chart card ----------
+// ---------- Minimal Chart Card (Modern Update) ----------
 @Composable
 private fun MinimalChartCard(
     title: String,
@@ -699,155 +748,160 @@ private fun MinimalChartCard(
     titleColor: Color,
     content: @Composable () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
+    // Explicitly override surface for dark mode if needed
+    val cardSurface = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.6f) else surface
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = cardSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp), // Removed elevation
+        border = null // Removed border
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = titleColor
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(24.dp))
             content()
         }
     }
 }
 
+// ---------- Blood Color Pie Chart ----------
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BloodColorPieChart(
-    data: List<Pair<String, Float>>,  // (label, fraction)
+    data: List<Pair<String, Float>>,
     surface: Color,
     labelColor: Color,
     modifier: Modifier = Modifier
 ) {
     if (data.isEmpty()) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Text("No data yet", style = MaterialTheme.typography.bodyMedium, color = labelColor)
+        Box(modifier.height(200.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = "No data yet",
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.bodyMedium,
+                color = labelColor.copy(alpha = 0.5f)
+            )
         }
         return
     }
 
-    // Normalize
     val total = data.sumOf { it.second.toDouble() }.toFloat().coerceAtLeast(0.0001f)
     val normalized = data
         .map { it.first.lowercase() to (it.second / total) }
         .filter { it.second > 0f }
 
-    // Palette
     val colorMap = mapOf(
-        "bright red" to Color(0xFFE53935),
-        "dark red"   to Color(0xFFC62828),
-        "brown"      to Color(0xFF8D6E63),
-        "pink"       to Color(0xFFF48FB1),
-        "orange"     to Color(0xFFFFA726),
-        "purple"     to Color(0xFF8E24AA)
+        "bright red" to Color(0xFFFF5252),
+        "dark red"   to Color(0xFFD32F2F),
+        "brown"      to Color(0xFFA1887F),
+        "pink"       to Color(0xFFF06292),
+        "orange"     to Color(0xFFFFB74D),
+        "purple"     to Color(0xFFBA68C8)
     )
 
     val density = LocalDensity.current
 
-    // Build a human legend list for the bottom row(s)
     val legendItems = normalized.map { (label, frac) ->
         val pct = (frac * 100f)
         Triple(label.replaceFirstChar { it.uppercase() }, pct, colorMap[label] ?: Color(0xFF90A4AE))
     }
 
     Column(modifier = modifier) {
-        // Donut with percent labels inside
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .weight(1f, fill = true)
+                .height(220.dp)
         ) {
-            drawRect(color = surface, topLeft = Offset.Zero, size = size)
-
-            val padding = 20.dp.toPx()
+            val padding = 10.dp.toPx()
             val diameter = minOf(size.width, size.height) - padding * 2
             val radius = diameter / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
-
-            val ring = radius * 0.2f
-            val stroke = Stroke(width = radius - ring)
+            val ringWidth = 50.dp.toPx()
+            val stroke = Stroke(width = ringWidth, cap = StrokeCap.Round)
 
             var startAngle = -90f
+            val gapAngle = 2f
 
             normalized.forEach { (label, frac) ->
-                val sweep = frac * 360f
+                val sweep = (frac * 360f) - gapAngle
                 val key = label.lowercase()
                 val col = colorMap[key] ?: Color(0xFF90A4AE)
 
-                // Slice
-                drawArc(
-                    color = col,
-                    startAngle = startAngle,
-                    sweepAngle = sweep,
-                    useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                    style = stroke
-                )
+                if (sweep > 0) {
+                    drawArc(
+                        color = col,
+                        startAngle = startAngle,
+                        sweepAngle = sweep,
+                        useCenter = false,
+                        topLeft = Offset(center.x - (radius - ringWidth/2), center.y - (radius - ringWidth/2)),
+                        size = androidx.compose.ui.geometry.Size((radius - ringWidth/2) * 2, (radius - ringWidth/2) * 2),
+                        style = stroke
+                    )
+                }
 
-                // Percentage label inside slice (skip tiny slices)
                 val pct = (frac * 100f)
-                if (pct >= 4f) { // avoid clutter under 4%
+                if (pct >= 8f) {
                     val midAngleDeg = startAngle + sweep / 2f
                     val midAngleRad = Math.toRadians(midAngleDeg.toDouble()).toFloat()
-                    // Place text between ring and outer radius
-                    val textR = ring + (radius - ring) * 0.9f
+                    val textR = radius - ringWidth / 2
                     val tx = center.x + textR * kotlin.math.cos(midAngleRad)
                     val ty = center.y + textR * kotlin.math.sin(midAngleRad)
 
                     val paint = android.graphics.Paint().apply {
                         color = Color.White.toArgb()
-                        textSize = with(density) { 11.sp.toPx() }
+                        textSize = with(density) { 12.sp.toPx() }
                         textAlign = android.graphics.Paint.Align.CENTER
+                        // Set native Typeface to match BricolageGrotesque Bold
+                        typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
                         isAntiAlias = true
                     }
+                    val textHeight = paint.descent() - paint.ascent()
+                    val textOffset = (textHeight / 2) - paint.descent()
+
                     drawContext.canvas.nativeCanvas.drawText(
                         "${pct.toInt()}%",
                         tx,
-                        ty + 8.dp.toPx(),
+                        ty + textOffset,
                         paint
                     )
                 }
-
-                startAngle += sweep
+                startAngle += (sweep + gapAngle)
             }
-
-            // Donut center
-            drawCircle(color = surface, radius = ring - 2.dp.toPx(), center = center)
         }
 
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(24.dp))
 
-        // Bottom legend: wrap items centered
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            maxItemsInEachRow = Int.MAX_VALUE,
+                .padding(horizontal = 4.dp),
+            maxItemsInEachRow = 3,
             horizontalArrangement = Arrangement.Center,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             legendItems.forEach { (name, pct, color) ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(color.copy(alpha = 0.1f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(color)
-                    )
-                    Spacer(Modifier.width(6.dp))
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "$name",
-                        style = MaterialTheme.typography.labelMedium,
+                        text = name,
+                        fontFamily = BricolageGrotesque, // Applied font
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = labelColor
                     )
                 }
@@ -855,8 +909,6 @@ private fun BloodColorPieChart(
         }
     }
 }
-
-
 
 // ---------- Sorting helpers for charts ----------
 private fun cyclesSorted(cycles: List<PeriodViewModel.Cycle>): List<PeriodViewModel.Cycle> =
@@ -892,7 +944,7 @@ private fun bloodColorDistributionVM(cycles: List<PeriodViewModel.Cycle>): List<
         .map { it.key to (it.value.toFloat() / total.toFloat()) }
 }
 
-// ---------- Charts ----------
+// ---------- Charts (Line Chart Updated) ----------
 @Composable
 private fun ScrollableLineChart(
     points: List<Pair<Float, Float>>,
@@ -911,8 +963,8 @@ private fun ScrollableLineChart(
     val scope = rememberCoroutineScope()
 
     if (points.isEmpty()) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            Text("No data yet", style = MaterialTheme.typography.bodyMedium, color = labelColor)
+        Box(modifier.height(200.dp), contentAlignment = Alignment.Center) {
+            Text("No data yet", style = MaterialTheme.typography.bodyMedium, color = labelColor.copy(alpha = 0.5f))
         }
         return
     }
@@ -921,30 +973,29 @@ private fun ScrollableLineChart(
         scope.launch {
             hScroll.animateScrollTo(
                 hScroll.maxValue,
-                animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing)
+                animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing)
             )
         }
     }
 
-    Row(modifier = modifier) {
+    // Modern layout: Y-Axis floating on left, Chart scrolling
+    Row(modifier = modifier.height(220.dp)) {
         YAxisLabels(
             yLabels = yLabels,
-            labelColor = labelColor,
-            axisColor = axisColor,
+            labelColor = labelColor.copy(alpha = 0.6f),
+            axisColor = Color.Transparent, // Hidden Y-axis line for cleaner look
             modifier = Modifier
-                .width(32.dp)
+                .width(36.dp)
                 .fillMaxHeight()
         )
 
-        // 1. Measure the exact available screen space FIRST (no scroll modifier here)
         BoxWithConstraints(
             modifier = Modifier.weight(1f)
         ) {
-            // This 'maxWidth' is explicitly pulling from the BoxWithConstraints scope
             val minChartWidth = this.maxWidth
-            val dynamicWidth = (points.size * 64.dp)
+            // Wider spacing for more breathing room
+            val dynamicWidth = (points.size * 70.dp).coerceAtLeast(minChartWidth)
 
-            // 2. Apply the scrolling INSIDE the bounded area
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -956,12 +1007,12 @@ private fun ScrollableLineChart(
                     lineColor = lineColor,
                     yMax = yMax,
                     showArea = showArea,
-                    gridColor = gridColor,
-                    axisColor = axisColor,
-                    labelColor = labelColor,
+                    gridColor = gridColor.copy(alpha = 0.05f), // Very subtle grid
+                    axisColor = axisColor.copy(alpha = 0.1f),
+                    labelColor = labelColor.copy(alpha = 0.7f),
                     surface = surface,
                     modifier = Modifier
-                        .width(maxOf(minChartWidth, dynamicWidth))
+                        .width(dynamicWidth)
                         .fillMaxHeight()
                 )
             }
@@ -978,30 +1029,26 @@ private fun YAxisLabels(
 ) {
     val density = LocalDensity.current
     Canvas(modifier) {
-        val padding = 8.dp.toPx()
-        val bottomPadding = 48.dp.toPx()
-        val chartHeight = size.height - padding - bottomPadding
-        val chartTop = padding
-        val chartBottom = chartTop + chartHeight
-
-        drawLine(
-            color = axisColor,
-            start = Offset(size.width - 1.dp.toPx(), chartTop),
-            end = Offset(size.width - 1.dp.toPx(), chartBottom),
-            strokeWidth = 1.dp.toPx()
-        )
+        val bottomPadding = 40.dp.toPx()
+        val topPadding = 20.dp.toPx()
+        val chartHeight = size.height - bottomPadding - topPadding
+        val chartBottom = size.height - bottomPadding
 
         yLabels.forEachIndexed { index, label ->
             val y = chartBottom - (index.toFloat() / (yLabels.size - 1)) * chartHeight
             val paint = android.graphics.Paint().apply {
                 color = labelColor.toArgb()
-                textSize = with(density) { 11.sp.toPx() }
+                textSize = with(density) { 10.sp.toPx() }
                 textAlign = android.graphics.Paint.Align.RIGHT
+                typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
             }
+            val textHeight = paint.descent() - paint.ascent()
+            val textOffset = (textHeight / 2) - paint.descent()
+
             drawContext.canvas.nativeCanvas.drawText(
                 label,
-                size.width - 6.dp.toPx(),
-                y + 4.dp.toPx(),
+                size.width - 8.dp.toPx(),
+                y + textOffset,
                 paint
             )
         }
@@ -1023,46 +1070,45 @@ private fun LineChartContent(
 ) {
     val density = LocalDensity.current
     Canvas(modifier) {
-        // --- UPDATED PADDING MATH ---
-        val horizontalPadding = 32.dp.toPx() // Pulls chart inwards so text doesn't clip
-        val bottomPadding = 48.dp.toPx()
-        val topPadding = 16.dp.toPx()
+        val horizontalPadding = 32.dp.toPx()
+        val bottomPadding = 40.dp.toPx()
+        val topPadding = 20.dp.toPx()
 
         val chartLeft = horizontalPadding
         val chartRight = size.width - horizontalPadding
         val chartWidth = chartRight - chartLeft
-        val chartTop = topPadding
         val chartBottom = size.height - bottomPadding
-        val chartHeight = chartBottom - chartTop
+        val chartHeight = chartBottom - topPadding
 
-        drawRect(color = surface, topLeft = Offset.Zero, size = size)
-
-        // Horizontal Grid Lines
         val ySteps = 4
+        val gridPaint = android.graphics.Paint().apply {
+            color = gridColor.toArgb()
+            strokeWidth = 1.dp.toPx()
+            pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+        }
+
         repeat(ySteps + 1) { i ->
             val y = chartBottom - (i.toFloat() / ySteps) * chartHeight
-            drawLine(gridColor, Offset(chartLeft, y), Offset(chartRight, y), 1.dp.toPx())
+            drawContext.canvas.nativeCanvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
         }
-        drawLine(axisColor, Offset(chartLeft, chartBottom), Offset(chartRight, chartBottom), 1.dp.toPx())
+
+        drawLine(axisColor, Offset(chartLeft, chartBottom), Offset(chartRight, chartBottom), 1.5.dp.toPx())
 
         val denom = (points.size - 1).coerceAtLeast(1).toFloat()
 
-        // Vertical guides + X labels
         points.forEachIndexed { index, (x, _) ->
             val xPos = chartLeft + (x / denom) * chartWidth
-            drawLine(gridColor.copy(alpha = 0.7f), Offset(xPos, chartTop), Offset(xPos, chartBottom), 1.dp.toPx())
-
             if (index < dates.size) {
                 val paint = android.graphics.Paint().apply {
                     color = labelColor.toArgb()
                     textSize = with(density) { 10.sp.toPx() }
                     textAlign = android.graphics.Paint.Align.CENTER
+                    typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
                 }
-                // No more clamping needed because of horizontalPadding
                 drawContext.canvas.nativeCanvas.drawText(
                     dates[index],
                     xPos,
-                    chartBottom + 22.dp.toPx(),
+                    size.height - 10.dp.toPx(),
                     paint
                 )
             }
@@ -1070,7 +1116,6 @@ private fun LineChartContent(
 
         val linePath = Path()
         val areaPath = Path()
-
         var prevXPos = 0f
         var prevYPos = 0f
 
@@ -1086,19 +1131,9 @@ private fun LineChartContent(
                 }
             } else {
                 val controlPointX = (prevXPos + xPos) / 2f
-
-                linePath.cubicTo(
-                    x1 = controlPointX, y1 = prevYPos,
-                    x2 = controlPointX, y2 = yPos,
-                    x3 = xPos, y3 = yPos
-                )
-
+                linePath.cubicTo(controlPointX, prevYPos, controlPointX, yPos, xPos, yPos)
                 if (showArea) {
-                    areaPath.cubicTo(
-                        x1 = controlPointX, y1 = prevYPos,
-                        x2 = controlPointX, y2 = yPos,
-                        x3 = xPos, y3 = yPos
-                    )
+                    areaPath.cubicTo(controlPointX, prevYPos, controlPointX, yPos, xPos, yPos)
                 }
             }
             prevXPos = xPos
@@ -1113,22 +1148,21 @@ private fun LineChartContent(
             drawPath(
                 areaPath,
                 brush = Brush.verticalGradient(
-                    listOf(lineColor.copy(0.18f), lineColor.copy(0.04f)),
-                    chartTop,
-                    chartBottom
+                    listOf(lineColor.copy(0.25f), lineColor.copy(0.0f)),
+                    startY = topPadding,
+                    endY = chartBottom
                 )
             )
         }
 
-        drawPath(linePath, color = lineColor, style = Stroke(width = 2.5.dp.toPx()))
+        drawPath(linePath, color = lineColor, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
         points.forEach { (x, y) ->
             val xPos = chartLeft + (x / denom) * chartWidth
             val yPos = chartBottom - (y / yMax) * chartHeight
-
-            drawCircle(lineColor.copy(alpha = 0.18f), 8.dp.toPx(), Offset(xPos, yPos))
-            drawCircle(lineColor, 3.5.dp.toPx(), Offset(xPos, yPos))
-            drawCircle(Color.White, 2.dp.toPx(), Offset(xPos, yPos))
+            drawCircle(lineColor.copy(alpha = 0.2f), 6.dp.toPx(), Offset(xPos, yPos))
+            drawCircle(surface, 3.dp.toPx(), Offset(xPos, yPos))
+            drawCircle(lineColor, 3.dp.toPx(), Offset(xPos, yPos), style = Stroke(width = 1.5.dp.toPx()))
         }
     }
 }

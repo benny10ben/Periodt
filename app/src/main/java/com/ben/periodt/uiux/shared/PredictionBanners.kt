@@ -1,6 +1,8 @@
 package com.ben.periodt.uiux.shared
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,10 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ben.periodt.ui.theme.BricolageGrotesque
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -33,23 +37,33 @@ fun UpcomingBannerEnhanced(
     gradBottom: Color,
     onGradient: Color,
     onGradientMuted: Color,
-    // New: pass most-likely start date for days-left calculation (ISO yyyy-MM-dd or LocalDate)
     mostLikelyDate: LocalDate? = null
 ) {
+    val isDark = isSystemInDarkTheme()
+
+    val surfaceColor = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.6f) else Color.White
+    val accentColor = Color(0xFFe8ebed)
+
+    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+
+    val pillTextColor = if (isDark) Color.White else Color(0xFF1B1B1B)
+
+    val badgeAlpha = if (isDark) 0.1f else 0.4f
+
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(22.dp))
-                .background(Brush.verticalGradient(listOf(gradTop, gradMid, gradBottom)))
-                .background(Color.White.copy(alpha = 0.06f))
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(surfaceColor)
+                .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
-            // Compute days-left once
             val daysLeftLabel = remember(mostLikelyDate) {
                 mostLikelyDate?.let { target ->
                     val today = LocalDate.now()
@@ -70,44 +84,56 @@ fun UpcomingBannerEnhanced(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
-                        title,
-                        color = onGradient,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        text = title,
+                        fontFamily = BricolageGrotesque,
+                        color = textPrimary,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier.weight(1f)
                     )
                     ConfidenceIndicator(
                         confidence = confidence,
                         label = confidenceLabel,
-                        onGradient = onGradient,
-                        onGradientMuted = onGradientMuted
+                        accentColor = accentColor,
+                        textColorMuted = textSecondary
                     )
                 }
-                Spacer(Modifier.height(6.dp))
+
+                Spacer(Modifier.height(12.dp))
+
                 Text(
-                    windowText,
-                    color = onGradient.copy(alpha = 0.95f),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                    text = windowText,
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Normal,
+                    color = textPrimary.copy(alpha = 0.9f),
+                    style = MaterialTheme.typography.bodyMedium
                 )
-                Spacer(Modifier.height(4.dp))
+
+                Spacer(Modifier.height(10.dp))
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        mostLikely,
-                        color = onGradient.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.bodySmall
+                        text = mostLikely,
+                        fontFamily = BricolageGrotesque,
+                        fontWeight = FontWeight.Normal,
+                        color = textSecondary,
+                        style = MaterialTheme.typography.bodyMedium
                     )
+
                     if (badge.isNotBlank()) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(onGradient.copy(alpha = 0.16f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(accentColor.copy(alpha = badgeAlpha))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                badge,
-                                color = onGradient,
+                                text = badge,
+                                fontFamily = BricolageGrotesque,
+                                fontWeight = FontWeight.SemiBold,
+                                color = pillTextColor,
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
@@ -115,19 +141,19 @@ fun UpcomingBannerEnhanced(
                 }
             }
 
-            // Bottom-right days-left label
             if (!daysLeftLabel.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(top = 8.dp) // keeps off text above if it wraps
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(onGradient.copy(alpha = 0.14f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(color = 0xFF8089d2))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = daysLeftLabel,
-                        color = onGradient,
+                        fontFamily = BricolageGrotesque,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
@@ -140,27 +166,32 @@ fun UpcomingBannerEnhanced(
 fun ConfidenceIndicator(
     confidence: Float,
     label: String,
-    onGradient: Color,
-    onGradientMuted: Color
-) {
+    accentColor: Color,
+    textColorMuted: Color,
+
+    ) {
+    val dotColor = Color(0xFF8089D2)
+
     Column(
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             repeat(5) { index ->
-                val alpha = if (index < (confidence * 5).toInt()) 0.9f else 0.24f
+                val isActive = index < (confidence * 5).toInt()
                 Box(
                     modifier = Modifier
-                        .size(6.dp) // small dots; keep them subtle
+                        .size(8.dp)
                         .clip(CircleShape)
-                        .background(onGradient.copy(alpha = alpha))
+                        .background(if (isActive) dotColor else dotColor.copy(alpha = 0.4f))
                 )
             }
         }
         Text(
             text = label,
-            color = onGradientMuted,
+            fontFamily = BricolageGrotesque,
+            fontWeight = FontWeight.Normal,
+            color = textColorMuted,
             style = MaterialTheme.typography.labelSmall
         )
     }
