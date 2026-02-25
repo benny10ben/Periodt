@@ -1,36 +1,30 @@
 package com.ben.periodt
 
 import android.Manifest
-import android.app.AlarmManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.core.content.ContextCompat
 import com.ben.periodt.ui.theme.PeriodTTheme
 import com.ben.periodt.uiux.MainScreen
 import com.ben.periodt.uiux.onboarding.OnboardingNavigator
-import androidx.compose.animation.*
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
 
-    // ---- Notification permission request (Android 13+) ----
     private var onNotifResult: ((Boolean) -> Unit)? = null
 
     private val requestPostNotifications = registerForActivityResult(
@@ -57,40 +51,38 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        ensureReminderChannel(applicationContext) // safe to call repeatedly at startup [web:11][web:26]
+        ensureReminderChannel(applicationContext)
         super.onCreate(savedInstanceState)
-        System.loadLibrary("sqlcipher")  // ✅ Required for sqlcipher-android
-
+        System.loadLibrary("sqlcipher")
 
         setContent {
             PeriodTTheme {
                 val ctx = applicationContext
                 var showOnboarding by remember { mutableStateOf(!OnboardingPrefs.isDone(ctx)) }
 
-                Surface(color = Color.Black) {
-                    androidx.compose.animation.AnimatedContent(
+                Surface(color = Color.Transparent) {
+                    AnimatedContent(
                         targetState = showOnboarding,
                         transitionSpec = {
                             if (!targetState) {
-                                // CONTINUOUS SCROLL LOGIC:
-                                // Both screens move the full distance of the screen height
                                 slideInVertically(
                                     animationSpec = tween(1000, easing = LinearOutSlowInEasing),
-                                    initialOffsetY = { fullHeight -> fullHeight } // Main starts at bottom
+                                    initialOffsetY = { it }
                                 ).togetherWith(
                                     slideOutVertically(
                                         animationSpec = tween(1000, easing = LinearOutSlowInEasing),
-                                        targetOffsetY = { fullHeight -> -fullHeight } // Onboarding moves out top
+                                        targetOffsetY = { -it }
                                     )
                                 ).apply {
-                                    // Set to false to prevent the cross-fade/hover look
-                                    // This makes them behave like a single physical sheet
                                     targetContentZIndex = 1f
                                 }
                             } else {
                                 fadeIn(tween(1000)) togetherWith fadeOut(tween(1000))
                             }
                         },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RectangleShape),
                         label = "OnboardingToMainScroll"
                     ) { isOnboarding ->
                         if (isOnboarding) {
@@ -108,8 +100,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-
-
     }
 
     private fun ensureReminderChannel(context: Context) {
@@ -118,11 +108,9 @@ class MainActivity : ComponentActivity() {
                 "period_reminders",
                 "Period reminders",
                 android.app.NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Notifies 2 days before predicted period"
-            }
+            ).apply { description = "Notifies 2 days before predicted period" }
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            nm.createNotificationChannel(channel) // idempotent at app start [web:11][web:26]
+            nm.createNotificationChannel(channel)
         }
     }
 

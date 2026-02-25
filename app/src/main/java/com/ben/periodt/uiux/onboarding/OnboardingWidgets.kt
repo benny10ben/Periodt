@@ -24,7 +24,9 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,8 +36,18 @@ import com.ben.periodt.ui.theme.BricolageGrotesque
 @Composable
 fun AnimatedIconBackground() {
     val isDark = isSystemInDarkTheme()
-    // Reduced alpha for a subtle, professional background drift
-    val iconColor = if (isDark) Color.White.copy(alpha = 0.4f) else Color(0xFF1B1B1B).copy(alpha = 0.2f)
+    val iconColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1B1B1B).copy(alpha = 0.6f)
+
+    // --- 1. ICON TO TEXT MAPPING ---
+    val iconLabels = remember {
+        mapOf(
+            Icons.Rounded.WaterDrop to "Hydration", Icons.Rounded.Eco to "Eco", Icons.Rounded.Air to "Breath", Icons.Rounded.WbSunny to "Sun",
+            Icons.Rounded.SelfImprovement to "Mind", Icons.Rounded.Spa to "Relax", Icons.Rounded.Bedtime to "Sleep", Icons.Rounded.Nightlight to "Rest",
+            Icons.Rounded.DirectionsRun to "Run", Icons.Rounded.DirectionsBike to "Cycle", Icons.Rounded.FitnessCenter to "Gym", Icons.Rounded.Favorite to "Heart",
+            Icons.Rounded.LocalFlorist to "Flora", Icons.Rounded.Pets to "Pets", Icons.Rounded.Park to "Nature", Icons.Rounded.NaturePeople to "Active",
+            Icons.Rounded.AcUnit to "Cold", Icons.Rounded.Bolt to "Power", Icons.Rounded.Tsunami to "Waves", Icons.Rounded.DeviceThermostat to "Temp"
+        )
+    }
 
     val allRows = remember {
         listOf(
@@ -44,16 +56,21 @@ fun AnimatedIconBackground() {
             listOf(Icons.Rounded.DirectionsRun, Icons.Rounded.DirectionsBike, Icons.Rounded.FitnessCenter, Icons.Rounded.Favorite),
             listOf(Icons.Rounded.LocalFlorist, Icons.Rounded.Pets, Icons.Rounded.Park, Icons.Rounded.NaturePeople),
             listOf(Icons.Rounded.AcUnit, Icons.Rounded.Bolt, Icons.Rounded.Tsunami, Icons.Rounded.DeviceThermostat),
-            listOf(Icons.Rounded.MusicNote, Icons.Rounded.Brush, Icons.Rounded.Palette, Icons.Rounded.AutoAwesome)
         )
     }
 
     val uniqueIcons = remember { allRows.flatten().distinct() }
     val painterMap = uniqueIcons.associateWith { rememberVectorPainter(it) }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "bg_drift")
+    // --- 2. TEXT MEASUREMENT ---
+    val textMeasurer = rememberTextMeasurer()
+    val textStyle = MaterialTheme.typography.labelSmall.copy(
+        fontFamily = BricolageGrotesque,
+        fontSize = 10.sp,
+        color = iconColor
+    )
 
-    // We use a 0f to 360f range for smoother float precision in long loops
+    val infiniteTransition = rememberInfiniteTransition(label = "bg_drift")
     val angle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -65,27 +82,22 @@ fun AnimatedIconBackground() {
     )
 
     val density = LocalDensity.current
-    val iconSize = with(density) { 28.dp.toPx() } // Slightly smaller for elegance
+    val iconSize = with(density) { 24.dp.toPx() }
     val spacing = with(density) { 70.dp.toPx() }
-    val rowHeight = with(density) { 70.dp.toPx() }
+    val rowHeight = with(density) { 80.dp.toPx() } // Increased slightly to fit text below
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val totalItemWidth = iconSize + spacing
 
         allRows.forEachIndexed { i, currentIcons ->
             val patternWidth = totalItemWidth * currentIcons.size
-
-            // DIFFERENT SPEEDS: Gives depth (Parallax effect)
             val rowSpeed = if (i % 2 == 0) 1.2f else 0.7f
             val direction = if (i % 2 == 0) 1f else -1f
-
-            // PHYSICS: Calculate progress based on the 360-degree loop
             val progress = (angle / 360f)
             val rawOffset = progress * patternWidth * direction * rowSpeed
             val currentOffset = rawOffset % patternWidth
 
             translate(top = i * rowHeight + rowHeight) {
-                // Seamless Looping: Draw just enough to cover screen + 1 pattern width
                 val startK = -1
                 val endK = (size.width / patternWidth).toInt() + 1
 
@@ -95,17 +107,30 @@ fun AnimatedIconBackground() {
                     currentIcons.forEachIndexed { index, icon ->
                         val xPos = currentOffset + loopOffset + (index * totalItemWidth)
 
-                        // DRAWING: Only paint if actually within screen bounds
                         if (xPos > -iconSize && xPos < size.width) {
                             val painter = painterMap[icon]
                             painter?.let {
                                 translate(left = xPos) {
+                                    // Draw Icon
                                     with(it) {
                                         draw(
                                             size = androidx.compose.ui.geometry.Size(iconSize, iconSize),
                                             colorFilter = ColorFilter.tint(iconColor)
                                         )
                                     }
+
+                                    // --- 3. DRAW TEXT BELOW ICON ---
+                                    val label = iconLabels[icon] ?: ""
+                                    val measuredText = textMeasurer.measure(label, textStyle)
+
+                                    drawText(
+                                        textLayoutResult = measuredText,
+                                        // Center text horizontally relative to icon
+                                        topLeft = Offset(
+                                            x = (iconSize / 2) - (measuredText.size.width / 2),
+                                            y = iconSize + 4.dp.toPx() // 4dp gap below icon
+                                        )
+                                    )
                                 }
                             }
                         }
@@ -140,54 +165,6 @@ fun OnboardingButton(text: String, onClick: () -> Unit) {
             fontSize = 17.sp,
             color = txtColor
         )
-    }
-}
-
-@Composable
-fun ModeCard(title: String, subtitle: String, isSelected: Boolean) {
-    val cardColor = if (isSelected) Color(0xFFD89046) else Color.Gray.copy(alpha = 0.1f)
-    val contentColor = Color.White
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(0.9f)
-            .clip(RoundedCornerShape(32.dp))
-            .background(cardColor)
-            .padding(24.dp)
-    ) {
-        Column(modifier = Modifier.align(Alignment.CenterStart)) {
-            Text(
-                text = title,
-                fontFamily = BricolageGrotesque,
-                style = MaterialTheme.typography.headlineMedium,
-                color = contentColor,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = subtitle,
-                fontFamily = BricolageGrotesque,
-                style = MaterialTheme.typography.bodyLarge,
-                color = contentColor.copy(alpha = 0.9f)
-            )
-        }
-        if (isSelected) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .size(44.dp)
-                    .background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    tint = Color(0xFFD89046),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
     }
 }
 

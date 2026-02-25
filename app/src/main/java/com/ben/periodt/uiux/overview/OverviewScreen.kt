@@ -144,7 +144,7 @@ fun OverviewScreen(
                     title = "Upcoming period",
                     windowText = "${prediction.minPeriodStart.pretty()} – ${prediction.maxPeriodStart.pretty()}",
                     mostLikely = "Most likely: ${prediction.mostLikelyPeriodStart.pretty()}",
-                    badge = "${prediction.periodLength} days",
+                    badge = "",
                     confidence = getCycleConfidence(prediction.cycleRegularity),
                     confidenceLabel = prediction.cycleRegularity.getDisplayName(),
                     gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
@@ -175,6 +175,17 @@ fun OverviewScreen(
                     badge = "Confidence ${(prediction.ovulationConfidence * 100).toInt()}%",
                     confidence = prediction.ovulationConfidence,
                     confidenceLabel = getConfidenceLabel(prediction.ovulationConfidence),
+                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient = onGradient, onGradientMuted = onGradientMuted
+                )
+            } else {
+                UpcomingBannerEnhanced(
+                    title = "Fertile window",
+                    windowText = "Not enough data",
+                    mostLikely = "Track more cycles for predictions",
+                    badge = "",
+                    confidence = 0f,
+                    confidenceLabel = "No data",
                     gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
                     onGradient = onGradient, onGradientMuted = onGradientMuted
                 )
@@ -315,7 +326,8 @@ private fun MinimalChartCard(
 ) {
     val isDark = isSystemInDarkTheme()
     // Explicitly override surface for dark mode if needed
-    val cardSurface = if (isDark) Color(0xFF1B1B1B) else surface
+    val cardSurface = if (isDark) Color(0xFF1B1B1B) else Color.White
+
 
     Card(
         modifier = Modifier.fillMaxWidth(),

@@ -1,4 +1,4 @@
-# Keep key attributes commonly required
+# Keep key attributes
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 
 # Entry points (manifest-referenced)
@@ -6,9 +6,6 @@
 -keep class ** extends android.app.Service
 -keep class ** extends android.content.BroadcastReceiver
 -keep class ** extends android.appwidget.AppWidgetProvider
-
-# If you have reflection on your own classes, add targeted keeps, e.g.:
-# -keep class com.ben.periodt.SomeReflectionTarget { *; }
 
 # Kotlin coroutines
 -keepclassmembers class kotlinx.coroutines.** { *; }
@@ -34,12 +31,17 @@
 -keep,includedescriptorclasses class net.sqlcipher.** { *; }
 -keep,includedescriptorclasses interface net.sqlcipher.** { *; }
 
-# AndroidX Security (if used later)
+# AndroidX Security
 -keep class androidx.security.crypto.** { *; }
 
-# Optional: strip debug logs
+# Strip debug logs
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);
     public static *** i(...);
 }
+
+# Gson — only keep the library itself, data classes are protected
+# via @Keep annotations directly in source (BackupData.kt)
+-keep class com.google.gson.** { *; }
+-dontwarn com.google.gson.**

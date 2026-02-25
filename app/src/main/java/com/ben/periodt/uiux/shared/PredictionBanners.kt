@@ -39,15 +39,10 @@ fun UpcomingBannerEnhanced(
 ) {
     val isDark = isSystemInDarkTheme()
 
-    // UPDATED: Removed alpha from dark mode background for a solid feel
     val surfaceColor = if (isDark) Color(0xFF1B1B1B) else Color.White
-
-    // UPDATED: Accent color now uses Yellow (0xFFD89046) in both modes for consistency
     val accentColor = Color(0xFFD89046)
-
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-
     val badgeAlpha = if (isDark) 0.15f else 0.1f
 
     Card(
@@ -76,10 +71,14 @@ fun UpcomingBannerEnhanced(
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
+
+                // ── Header row: title (left) + dots only (right) ──────────────
+                // The label is intentionally excluded from this Row so it cannot
+                // shift the dots upward relative to the title text.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = title,
@@ -88,13 +87,23 @@ fun UpcomingBannerEnhanced(
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier.weight(1f)
                     )
-                    ConfidenceIndicator(
+                    ConfidenceDots(
                         confidence = confidence,
-                        label = confidenceLabel,
-                        accentColor = accentColor,
-                        textColorMuted = textSecondary
+                        accentColor = accentColor
                     )
                 }
+
+                // Confidence label — flush to the end, sits just below the dots
+                Text(
+                    text = confidenceLabel,
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Normal,
+                    color = textSecondary,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentWidth(Alignment.End)
+                )
 
                 Spacer(Modifier.height(12.dp))
 
@@ -106,7 +115,7 @@ fun UpcomingBannerEnhanced(
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(4.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -131,7 +140,6 @@ fun UpcomingBannerEnhanced(
                                 text = badge,
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.SemiBold,
-                                // Text remains Yellow in dark mode, deeper tone in light mode
                                 color = if (isDark) accentColor else Color(0xFFB45309),
                                 style = MaterialTheme.typography.labelSmall
                             )
@@ -145,7 +153,6 @@ fun UpcomingBannerEnhanced(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .clip(RoundedCornerShape(50))
-                        // Replaced Brand Purple with the wellness Deep Green for high-contrast
                         .background(Color(0xFF2A3825))
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
@@ -162,36 +169,21 @@ fun UpcomingBannerEnhanced(
     }
 }
 
+// ── Dots only — no label, so top-alignment with title is pixel-perfect ──────
 @Composable
-fun ConfidenceIndicator(
+fun ConfidenceDots(
     confidence: Float,
-    label: String,
     accentColor: Color,
-    textColorMuted: Color,
 ) {
-    val dotColor = accentColor
-
-    Column(
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(5) { index ->
-                val isActive = index < (confidence * 5).toInt()
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(if (isActive) dotColor else dotColor.copy(alpha = 0.2f))
-                )
-            }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(5) { index ->
+            val isActive = index < (confidence * 5).toInt()
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(if (isActive) accentColor else accentColor.copy(alpha = 0.2f))
+            )
         }
-        Text(
-            text = label,
-            fontFamily = BricolageGrotesque,
-            fontWeight = FontWeight.Normal,
-            color = textColorMuted,
-            style = MaterialTheme.typography.labelSmall
-        )
     }
 }

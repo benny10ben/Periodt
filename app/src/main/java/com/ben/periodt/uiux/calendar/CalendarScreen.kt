@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -145,8 +146,10 @@ import androidx.compose.material.icons.rounded.Grain
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
@@ -235,9 +238,7 @@ fun CalendarScreen() {
             .padding(horizontal = 16.dp)
             .nestedScroll(nestedScrollConnection)
     ) {
-        Spacer(Modifier.height(8.dp))
-        CalendarLegend()
-
+        Spacer(Modifier.height(0.dp))
         // --- WRAPPER FOR SMOOTH RESIZE ---
         // animateContentSize() here is the magic. It tells the Column:
         // "When the child (CalendarCard) changes size, animate my own size smoothly."
@@ -317,7 +318,7 @@ fun CalendarLegend() {
         // 1. Completed Period (Alpha applied)
         LegendItem(
             color = ColorPeriodSolid.copy(alpha = 0.6f),
-            label = "Logged",
+            label = "Completed",
             textColor = textSub
         )
 
@@ -335,7 +336,7 @@ fun CalendarLegend() {
         // 3. Upcoming Period (Solid)
         LegendItem(
             color = ColorPeriodSolid,
-            label = "Predicted",
+            label = "Upcoming",
             textColor = textSub
         )
     }
@@ -375,7 +376,13 @@ fun CalendarCard(
     val isDark = isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
 
-    // Pure Black Theme Background
+    // --- PREMIUM UI TRANSITION SPEC ---
+    // We'll use this for the View Switcher since the scroll functions won't take it.
+    val slowFadeSpec = tween<Float>(
+        durationMillis = 500,
+        easing = CubicBezierEasing(0.25f, 1f, 0.5f, 1f)
+    )
+
     val backgroundBrush = if (isDark) {
         Brush.linearGradient(colors = listOf(Color(0xFF1b1b1b), Color(0xFF1b1b1b)))
     } else {
@@ -384,6 +391,7 @@ fun CalendarCard(
 
     val onCardContent = if (isDark) Color.White else Color.Black
     val onCardContentMuted = onCardContent.copy(alpha = 0.70f)
+    val accentBg = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -396,7 +404,7 @@ fun CalendarCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Column {
-                // Header Title Logic
+                // --- HEADER ---
                 val headerText = if (isCollapsed) {
                     val currentWeek = weekState.firstVisibleWeek
                     val dominantDate = currentWeek.days.getOrNull(3)?.date ?: currentWeek.days.first().date
@@ -405,20 +413,46 @@ fun CalendarCard(
                     state.firstVisibleMonth.yearMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + state.firstVisibleMonth.yearMonth.year
                 }
 
-                // Header Row
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text("‹", color = onCardContentMuted, fontSize = 24.sp, fontFamily = BricolageGrotesque, modifier = Modifier.width(40.dp).clickable {
-                        scope.launch { if (isCollapsed) weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.minusWeeks(1)) else state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.minusMonths(1)) }
-                    }, textAlign = TextAlign.Center)
+                    Text(headerText, fontFamily = BricolageGrotesque, color = onCardContent,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.padding(start = 4.dp))
 
-                    Text(headerText, fontFamily = BricolageGrotesque, color = onCardContent, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(12.dp))
 
-                    Text("›", color = onCardContentMuted, fontSize = 24.sp, fontFamily = BricolageGrotesque, modifier = Modifier.width(40.dp).clickable {
-                        scope.launch { if (isCollapsed) weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.plusWeeks(1)) else state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.plusMonths(1)) }
-                    }, textAlign = TextAlign.Center)
+                    // Left Arrow
+                    Text("‹", color = onCardContentMuted, fontSize = 24.sp, fontFamily = BricolageGrotesque,
+                        modifier = Modifier.size(36.dp).clip(CircleShape).clickable {
+                            scope.launch {
+                                if (isCollapsed) weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.minusWeeks(1))
+                                else state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.minusMonths(1))
+                            }
+                        }.wrapContentSize(Alignment.Center), textAlign = TextAlign.Center)
+
+                    // Right Arrow
+                    Text("›", color = onCardContentMuted, fontSize = 24.sp, fontFamily = BricolageGrotesque,
+                        modifier = Modifier.size(36.dp).clip(CircleShape).clickable {
+                            scope.launch {
+                                if (isCollapsed) weekState.animateScrollToWeek(weekState.firstVisibleWeek.days.first().date.plusWeeks(1))
+                                else state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.plusMonths(1))
+                            }
+                        }.wrapContentSize(Alignment.Center), textAlign = TextAlign.Center)
+
+                    Spacer(Modifier.weight(1f))
+
+                    // Today Button (Fixed: Removed slowScrollSpec)
+                    Box(modifier = Modifier.size(32.dp).clip(CircleShape).clickable {
+                        scope.launch {
+                            if (isCollapsed) weekState.animateScrollToWeek(LocalDate.now())
+                            else state.animateScrollToMonth(YearMonth.now())
+                        }
+                    }, contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Rounded.EventRepeat, contentDescription = null, tint = onCardContent, modifier = Modifier.size(16.dp))
+                    }
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
 
                 // Days of Week
                 Row(Modifier.fillMaxWidth()) {
@@ -431,12 +465,11 @@ fun CalendarCard(
 
                 Spacer(Modifier.height(8.dp))
 
-                // View Switcher (Snap Animation)
+                // Switcher using your slow fade spec
                 AnimatedContent(
                     targetState = isCollapsed,
-                    label = "calendar_collapse",
                     transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                        fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
                     }
                 ) { collapsed ->
                     if (collapsed) {
@@ -445,7 +478,10 @@ fun CalendarCard(
                         HorizontalCalendar(state = state, dayContent = { DayCellEnhanced(it.date, it.position == DayPosition.MonthDate, cycles, prediction) })
                     }
                 }
-                Spacer(Modifier.height(6.dp))
+
+                Spacer(Modifier.height(12.dp))
+                CalendarLegend()
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
@@ -460,13 +496,10 @@ fun DayCellEnhanced(
     prediction: Prediction?
 ) {
     val isDark = isSystemInDarkTheme()
-
-    val ovulationBg = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val ovulationText = if (isDark) Color.White else Color(0xFF1B1B1B)
-
     val isOvulation = prediction?.ovulationDay == date
     val isToday = date == LocalDate.now()
 
+    // --- PHASE LOGIC ---
     fun checkPhase(d: LocalDate): Int {
         val isLoggedPeriod = cycles.any { c ->
             val start = c.startDate
@@ -495,6 +528,7 @@ fun DayCellEnhanced(
 
     val stripRadius = 100.dp
 
+    // Shape for the "Infinite Strip" background
     val shape = when {
         currentPhase == 0 -> CircleShape
         isStart && isEnd -> RoundedCornerShape(stripRadius)
@@ -505,10 +539,10 @@ fun DayCellEnhanced(
 
     val padding = when {
         currentPhase == 0 -> PaddingValues(2.dp)
-        isStart && isEnd -> PaddingValues(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)
+        isStart && isEnd -> PaddingValues(all = 4.dp)
         isStart -> PaddingValues(start = 4.dp, top = 4.dp, end = 0.dp, bottom = 4.dp)
         isEnd -> PaddingValues(start = 0.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)
-        else -> PaddingValues(start = 0.dp, top = 4.dp, end = 0.dp, bottom = 4.dp)
+        else -> PaddingValues(vertical = 4.dp)
     }
 
     val bgColor = when (currentPhase) {
@@ -518,6 +552,7 @@ fun DayCellEnhanced(
         else -> Color.Transparent
     }
 
+    // --- MAIN CELL CONTAINER ---
     Box(
         modifier = Modifier
             .aspectRatio(1f)
@@ -526,11 +561,15 @@ fun DayCellEnhanced(
             .background(bgColor),
         contentAlignment = Alignment.Center
     ) {
+        // LAYER 1: Text or Ovulation Indicator
         if (isOvulation) {
+            val ovulationBg = if (isDark) Color(0xFF1B1B1B) else Color.White.copy(alpha=0.4f)
+            val ovulationText = Color.White
+
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .shadow(if (isDark) 0.dp else 8.dp, CircleShape, spotColor = ovulationBg)
+                    .shadow(if (isDark) 0.dp else 4.dp, CircleShape, spotColor = Color.Black.copy(alpha = 0.2f))
                     .background(ovulationBg, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -542,12 +581,18 @@ fun DayCellEnhanced(
                     fontFamily = BricolageGrotesque
                 )
             }
-        } else if (isToday && currentPhase == 0) {
-            // --- HAND-DRAWN SKETCH LOGIC ---
+        } else {
+            val isHighlighted = currentPhase != 0
+            DayText(date, isCurrentMonth, isHighlighted)
+        }
+
+        // LAYER 2: The Hand-Drawn "Today" Indicator
+        // We draw this LAST so it appears on top of the period/fertile highlights.
+        if (isToday) {
             Box(
                 modifier = Modifier
-                    .size(42.dp) // Larger container to let the oval "breathe"
-                    .padding(2.dp),
+                    .fillMaxSize()
+                    .padding(1.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -555,17 +600,17 @@ fun DayCellEnhanced(
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        // This makes it an oval like your reference
-                        .scale(scaleX = 1.3f, scaleY = 1.0f),
-                        // Rotating slightly makes it look hand-drawn, not computer-generated
-                    colorFilter = ColorFilter.tint(if (isDark) Color.White else Color.Black)
+                        // scaleX makes it a wide oval, scaleY keeps it tight
+                        .scale(scaleX = 1.4f, scaleY = 1.1f)
+                        // Slight rotation makes it look less computer-generated
+                        .rotate(-4f),
+                    colorFilter = ColorFilter.tint(
+                        // If day is highlighted (Period/Fertile), use white for the sketch
+                        // If neutral, use the theme-appropriate contrast
+                        if (currentPhase != 0) Color.White else (if (isDark) Color.White else Color.Black)
+                    )
                 )
-
-                DayText(date, isCurrentMonth, false)
             }
-        } else {
-            val isHighlighted = currentPhase != 0
-            DayText(date, isCurrentMonth, isHighlighted)
         }
     }
 }

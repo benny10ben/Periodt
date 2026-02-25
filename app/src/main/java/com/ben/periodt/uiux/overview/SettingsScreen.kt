@@ -1,5 +1,6 @@
 package com.ben.periodt.uiux.overview
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -204,7 +205,7 @@ fun SettingsScreen(
                     SettingsItem(
                         icon = Icons.Rounded.DeleteForever,
                         title = "Clear All Data",
-                        subtitle = "Permanently wipe history",
+                        subtitle = "Permanently delete all your tracked data? This cannot be undone.",
                         tint = Color(0xFFEF5350),
                         showChevron = false,
                         onClick = { showClearConfirm = true }
@@ -274,7 +275,7 @@ fun SettingsScreen(
                     SettingsItem(
                         icon = Icons.Rounded.Info,
                         title = "About Periodt",
-                        subtitle = "v1.0.4",
+                        subtitle = "v1.0.5",
                         tint = textPrimary,
                         onClick = { showAbout = true }
                     )
@@ -352,7 +353,7 @@ fun SettingsScreen(
         ContentDialog(title = "About Periodt", onDismiss = { showAbout = false }) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(text = "Periodt", style = MaterialTheme.typography.headlineMedium, fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, color = textPrimary)
-                Text(text = "v1.0.4", style = MaterialTheme.typography.labelLarge, fontFamily = BricolageGrotesque, color = textSub)
+                Text(text = "v1.0.5", style = MaterialTheme.typography.labelLarge, fontFamily = BricolageGrotesque, color = textSub)
                 Spacer(Modifier.height(16.dp))
                 Text(text = "Designed to be simple, private, and aesthetic. Developed with ❤️ by Ben.", style = MaterialTheme.typography.bodyMedium, fontFamily = BricolageGrotesque, color = textSub, lineHeight = 22.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(24.dp))
@@ -366,15 +367,7 @@ fun SettingsScreen(
     }
 
     if (showWhatsNew) {
-        ContentDialog(title = "What's New", onDismiss = { showWhatsNew = false }) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Version 1.0.4", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, color = textPrimary)
-                Text("• Revamped Settings UI for better accessibility.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-                Text("• Added detailed 'How we calculate' section.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-                Text("• Added Home Screen Widget instructions.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-                Text("• Improved backup & restore reliability.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-            }
-        }
+        WhatsNewDialog(onDismiss = { showWhatsNew = false })
     }
 
     // --- System Feedback Dialogs ---

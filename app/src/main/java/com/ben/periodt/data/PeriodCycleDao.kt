@@ -24,10 +24,13 @@ interface PeriodCycleDao {
     @Insert
     suspend fun insertCycle(entity: PeriodCycleEntity)
 
-    // NEW: Update an existing cycle
     @Update
     suspend fun updateCycle(entity: PeriodCycleEntity)
 
     @Query("DELETE FROM period_cycles WHERE id = :id")
     suspend fun deleteCycleById(id: Int)
+
+    // FIX: Single-query wipe instead of N individual deletes in a loop
+    @Query("DELETE FROM period_cycles")
+    suspend fun deleteAll()
 }

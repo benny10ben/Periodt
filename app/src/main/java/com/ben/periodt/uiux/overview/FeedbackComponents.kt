@@ -246,3 +246,41 @@ fun DestructiveConfirmationDialog(
         }
     }
 }
+
+@Composable
+fun WhatsNewDialog(onDismiss: () -> Unit) {
+    val isDark = isSystemInDarkTheme()
+    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+
+    ContentDialog(title = "What's New", onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = "Version 1.0.5",
+                fontFamily = BricolageGrotesque,
+                fontWeight = FontWeight.Bold,
+                color = textPrimary,
+                fontSize = 18.sp
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("✨ Fresh New Look", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("A complete UI/UX overhaul with smoother transitions, better accessibility, and a more intuitive layout.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("💾 Data Export & Import", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Your data is now fully portable. Backup your history to a file or migrate it to a new device in seconds.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("📱 Homescreen Widgets", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Added two new highly customizable home-screen widgets to track your cycle at a glance.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("🎨 Made for You", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Deep personalization options added to make the app truly feel like your own.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+            }
+        }
+    }
+}

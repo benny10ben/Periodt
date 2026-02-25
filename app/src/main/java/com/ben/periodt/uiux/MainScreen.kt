@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,7 +38,9 @@ import com.ben.periodt.uiux.calendar.AddCycleDialog
 import com.ben.periodt.uiux.calendar.CalendarScreen
 import com.ben.periodt.uiux.overview.OverviewScreen
 import com.ben.periodt.uiux.overview.SettingsScreen // Ensure this is imported
+import com.ben.periodt.uiux.overview.WhatsNewDialog
 import com.ben.periodt.viewmodel.PeriodViewModel
+import kotlinx.coroutines.delay
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "Calendar", Icons.Rounded.CalendarMonth)
@@ -53,13 +56,21 @@ fun SmoothBottomNavigation(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
+
+    // --- THE STEADY GLIDE SPEC ---
+    // Match this to your MainScreen (700ms) to ensure the bar and screen move together
+    val smoothSpec = tween<Dp>(
+        durationMillis = 700,
+        easing = FastOutSlowInEasing // Prevents the jumpy/bouncy feel
+    )
+
     val navBarBrush = if (isDark) {
         Brush.linearGradient(colors = listOf(Color(0xFF2A3825), Color(0xFF2A3825)))
     } else {
         Brush.linearGradient(colors = listOf(Color(0xFFFFFFFF), Color(0xFFFFFFFF)))
     }
 
-    val selectedBg = if (isDark) Color(color = 0xFF1B1B1B) else Color(color = 0xFF2A3825)
+    val selectedBg = if (isDark) Color(0xFF1B1B1B) else Color(0xFF2A3825)
     val selectedContent = Color.White
     val unselectedContent = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.3f)
 
@@ -67,7 +78,12 @@ fun SmoothBottomNavigation(
     val slotWidth = 95.dp
     val itemHeight = 46.dp
 
-    val indicatorOffset by animateDpAsState(targetValue = slotWidth * selectedIndex, label = "indicatorOffset")
+    // Updated offset animation with the smoothSpec
+    val indicatorOffset by animateDpAsState(
+        targetValue = slotWidth * selectedIndex,
+        animationSpec = smoothSpec,
+        label = "indicatorOffset"
+    )
 
     Box(
         modifier = modifier
@@ -75,34 +91,40 @@ fun SmoothBottomNavigation(
             .shadow(
                 elevation = 8.dp,
                 shape = RoundedCornerShape(28.dp),
-                ambientColor = Color.Black.copy(alpha = 0.6f),
-                spotColor = Color.Black.copy(alpha = 0.6f)
+                ambientColor = Color.Black.copy(alpha = 0.4f),
+                spotColor = Color.Black.copy(alpha = 0.4f)
             )
             .clip(RoundedCornerShape(28.dp))
             .background(navBarBrush)
             .padding(horizontal = 9.dp, vertical = 8.dp)
     ) {
+        // The Sliding Background Pill
         Box(
             modifier = Modifier
-                .fillMaxHeight()
+                .height(itemHeight)
                 .width(slotWidth)
                 .offset(x = indicatorOffset)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(22.dp)) // Slightly tighter corner for the inner pill
                 .background(selectedBg)
-                .zIndex(-1f)
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             screens.forEachIndexed { index, screen ->
                 val isSelected = index == selectedIndex
+
+                // Content color also needs a smooth fade to match the motion
                 val contentColor by animateColorAsState(
                     targetValue = if (isSelected) selectedContent else unselectedContent,
+                    animationSpec = tween(durationMillis = 500),
                     label = "contentColor"
                 )
+
                 val interaction = remember { MutableInteractionSource() }
 
                 Box(
-                    modifier = Modifier.width(slotWidth).height(itemHeight),
+                    modifier = Modifier
+                        .width(slotWidth)
+                        .height(itemHeight),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -158,6 +180,20 @@ fun MainScreen() {
     val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context))
     val screens = listOf(Screen.Calendar, Screen.Overview)
 
+    // Auto-show What's New on update
+    var showWhatsNew by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val currentVersion = context.packageManager
+            .getPackageInfo(context.packageName, 0)
+            .versionCode
+        val lastSeen = VersionPrefs.getLastSeenVersion(context)
+        if (currentVersion > lastSeen) {
+            VersionPrefs.setLastSeenVersion(context, currentVersion)
+            delay(3000)
+            showWhatsNew = true
+        }
+    }
     SetSystemBars(statusBarColor = Color.Transparent, darkIcons = !isDark)
 
     var showAddCycleDialog by remember { mutableStateOf(false) }
@@ -297,6 +333,9 @@ fun MainScreen() {
                     showAddCycleDialog = false
                 }
             )
+        }
+        if (showWhatsNew) {
+            WhatsNewDialog(onDismiss = { showWhatsNew = false })
         }
     }
 }
