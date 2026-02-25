@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal">
+
+    <TextView style="@style/WidgetWeekdayLabel" android:text="SUN" />
+    <TextView style="@style/WidgetWeekdayLabel" android:text="MON" />
+    <TextView style="@style/WidgetWeekdayLabel" android:text="TUE" />
+    <TextView style="@style/WidgetWeekdayLabel" android:text="WED" />
+    <TextView style="@style/WidgetWeekdayLabel" android:text="THU" />
+    <TextView style="@style/WidgetWeekdayLabel" android:text="FRI" />
+    <TextView style="@style/WidgetWeekdayLabel" android:text="SAT" />
+
+</LinearLayout>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/day_text"
+    android:layout_width="0dp"
+    android:layout_height="40dp"
+    android:layout_weight="1"
+    android:gravity="center"
+    android:textSize="14sp"
+    android:fontFamily="@font/bricolage_grotesque"
+    android:textColor="@color/widget_text_primary"
+    android:background="@android:color/transparent" />

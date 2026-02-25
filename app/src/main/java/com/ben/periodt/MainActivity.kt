@@ -12,13 +12,21 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.ben.periodt.ui.theme.PeriodTTheme
 import com.ben.periodt.uiux.MainScreen
 import com.ben.periodt.uiux.onboarding.OnboardingNavigator
+import androidx.compose.animation.*
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
 
@@ -59,11 +67,31 @@ class MainActivity : ComponentActivity() {
                 val ctx = applicationContext
                 var showOnboarding by remember { mutableStateOf(!OnboardingPrefs.isDone(ctx)) }
 
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    androidx.compose.animation.Crossfade(
+                Surface(color = Color.Black) {
+                    androidx.compose.animation.AnimatedContent(
                         targetState = showOnboarding,
-                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 350),
-                        label = "Onboarding->Main crossfade" // optional
+                        transitionSpec = {
+                            if (!targetState) {
+                                // CONTINUOUS SCROLL LOGIC:
+                                // Both screens move the full distance of the screen height
+                                slideInVertically(
+                                    animationSpec = tween(1000, easing = LinearOutSlowInEasing),
+                                    initialOffsetY = { fullHeight -> fullHeight } // Main starts at bottom
+                                ).togetherWith(
+                                    slideOutVertically(
+                                        animationSpec = tween(1000, easing = LinearOutSlowInEasing),
+                                        targetOffsetY = { fullHeight -> -fullHeight } // Onboarding moves out top
+                                    )
+                                ).apply {
+                                    // Set to false to prevent the cross-fade/hover look
+                                    // This makes them behave like a single physical sheet
+                                    targetContentZIndex = 1f
+                                }
+                            } else {
+                                fadeIn(tween(1000)) togetherWith fadeOut(tween(1000))
+                            }
+                        },
+                        label = "OnboardingToMainScroll"
                     ) { isOnboarding ->
                         if (isOnboarding) {
                             OnboardingNavigator(

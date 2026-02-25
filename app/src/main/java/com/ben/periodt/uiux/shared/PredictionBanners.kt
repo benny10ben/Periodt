@@ -15,8 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,22 +39,22 @@ fun UpcomingBannerEnhanced(
 ) {
     val isDark = isSystemInDarkTheme()
 
-    val surfaceColor = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.6f) else Color.White
-    val accentColor = Color(0xFFe8ebed)
+    // UPDATED: Removed alpha from dark mode background for a solid feel
+    val surfaceColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+
+    // UPDATED: Accent color now uses Yellow (0xFFD89046) in both modes for consistency
+    val accentColor = Color(0xFFD89046)
 
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
 
-    val pillTextColor = if (isDark) Color.White else Color(0xFF1B1B1B)
-
-    val badgeAlpha = if (isDark) 0.1f else 0.4f
+    val badgeAlpha = if (isDark) 0.15f else 0.1f
 
     Card(
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = Modifier.fillMaxWidth()
     ) {
         Box(
             modifier = Modifier
@@ -133,7 +131,8 @@ fun UpcomingBannerEnhanced(
                                 text = badge,
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.SemiBold,
-                                color = pillTextColor,
+                                // Text remains Yellow in dark mode, deeper tone in light mode
+                                color = if (isDark) accentColor else Color(0xFFB45309),
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
@@ -146,7 +145,8 @@ fun UpcomingBannerEnhanced(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .clip(RoundedCornerShape(50))
-                        .background(Color(color = 0xFF8089d2))
+                        // Replaced Brand Purple with the wellness Deep Green for high-contrast
+                        .background(Color(0xFF2A3825))
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
@@ -168,9 +168,8 @@ fun ConfidenceIndicator(
     label: String,
     accentColor: Color,
     textColorMuted: Color,
-
-    ) {
-    val dotColor = Color(0xFF8089D2)
+) {
+    val dotColor = accentColor
 
     Column(
         horizontalAlignment = Alignment.End,
@@ -183,7 +182,7 @@ fun ConfidenceIndicator(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(if (isActive) dotColor else dotColor.copy(alpha = 0.4f))
+                        .background(if (isActive) dotColor else dotColor.copy(alpha = 0.2f))
                 )
             }
         }

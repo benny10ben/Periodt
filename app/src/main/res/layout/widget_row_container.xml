@@ -1,11 +1,9 @@
-<!-- widget_row_container.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/row_inner"
     android:layout_width="match_parent"
     android:layout_height="0dp"
     android:layout_weight="1"
     android:orientation="horizontal"
-    android:paddingTop="2dp"
-    android:paddingBottom="2dp"
-    android:textColor="@color/widget_text"
-    />
+    android:paddingVertical="4dp"
+    android:baselineAligned="false" />

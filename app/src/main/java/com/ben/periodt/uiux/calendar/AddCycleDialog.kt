@@ -50,6 +50,7 @@ fun AddCycleDialog(
     onDismiss: () -> Unit,
     onSave: (LocalDate, LocalDate?, String, String, Int) -> Unit
 ) {
+    // --- STATE MANAGEMENT ---
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
 
@@ -64,21 +65,35 @@ fun AddCycleDialog(
     val bleedingOptions = listOf("Heavy", "Medium", "Light", "Spotting")
     val colorOptions = listOf("Bright Red", "Dark Red", "Brown")
 
+    // --- THEME & COLORS ---
     val isDark = isSystemInDarkTheme()
 
-    val contentSurface = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
-    val pillTextColor = if (isDark) Color.White else Color(0xFF2C3F70)
-    val accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF1B1B1B)
+    // Dark Mode background: Pure Black to Deep Gray
+    val contentSurface = if (isDark) {
+        Brush.linearGradient(
+            0.0f to Color.Black,
+            1.0f to Color(0xFF1B1B1B)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3))
+        )
+    }
+
+    // Yellow accent for Slider and Buttons in Dark Mode
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val surfaceFallback = if (isDark) Color.Black else Color.White
+
+    // Synchronized Pastel Palette
+    val pastelGreen = Color(0xFF2A3825)
+    val pastelOrange = Color(0xFFD89046)
+    val pastelMaroon = Color(0xFF4E1A1A)
+
+    val pillBackground = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+    val pillTextColor = if (isDark) Color.White else Color(0xFF1B1B1B)
 
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-
-    val dialogBrush = if (isDark) {
-        Brush.linearGradient(listOf(Color(0xFFC8D4E5), Color(0xFF8089D2)))
-    } else {
-        Brush.linearGradient(listOf(Color(0xFF2C3F70), Color(0xFF2C3F70)))
-    }
 
     val formatter = remember { DateTimeFormatter.ofPattern("MMM dd") }
 
@@ -88,210 +103,240 @@ fun AddCycleDialog(
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.92f)
                 .padding(vertical = 24.dp),
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = surfaceFallback),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(dialogBrush)
-                    .padding(0.dp)
+                    .fillMaxWidth()
+                    .background(contentSurface)
             ) {
-                Column(
+                // Header
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(contentSurface)
+                        .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Text(
+                        text = "Log Cycle",
+                        fontFamily = BricolageGrotesque,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = textPrimary
+                    )
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(textSub.copy(alpha = 0.1f))
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = textPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    // Date Selectors
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CleanDateCard(
+                            label = "Start Date",
+                            date = startDate.format(formatter),
+                            icon = Icons.Rounded.CalendarToday,
+                            bg = pillBackground,
+                            textColor = pillTextColor,
+                            onClick = { showStartPicker = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                        CleanDateCard(
+                            label = "End Date",
+                            date = endDate?.format(formatter) ?: "Ongoing",
+                            icon = if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable,
+                            bg = pillBackground,
+                            textColor = pillTextColor,
+                            onClick = { showEndPicker = true },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Flow Intensity
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "Log Cycle",
+                            text = "Flow Intensity",
                             fontFamily = BricolageGrotesque,
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                             color = textPrimary
                         )
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(textSub.copy(alpha = 0.1f))
-                                .clickable(onClick = onDismiss),
-                            contentAlignment = Alignment.Center
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = textPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            bleedingOptions.forEach { option ->
+                                val isSelected = bleeding.equals(option, ignoreCase = true)
+                                val activePillColor = when(option) {
+                                    "Heavy" -> pastelMaroon
+                                    "Medium" -> pastelOrange
+                                    else -> pastelGreen
+                                }
+
+                                EntryStylePill(
+                                    text = option,
+                                    isSelected = isSelected,
+                                    activeBg = activePillColor,
+                                    activeText = Color.White,
+                                    inactiveText = textSub,
+                                    surface = surfaceFallback,
+                                    onClick = { bleeding = option }
+                                )
+                            }
                         }
                     }
 
-                    Column(
-                        modifier = Modifier
-                            .verticalScroll(rememberScrollState())
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp)
-                    ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            CleanDateCard(
-                                label = "Started",
-                                date = startDate.format(formatter),
-                                icon = Icons.Rounded.CalendarToday,
-                                bg = pillBackground,
-                                textColor = pillTextColor,
-                                onClick = { showStartPicker = true },
-                                modifier = Modifier.weight(1f)
-                            )
-                            CleanDateCard(
-                                label = "Ended",
-                                date = endDate?.format(formatter) ?: "Ongoing",
-                                icon = if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable,
-                                bg = pillBackground,
-                                textColor = pillTextColor,
-                                onClick = { showEndPicker = true },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                    // Blood Color
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Blood Color",
+                            fontFamily = BricolageGrotesque,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textPrimary
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            colorOptions.forEach { option ->
+                                val isSelected = bloodColor.equals(option, ignoreCase = true)
 
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                text = "Flow Intensity",
-                                fontFamily = BricolageGrotesque,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textPrimary
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                bleedingOptions.forEach { option ->
-                                    EntryStylePill(
-                                        text = option,
-                                        isSelected = bleeding.equals(option, ignoreCase = true),
-                                        activeBg = pillBackground,
-                                        activeText = pillTextColor,
-                                        inactiveText = textSub,
-                                        surface = contentSurface,
-                                        onClick = { bleeding = option }
-                                    )
+                                val activePillColor = when(option) {
+                                    "Bright Red" -> pastelGreen
+                                    "Dark Red"   -> Color(0xFF4E1A1A)
+                                    "Brown"      -> pastelOrange
+                                    else         -> accentColor
                                 }
-                            }
-                        }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                text = "Color",
-                                fontFamily = BricolageGrotesque,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textPrimary
-                            )
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                colorOptions.forEach { option ->
-                                    EntryStylePill(
-                                        text = option,
-                                        isSelected = bloodColor.equals(option, ignoreCase = true),
-                                        activeBg = pillBackground,
-                                        activeText = pillTextColor,
-                                        inactiveText = textSub,
-                                        surface = contentSurface,
-                                        onClick = { bloodColor = option }
-                                    )
-                                }
-                            }
-                        }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Pain Level",
-                                    fontFamily = BricolageGrotesque,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = textPrimary
-                                )
-                                Text(
-                                    text = "${sliderPosition.toInt()} / 10",
-                                    fontFamily = BricolageGrotesque,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = accentColor
+                                EntryStylePill(
+                                    text = option,
+                                    isSelected = isSelected,
+                                    activeBg = activePillColor,
+                                    activeText = Color.White,
+                                    inactiveText = textSub,
+                                    surface = surfaceFallback,
+                                    onClick = { bloodColor = option }
                                 )
                             }
-                            Slider(
-                                value = sliderPosition,
-                                onValueChange = {
-                                    sliderPosition = it
-                                    painLevel = it.toInt()
-                                },
-                                valueRange = 0f..10f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = accentColor,
-                                    activeTrackColor = accentColor,
-                                    inactiveTrackColor = pillBackground.copy(alpha = 0.3f)
-                                )
-                            )
                         }
+                    }
 
-                        Button(
-                            onClick = { onSave(startDate, endDate, bleeding, bloodColor, painLevel) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = accentColor,
-                                contentColor = Color.White
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    // Pain Level Slider
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Save Entry",
+                                text = "Cramps & Pain",
                                 fontFamily = BricolageGrotesque,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textPrimary
+                            )
+                            Text(
+                                text = "${sliderPosition.toInt()} / 10",
+                                fontFamily = BricolageGrotesque,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor
                             )
                         }
+                        Slider(
+                            value = sliderPosition,
+                            onValueChange = {
+                                sliderPosition = it
+                                painLevel = it.toInt()
+                            },
+                            valueRange = 0f..10f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = accentColor,
+                                activeTrackColor = accentColor,
+                                inactiveTrackColor = pillBackground
+                            )
+                        )
+                    }
+
+                    // Action Button
+                    Button(
+                        onClick = {
+                            onSave(startDate, endDate, bleeding, bloodColor, painLevel)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(bottom = 8.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accentColor,
+                            contentColor = Color.White
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    ) {
+                        Text(
+                            text = "Save Entry",
+                            fontFamily = BricolageGrotesque,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
     }
 
+    // --- DATE PICKERS ---
     if (showStartPicker) {
         MinimalDatePickerDialog(
             title = "Start Date",
-            brand = accentColor, gradTop = Color.Gray, gradMid = Color.Gray, gradBottom = Color.Gray,
-            onGradient = Color.White, buttonContainer = contentSurface, buttonContent = textPrimary,
+            brand = accentColor,
+            gradTop = pastelGreen, gradMid = pastelOrange, gradBottom = pastelMaroon,
+            onGradient = Color.White,
+            buttonContainer = surfaceFallback,
+            buttonContent = textPrimary,
             onDismiss = { showStartPicker = false },
-            onConfirm = { ms -> millisToLocalDate(ms)?.let { startDate = it }; showStartPicker = false }
+            onConfirm = { ms ->
+                millisToLocalDate(ms)?.let { startDate = it }
+                showStartPicker = false
+            }
         )
     }
     if (showEndPicker) {
         MinimalDatePickerDialog(
             title = "End Date",
-            brand = accentColor, gradTop = Color.Gray, gradMid = Color.Gray, gradBottom = Color.Gray,
-            onGradient = Color.White, buttonContainer = contentSurface, buttonContent = textPrimary,
+            brand = accentColor,
+            gradTop = pastelGreen, gradMid = pastelOrange, gradBottom = pastelMaroon,
+            onGradient = Color.White,
+            buttonContainer = surfaceFallback,
+            buttonContent = textPrimary,
             onDismiss = { showEndPicker = false },
-            onConfirm = { ms -> millisToLocalDate(ms)?.let { endDate = it }; showEndPicker = false }
+            onConfirm = { ms ->
+                millisToLocalDate(ms)?.let { endDate = it }
+                showEndPicker = false
+            }
         )
     }
 }
@@ -323,92 +368,92 @@ fun MinimalDatePickerDialog(
         )
     }
 
-    val dialogBrush = if (isDark) {
-        Brush.linearGradient(listOf(Color(0xFFC8D4E5), Color(0xFF8089D2)))
+    // --- UPDATED BACKGROUND & COLORS ---
+    val contentSurface = if (isDark) {
+        Brush.linearGradient(
+            0.0f to Color.Black,
+            1.0f to Color(0xFF1B1B1B)
+        )
     } else {
-        Brush.linearGradient(listOf(Color(0xFF2C3F70), Color(0xFF2C3F70)))
+        Brush.linearGradient(
+            colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3))
+        )
     }
 
-    val contentSurface = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
-    val accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF1B1B1B)
-    val buttonText = Color.White
+    val surfaceFallback = if (isDark) Color.Black else Color.White
+    val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
+
+    // UPDATED: Yellow accent for dark mode
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val buttonText = Color.White // Forced White only
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = true)
     ) {
         Card(
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = surfaceFallback),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(dialogBrush)
-                    .padding(0.dp)
+                    .fillMaxWidth()
+                    .background(contentSurface)
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(contentSurface)
-                        .padding(horizontal = 16.dp, vertical = 20.dp)
+                        .padding(bottom = 20.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = title,
-                            fontFamily = BricolageGrotesque,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp
-                            ),
-                            color = textPrimary,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-
-                    MinimalMonthPicker(
-                        displayedYm = displayedYm,
-                        selectedMillis = selectedMillis,
-                        onDisplayedYmChange = { displayedYm = it },
-                        onSelect = { ms -> selectedMillis = ms },
-                        textColor = textPrimary,
-                        accentColor = accentColor,
-                        weekStartsOnMonday = true
-                    )
-
-                    Spacer(Modifier.height(20.dp))
-
-                    Button(
-                        onClick = { onConfirm(selectedMillis) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = accentColor,
-                            contentColor = buttonText
-                        ),
-                        shape = RoundedCornerShape(50),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-                    ) {
-                        Text(
-                            text = "OK",
-                            fontFamily = BricolageGrotesque,
+                    Text(
+                        text = title,
+                        fontFamily = BricolageGrotesque,
+                        style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
+                            fontSize = 22.sp
+                        ),
+                        color = textPrimary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                MinimalMonthPicker(
+                    displayedYm = displayedYm,
+                    selectedMillis = selectedMillis,
+                    onDisplayedYmChange = { displayedYm = it },
+                    onSelect = { ms -> selectedMillis = ms },
+                    textColor = textPrimary,
+                    accentColor = accentColor,
+                    weekStartsOnMonday = true
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                Button(
+                    onClick = { onConfirm(selectedMillis) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = accentColor,
+                        contentColor = buttonText
+                    ),
+                    shape = RoundedCornerShape(50),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                ) {
+                    Text(
+                        text = "Confirm Date",
+                        fontFamily = BricolageGrotesque,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
                 }
             }
         }
@@ -498,7 +543,8 @@ fun MinimalMonthPicker(
 
     val todayChipBg = textColor.copy(alpha = 0.1f)
     val selectedChipBg = accentColor
-    val selectedChipText = if (isDark) Color(0xFF1B1B1B) else Color.White
+    // UPDATED: In dark mode, text on the yellow chip is Black for contrast
+    val selectedChipText = if (isDark) Color.Black else Color.White
 
     var day = 1
     repeat(rows) { r ->

@@ -7,15 +7,15 @@ plugins {
 
 android {
     namespace = "com.ben.periodt"
-    compileSdk = 34
+    compileSdk = 35
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.ben.periodt"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 4
-        versionName = "1.0.4"
+        targetSdk = 35
+        versionCode = 5
+        versionName = "1.0.5"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
@@ -73,38 +73,49 @@ android {
 }
 
 dependencies {
-    // Jetpack Compose
-    implementation(platform("androidx.compose:compose-bom:2024.05.00"))
+    // --- JETPACK COMPOSE ---
+    // Update BOM to a newer version compatible with SDK 35
+    implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
+
+    // FIX: Replaced "libs.androidx.compose.animation" with the BOM-managed version
+    // This prevents the version conflict causing the crash.
+    implementation("androidx.compose.animation:animation")
+    implementation(libs.androidx.compose.foundation)
+
     debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation("androidx.compose.material:material-icons-extended:1.6.0")
-
-    // Lifecycle + ViewModel
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-
-    // Room (with Flow support)
-    implementation("androidx.room:room-runtime:2.6.0")
-    implementation("androidx.room:room-ktx:2.6.0")
-    kapt("androidx.room:room-compiler:2.6.0")
-
-    // Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.05.00"))
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-
-    implementation("com.kizitonwose.calendar:compose:2.6.0")
+    // Update Navigation to match SDK 35 requirements
+    implementation("androidx.navigation:navigation-compose:2.8.3")
+    // Update Material Icons
     implementation("androidx.compose.material:material-icons-extended")
+
+    // --- LIFECYCLE (Updated for SDK 35) ---
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+
+    // --- ROOM DATABASE ---
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+
+    // --- COROUTINES ---
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // --- THIRD PARTY LIBRARIES ---
+    implementation("com.kizitonwose.calendar:compose:2.6.0")
     implementation("net.zetetic:sqlcipher-android:4.10.0@aar")
-    implementation("androidx.datastore:datastore-preferences:1.1.7")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.sqlite:sqlite:2.4.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("nl.dionsegijn:konfetti-compose:2.0.4")
+
+    // --- TESTING ---
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.10.01"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }

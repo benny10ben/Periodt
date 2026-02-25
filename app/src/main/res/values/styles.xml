@@ -1,12 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Weekday label style used in widget_monthly.xml -->
     <style name="WidgetLabelSmall">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#B0BEC5</item>
+        <item name="android:textColor">@color/widget_text_muted</item>
         <item name="android:textSize">11sp</item>
+        <item name="android:fontFamily">@font/bricolage_grotesque</item>
+    </style>
+
+    <style name="WidgetWeekdayLabel">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/widget_text_muted</item>
+        <item name="android:fontFamily">@font/bricolage_grotesque</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="WidgetTextStyle">
+        <item name="android:fontFamily">@font/bricolage_grotesque</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/widget_text_primary</item>
     </style>
 </resources>
