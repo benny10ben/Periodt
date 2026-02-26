@@ -164,11 +164,19 @@ fun CalendarScreen() {
     val prediction by viewModel.prediction.collectAsState()
     val isDark = isSystemInDarkTheme()
 
+    // 1. Sort cycles by date
     val sortedCycles = remember(cycles) { cycles.sortedByDescending { it.startDate } }
+
+    // 2. PAGINATION STATE: Start with 5 items
+    var visibleCyclesCount by remember { mutableIntStateOf(5) }
+    val displayedCycles = remember(sortedCycles, visibleCyclesCount) {
+        sortedCycles.take(visibleCyclesCount)
+    }
+
     val currentMonth = remember { YearMonth.now() }
     val currentDate = remember { LocalDate.now() }
 
-    // --- STATES ---
+    // --- CALENDAR STATES ---
     val state = rememberCalendarState(
         startMonth = currentMonth.minusMonths(12),
         endMonth = currentMonth.plusMonths(12),
@@ -183,52 +191,29 @@ fun CalendarScreen() {
     val listState = rememberLazyListState()
     var isCollapsed by remember { mutableStateOf(false) }
 
-    // --- SMOOTH SCROLL LOGIC ---
+    // --- NESTED SCROLL CONNECTION (Unchanged) ---
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 val delta = available.y
-
-                // 1. Swiping UP (Collapse)
                 if (delta < 0 && !isCollapsed) {
                     isCollapsed = true
-                    // Consuming the scroll ensures the list DOESN'T scroll while the calendar is shrinking.
-                    // This forces the UI to prioritize the resize animation.
                     return Offset(0f, available.y)
                 }
-
-                // 2. Swiping DOWN (Expand)
                 if (delta > 0 && isCollapsed && listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
                     isCollapsed = false
-                    // Consume scroll to prevent list from pulling down before calendar expands
                     return Offset(0f, available.y)
                 }
-
                 return Offset.Zero
             }
         }
     }
 
-    // --- SYNC LOGIC (Unchanged) ---
-    LaunchedEffect(state.firstVisibleMonth) {
-        if (!isCollapsed) {
-            val targetMonth = state.firstVisibleMonth.yearMonth
-            val dominantDate = weekState.firstVisibleWeek.days.getOrNull(3)?.date ?: weekState.firstVisibleWeek.days.first().date
-            if (YearMonth.from(dominantDate) != targetMonth) weekState.scrollToWeek(targetMonth.atDay(1))
-        }
-    }
-    LaunchedEffect(weekState.firstVisibleWeek) {
-        if (isCollapsed) {
-            val dominantDate = weekState.firstVisibleWeek.days.getOrNull(3)?.date ?: weekState.firstVisibleWeek.days.first().date
-            val targetMonth = YearMonth.from(dominantDate)
-            if (state.firstVisibleMonth.yearMonth != targetMonth) state.scrollToMonth(targetMonth)
-        }
-    }
-
-    // --- COLORS ---
+    // --- UI COLORS ---
     val entrySurface = if (isDark) Color(0xFF1B1B1B) else Color.White
     val entryText = if (isDark) Color.White else Color(0xFF0F172A)
     val entrySub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
 
     var cycleToEdit by remember { mutableStateOf<PeriodViewModel.Cycle?>(null) }
 
@@ -238,11 +223,6 @@ fun CalendarScreen() {
             .padding(horizontal = 16.dp)
             .nestedScroll(nestedScrollConnection)
     ) {
-        Spacer(Modifier.height(0.dp))
-        // --- WRAPPER FOR SMOOTH RESIZE ---
-        // animateContentSize() here is the magic. It tells the Column:
-        // "When the child (CalendarCard) changes size, animate my own size smoothly."
-        // This pushes the LazyColumn below it up or down with a spring animation.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -253,11 +233,11 @@ fun CalendarScreen() {
             CalendarCard(isCollapsed, state, weekState, cycles, prediction)
         }
 
-        // --- CONTENT LIST ---
+        // --- CYCLE LIST WITH LOAD MORE ---
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f) // Fills remaining space dynamically
+                .weight(1f)
                 .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -266,10 +246,13 @@ fun CalendarScreen() {
             item { WellnessCardsRow(cycles = cycles, prediction = prediction) }
             item { PredictionBanner(prediction, cycles, entrySurface, entryText, entrySub) }
 
-            items(sortedCycles, key = { it.id }) { cycle ->
+            // Displays only the "displayedCycles" subset
+            items(displayedCycles, key = { it.id }) { cycle ->
                 SwipeToDeleteCard(onDelete = { viewModel.deleteCycle(cycle.id) }) { isSwiping ->
                     EntryRow(
-                        monthLabel = cycle.startDate.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase(),
+                        // FIXED: Full month name, properly capitalized
+                        monthLabel = cycle.startDate.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+                            .lowercase().replaceFirstChar { it.uppercase() },
                         dayNumber = cycle.startDate.dayOfMonth.toString(),
                         startDate = cycle.startDate.toString(),
                         endDate = cycle.endDate?.toString() ?: "",
@@ -284,6 +267,35 @@ fun CalendarScreen() {
                         isSwiping = isSwiping,
                         onEditClick = { cycleToEdit = cycle }
                     )
+                }
+            }
+
+            // --- THE LOAD MORE TRIGGER ---
+            if (sortedCycles.size > visibleCyclesCount) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TextButton(
+                            onClick = { visibleCyclesCount += 5 },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.textButtonColors(contentColor = accentColor)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Rounded.Update, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "Load 5 More",
+                                    fontFamily = BricolageGrotesque,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -383,11 +395,7 @@ fun CalendarCard(
         easing = CubicBezierEasing(0.25f, 1f, 0.5f, 1f)
     )
 
-    val backgroundBrush = if (isDark) {
-        Brush.linearGradient(colors = listOf(Color(0xFF1b1b1b), Color(0xFF1b1b1b)))
-    } else {
-        Brush.linearGradient(colors = listOf(Color(0xFFffffff), Color(0xFFffffff)))
-    }
+    val backgroundBrush = if (isDark) Color(color = 0xFF1B1B1B).copy(alpha = 0.4f) else Color.White
 
     val onCardContent = if (isDark) Color.White else Color.Black
     val onCardContentMuted = onCardContent.copy(alpha = 0.70f)
@@ -1161,7 +1169,10 @@ fun EntryRow(
 
     val isDark = isSystemInDarkTheme()
 
+    // --- ALPHA ADJUSTMENT ---
+    // Applying 0.4f alpha to the card background
     val cardBackground = if (isDark) Color(0xFF1B1B1B) else Color.White
+
     val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
 
     val progressBrush = remember(isDark) {
@@ -1178,10 +1189,16 @@ fun EntryRow(
     val secondaryTextColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val pillTextColor = if (isDark) Color.White else Color(0xFF1B1B1B)
 
+    val capitalizedBleeding = remember(bleeding) {
+        bleeding.lowercase(java.util.Locale.getDefault()).replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString()
+        }
+    }
+
     fun shortPretty(d: String): String = runCatching {
         if (d.isBlank()) return@runCatching "?"
-        val date = LocalDate.parse(d)
-        "${date.month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())} ${date.dayOfMonth}"
+        val date = java.time.LocalDate.parse(d)
+        "${date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} ${date.dayOfMonth}"
     }.getOrElse { d }
 
     fun painLabel(p: Int): String = when {
@@ -1192,9 +1209,9 @@ fun EntryRow(
         else -> "Very severe ($p/10)"
     }
 
-    val startDt = remember(startDate) { runCatching { LocalDate.parse(startDate) }.getOrNull() }
-    val endDt = remember(endDate) { runCatching { if (endDate.isNotBlank()) LocalDate.parse(endDate) else null }.getOrNull() }
-    val now = LocalDateTime.now()
+    val startDt = remember(startDate) { runCatching { java.time.LocalDate.parse(startDate) }.getOrNull() }
+    val endDt = remember(endDate) { runCatching { if (endDate.isNotBlank()) java.time.LocalDate.parse(endDate) else null }.getOrNull() }
+    val now = java.time.LocalDateTime.now()
     val today = now.toLocalDate()
 
     var progTarget = 0f
@@ -1205,25 +1222,23 @@ fun EntryRow(
     if (startDt != null) {
         val startDateTime = startDt.atStartOfDay()
         val totalDays: Long
-
         if (endDt == null) {
-            val elapsedDays = ChronoUnit.DAYS.between(startDt, today) + 1
+            val elapsedDays = java.time.temporal.ChronoUnit.DAYS.between(startDt, today) + 1
             statusText = "Day $elapsedDays • Ongoing"
             totalDays = maxOf(6L, elapsedDays + 2L)
-            val elapsedMinutes = ChronoUnit.MINUTES.between(startDateTime, now)
+            val elapsedMinutes = java.time.temporal.ChronoUnit.MINUTES.between(startDateTime, now)
             progTarget = (elapsedMinutes.toFloat() / (totalDays * 1440f)).coerceIn(0f, 0.95f)
         } else {
-            totalDays = ChronoUnit.DAYS.between(startDt, endDt) + 1
+            totalDays = java.time.temporal.ChronoUnit.DAYS.between(startDt, endDt) + 1
             if (today.isAfter(endDt)) {
                 statusText = "$totalDays Days • Completed"
                 progTarget = 1f
             } else {
-                statusText = "${ChronoUnit.DAYS.between(today, endDt)} days left"
-                val elapsedMinutes = ChronoUnit.MINUTES.between(startDateTime, now)
+                statusText = "${java.time.temporal.ChronoUnit.DAYS.between(today, endDt)} days left"
+                val elapsedMinutes = java.time.temporal.ChronoUnit.MINUTES.between(startDateTime, now)
                 progTarget = (elapsedMinutes.toFloat() / (totalDays * 1440f)).coerceIn(0f, 1f)
             }
         }
-
         compliment = when {
             progTarget >= 1f -> "Cycle completed. You did it! 🌟"
             progTarget > 0.8f -> "You're stronger than you know. 💪"
@@ -1238,7 +1253,7 @@ fun EntryRow(
     Card(
         colors = CardDefaults.cardColors(containerColor = cardBackground),
         shape = RoundedCornerShape(22.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp), // Zero elevation for transparent look
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
@@ -1247,10 +1262,8 @@ fun EntryRow(
                 onClick = { expanded = !expanded }
             )
     ) {
-        // Reduced vertical padding to 16.dp for a slimmer profile
         Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
-
-            // Header Row: Dropdown icon aligned to title text
+            // Header
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
@@ -1259,7 +1272,7 @@ fun EntryRow(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = bleeding.replaceFirstChar { it.uppercase() },
+                            text = "$monthLabel $dayNumber",
                             fontFamily = BricolageGrotesque,
                             color = primaryTextColor,
                             fontSize = 17.sp,
@@ -1275,7 +1288,7 @@ fun EntryRow(
                         )
                     }
                     Text(
-                        text = "$monthLabel $dayNumber",
+                        text = statusText,
                         fontFamily = BricolageGrotesque,
                         color = secondaryTextColor,
                         fontSize = 13.sp,
@@ -1286,18 +1299,6 @@ fun EntryRow(
 
             Spacer(Modifier.height(6.dp))
 
-            // Status and Pills
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text(
-                    text = statusText,
-                    fontFamily = BricolageGrotesque,
-                    color = primaryTextColor,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal
-                )
-                MetaPill("Color", bloodColor, pillTextColor, pillBackground)
-            }
-
             AnimatedVisibility(visible = isOngoing || expanded) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(Modifier.height(14.dp))
@@ -1305,23 +1306,19 @@ fun EntryRow(
                         drawRoundRect(
                             color = pillBackground.copy(alpha = 0.4f),
                             size = size,
-                            cornerRadius = CornerRadius(50f)
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f)
                         )
                         drawRoundRect(
                             brush = progressBrush,
-                            size = Size(animatedProgress * size.width, size.height),
-                            cornerRadius = CornerRadius(50f)
+                            size = androidx.compose.ui.geometry.Size(animatedProgress * size.width, size.height),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f)
                         )
                     }
-
                     if (compliment.isNotEmpty()) {
                         Spacer(Modifier.height(10.dp))
-                        // Highlighted Quotation: Centered and enlarged
                         Text(
                             text = compliment,
                             fontFamily = BricolageGrotesque,
-                            textAlign = TextAlign.Start,
-                            modifier = Modifier.fillMaxWidth(),
                             style = androidx.compose.ui.text.TextStyle(
                                 brush = progressBrush,
                                 fontSize = 15.sp,
@@ -1335,10 +1332,18 @@ fun EntryRow(
             AnimatedVisibility(visible = expanded) {
                 Column {
                     Spacer(Modifier.height(18.dp))
-                    Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
-                        InfoBox("Duration", "${shortPretty(startDate)} - ${if(endDate.isNotBlank()) shortPretty(endDate) else "Ongoing"}", pillBackground, pillTextColor)
-                        InfoBox("Cramps / Pain", painLabel(crampsPain), pillBackground, pillTextColor)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
+                            InfoBox("Duration", "${shortPretty(startDate)} - ${if(endDate.isNotBlank()) shortPretty(endDate) else "Ongoing"}", pillBackground, pillTextColor)
+                            InfoBox("Pain", painLabel(crampsPain), pillBackground, pillTextColor)
+                        }
+                        // Blood Flow and Blood Color moved here side-by-side
+                        Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
+                            InfoBox("Flow", capitalizedBleeding, pillBackground, pillTextColor)
+                            InfoBox("Color", bloodColor, pillBackground, pillTextColor)
+                        }
                     }
+
                     Spacer(Modifier.height(16.dp))
                     OutlinedButton(
                         onClick = onEditClick,
@@ -1361,6 +1366,7 @@ fun EntryRow(
         }
     }
 }
+
 
 @Composable
 fun RowScope.InfoBox(
@@ -1390,28 +1396,6 @@ fun RowScope.InfoBox(
             color = textColor,
             fontSize = 13.sp,
             fontWeight = FontWeight.Normal
-        )
-    }
-}
-
-@Composable
-fun MetaPill(label: String, value: String, textColor: Color, bg: Color) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(bg)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = value,
-            fontFamily = BricolageGrotesque, // Applied custom font
-            color = textColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 120.dp)
         )
     }
 }

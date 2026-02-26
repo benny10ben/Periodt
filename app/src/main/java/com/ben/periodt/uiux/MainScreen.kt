@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
@@ -20,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -37,13 +40,17 @@ import androidx.navigation.compose.rememberNavController
 import com.ben.periodt.uiux.calendar.AddCycleDialog
 import com.ben.periodt.uiux.calendar.CalendarScreen
 import com.ben.periodt.uiux.overview.OverviewScreen
-import com.ben.periodt.uiux.overview.SettingsScreen // Ensure this is imported
+import com.ben.periodt.uiux.overview.SettingsScreen
 import com.ben.periodt.uiux.overview.WhatsNewDialog
+import com.ben.periodt.uiux.pill.PillTrackerScreen
+import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.delay
 
+// --- NAVIGATION CONFIGURATION ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "Calendar", Icons.Rounded.CalendarMonth)
+    object Pill : Screen("pill", "Pills", Icons.Default.Medication)
     object Overview : Screen("overview", "Overview", Icons.Rounded.SpaceDashboard)
     object Settings : Screen("settings", "Settings", Icons.Rounded.Settings)
 }
@@ -56,31 +63,23 @@ fun SmoothBottomNavigation(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
+    val smoothSpec = tween<Dp>(durationMillis = 500, easing = FastOutSlowInEasing)
 
-    // --- THE STEADY GLIDE SPEC ---
-    // Match this to your MainScreen (700ms) to ensure the bar and screen move together
-    val smoothSpec = tween<Dp>(
-        durationMillis = 700,
-        easing = FastOutSlowInEasing // Prevents the jumpy/bouncy feel
-    )
+    val navBarBg = if (isDark) Color(0xFF2A3825) else Color(0xFFFFFFFF)
+    val selectionPillBg = if (isDark) Color(0xFF1B1B1B) else Color(0xFF2A3825)
 
-    val navBarBrush = if (isDark) {
-        Brush.linearGradient(colors = listOf(Color(0xFF2A3825), Color(0xFF2A3825)))
-    } else {
-        Brush.linearGradient(colors = listOf(Color(0xFFFFFFFF), Color(0xFFFFFFFF)))
-    }
-
-    val selectedBg = if (isDark) Color(0xFF1B1B1B) else Color(0xFF2A3825)
     val selectedContent = Color.White
     val unselectedContent = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.3f)
 
     val selectedIndex = screens.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
-    val slotWidth = 95.dp
-    val itemHeight = 46.dp
 
-    // Updated offset animation with the smoothSpec
+    val paddingValue = 6.dp
+    val slotWidth = 72.dp
+    val barHeight = 58.dp
+    val pillWidth = 62.dp
+
     val indicatorOffset by animateDpAsState(
-        targetValue = slotWidth * selectedIndex,
+        targetValue = (slotWidth * selectedIndex),
         animationSpec = smoothSpec,
         label = "indicatorOffset"
     )
@@ -88,54 +87,50 @@ fun SmoothBottomNavigation(
     Box(
         modifier = modifier
             .wrapContentWidth()
+            .height(barHeight)
             .shadow(
                 elevation = 8.dp,
-                shape = RoundedCornerShape(28.dp),
+                shape = RoundedCornerShape(29.dp),
                 ambientColor = Color.Black.copy(alpha = 0.4f),
                 spotColor = Color.Black.copy(alpha = 0.4f)
             )
-            .clip(RoundedCornerShape(28.dp))
-            .background(navBarBrush)
-            .padding(horizontal = 9.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(29.dp))
+            .background(navBarBg)
+            .padding(all = paddingValue)
     ) {
-        // The Sliding Background Pill
         Box(
             modifier = Modifier
-                .height(itemHeight)
-                .width(slotWidth)
-                .offset(x = indicatorOffset)
-                .clip(RoundedCornerShape(22.dp)) // Slightly tighter corner for the inner pill
-                .background(selectedBg)
+                .offset(x = indicatorOffset + (slotWidth - pillWidth) / 2)
+                .align(Alignment.CenterStart)
+                .width(pillWidth)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(23.dp))
+                .background(selectionPillBg)
         )
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            screens.forEachIndexed { index, screen ->
-                val isSelected = index == selectedIndex
-
-                // Content color also needs a smooth fade to match the motion
+        Row(
+            modifier = Modifier.fillMaxHeight(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            screens.forEach { screen ->
+                val isSelected = screen.route == currentRoute
                 val contentColor by animateColorAsState(
                     targetValue = if (isSelected) selectedContent else unselectedContent,
-                    animationSpec = tween(durationMillis = 500),
+                    animationSpec = tween(durationMillis = 400),
                     label = "contentColor"
                 )
-
-                val interaction = remember { MutableInteractionSource() }
 
                 Box(
                     modifier = Modifier
                         .width(slotWidth)
-                        .height(itemHeight),
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onNavigate(screen.route) }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .clickable(
-                                interactionSource = interaction,
-                                indication = null,
-                                onClick = { onNavigate(screen.route) }
-                            )
-                    )
                     Icon(
                         imageVector = screen.icon,
                         contentDescription = screen.label,
@@ -147,12 +142,11 @@ fun SmoothBottomNavigation(
         }
     }
 }
-
 @Composable
 fun MainScreen() {
     val isDark = isSystemInDarkTheme()
 
-    // UPDATED SCREEN BACKGROUNDS (Diagonal Gradient)
+    // --- VISUAL SETUP ---
     val bgGradient = if (isDark) {
         Brush.linearGradient(
             0.0f to Color.Black,
@@ -175,65 +169,37 @@ fun MainScreen() {
         Brush.linearGradient(colors = listOf(Color(0xFFFFFFFF), Color(0xFFFFFFFF)))
     }
 
+    // --- NAVIGATION & STATE ---
     val navController = rememberNavController()
     val context = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application
     val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context))
-    val screens = listOf(Screen.Calendar, Screen.Overview)
-
-    // Auto-show What's New on update
-    var showWhatsNew by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        val currentVersion = context.packageManager
-            .getPackageInfo(context.packageName, 0)
-            .versionCode
-        val lastSeen = VersionPrefs.getLastSeenVersion(context)
-        if (currentVersion > lastSeen) {
-            VersionPrefs.setLastSeenVersion(context, currentVersion)
-            delay(3000)
-            showWhatsNew = true
-        }
-    }
-    SetSystemBars(statusBarColor = Color.Transparent, darkIcons = !isDark)
+    val screens = listOf(Screen.Calendar, Screen.Pill, Screen.Overview)
 
     var showAddCycleDialog by remember { mutableStateOf(false) }
+    var showAddPillDialog by remember { mutableStateOf(false) }
+    var showWhatsNew by remember { mutableStateOf(false) }
 
-    val fadeInSmooth = fadeIn(tween(300, easing = FastOutSlowInEasing))
-    val fadeOutSmooth = fadeOut(tween(250, easing = FastOutLinearInEasing))
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    SetSystemBars(statusBarColor = Color.Transparent, darkIcons = !isDark)
 
     Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
+        // --- PAGE CONTENT ---
         NavHost(
             navController = navController,
             startDestination = Screen.Calendar.route,
             modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)
         ) {
-            // Calendar Screen
-            composable(Screen.Calendar.route, enterTransition = { fadeInSmooth }, exitTransition = { fadeOutSmooth }) {
-                CalendarScreen()
-            }
-
-            // Overview Screen
-            composable(Screen.Overview.route, enterTransition = { fadeInSmooth }, exitTransition = { fadeOutSmooth }) {
-                OverviewScreen(viewModel)
-            }
-
-            // Settings Screen (Slides in from right)
-            composable(
-                route = Screen.Settings.route,
-                enterTransition = { slideInHorizontally(initialOffsetX = { it }) },
-                exitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
-            ) {
-                SettingsScreen(
-                    onBack = { navController.popBackStack() },
-                    viewModel = viewModel
-                )
+            composable(Screen.Calendar.route) { CalendarScreen() }
+            composable(Screen.Pill.route) { PillTrackerScreen(viewModel) }
+            composable(Screen.Overview.route) { OverviewScreen(viewModel) }
+            composable(Screen.Settings.route) {
+                SettingsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel)
             }
         }
 
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry?.destination?.route
-        val isOverview = currentRoute == Screen.Overview.route
-        // Hide bottom bar/FAB when on Settings screen
+        // --- BOTTOM UI (NAV + FAB) ---
         val showBottomUi = currentRoute != Screen.Settings.route
 
         AnimatedVisibility(
@@ -246,15 +212,10 @@ fun MainScreen() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 35.dp, vertical = 20.dp)
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {
-                val barHeight = 60.dp
-                val fabSize = 58.dp
-                val settingsIconSize = 27.dp
-                val gapAboveFab = 20.dp
-
-                // Bottom Navigation Bar
-                Box(modifier = Modifier.align(Alignment.BottomStart).height(barHeight).widthIn(max = 300.dp)) {
+                // Navigation Bar
+                Box(modifier = Modifier.align(Alignment.BottomStart).height(58.dp)) {
                     SmoothBottomNavigation(
                         screens = screens,
                         currentRoute = currentRoute,
@@ -264,67 +225,66 @@ fun MainScreen() {
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        },
-                        modifier = Modifier.align(Alignment.CenterStart)
+                        }
                     )
                 }
 
-                // FAB & Settings Button Area
-                Box(modifier = Modifier.align(Alignment.CenterEnd).width(fabSize).height(fabSize + gapAboveFab + 24.dp)) {
-
-                    // Floating Action Button (Add Cycle)
+                // --- HARMONIZED SMART FAB ---
+                Box(modifier = Modifier.align(Alignment.CenterEnd).width(60.dp).height(58.dp)) {
                     Surface(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .size(fabSize)
-                            .zIndex(1f)
+                            .fillMaxSize()
                             .shadow(
-                                elevation = 8.dp,
+                                elevation = 8.dp, // Matches Navbar
                                 shape = CircleShape,
-                                ambientColor = Color.Black.copy(alpha = 0.6f),
-                                spotColor = Color.Black.copy(alpha = 0.6f)
+                                ambientColor = Color.Black.copy(alpha = 0.4f),
+                                spotColor = Color.Black.copy(alpha = 0.4f)
                             ),
                         shape = CircleShape,
                         color = Color.Transparent,
-                        onClick = { showAddCycleDialog = true }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape)
-                                .background(buttonBrush),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            ClickyAddIcon(tint = if (isDark) Color.White else Color(0xFF2A3825)) {
-                                showAddCycleDialog = true
+                        onClick = {
+                            when (currentRoute) {
+                                Screen.Pill.route -> showAddPillDialog = true // Triggers Dialog
+                                Screen.Overview.route -> navController.navigate(Screen.Settings.route)
+                                else -> showAddCycleDialog = true
                             }
                         }
-                    }
-
-                    // Settings Button (Transitions to new screen now)
-                    AnimatedVisibility(
-                        visible = isOverview,
-                        enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(200, 50, FastOutSlowInEasing)) + fadeIn(tween(250, 100, LinearOutSlowInEasing)),
-                        exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(200, easing = FastOutLinearInEasing)) + fadeOut(tween(200, easing = FastOutLinearInEasing)),
-                        modifier = Modifier.align(Alignment.TopCenter).offset(y = gapAboveFab * (-0.5f))
                     ) {
-                        IconButton(
-                            onClick = { navController.navigate(Screen.Settings.route) },
-                            modifier = Modifier.size(settingsIconSize + 16.dp)
+                        Box(
+                            modifier = Modifier.fillMaxSize().background(buttonBrush),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = if (isDark) Color.White else Color(0xFF2A3825),
-                                modifier = Modifier.size(settingsIconSize)
-                            )
+                            val iconColor = if (isDark) Color.White else Color(0xFF2A3825)
+
+                            AnimatedContent(targetState = currentRoute, label = "FABIconTransition") { route ->
+                                when (route) {
+                                    // Icons standardized to 24.dp
+                                    Screen.Pill.route -> CapsuleIcon(color = iconColor)
+                                    Screen.Overview.route -> Icon(
+                                        imageVector = Icons.Rounded.Settings,
+                                        contentDescription = "Settings",
+                                        tint = iconColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    else -> ClickyAddIcon(tint = iconColor) {
+                                        showAddCycleDialog = true
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Add Cycle Dialog (Global)
+        // --- DIALOGS (UI ONLY) ---
+        if (showAddPillDialog) {
+            PillTrackingSetupDialog(
+                onDismiss = { showAddPillDialog = false },
+                onSave = { _, _ -> showAddPillDialog = false } // Design-only closure
+            )
+        }
+
         if (showAddCycleDialog) {
             AddCycleDialog(
                 onDismiss = { showAddCycleDialog = false },
@@ -334,8 +294,29 @@ fun MainScreen() {
                 }
             )
         }
-        if (showWhatsNew) {
-            WhatsNewDialog(onDismiss = { showWhatsNew = false })
+    }
+}
+
+/**
+ * A custom-drawn capsule icon standardized to 24.dp to match Navbar icons
+ */
+@Composable
+fun CapsuleIcon(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(24.dp) // Size matched to Nav icons
+            .rotate(-45f),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .width(10.dp)
+                .height(20.dp)
+                .clip(RoundedCornerShape(100.dp))
+                .border(1.5.dp, color.copy(alpha = 0.8f), RoundedCornerShape(100.dp))
+        ) {
+            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(color))
+            Box(modifier = Modifier.fillMaxWidth().weight(1f).background(color.copy(alpha = 0.2f)))
         }
     }
 }
