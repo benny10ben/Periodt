@@ -20,17 +20,22 @@ object CalendarWidgetRenderer {
 
         // 1. Data Retrieval
         val dao = AppDatabase.getDatabase(context).periodCycleDao()
-        val rawCycles = dao.getAllCyclesNow()
-        val cycles = rawCycles.map {
+
+        // Fix: Use getAllCyclesOnce() if getAllCyclesNow() is missing from your DAO
+        val rawCycles = dao.getAllCyclesOnce()
+
+        val cycles = rawCycles.map { entity -> // Explicitly named 'entity' to fix 'it' errors
             PeriodViewModel.Cycle(
-                id = it.id,
-                startDate = LocalDate.parse(it.startDate),
-                endDate = it.endDate.takeIf { d -> d.isNotBlank() }?.let { d -> LocalDate.parse(d) },
-                bleeding = it.bleeding,
-                painLevel = it.painLevel,
-                bloodColor = it.bloodColor
+                id = entity.id,
+                startDate = LocalDate.parse(entity.startDate),
+                endDate = entity.endDate.takeIf { d -> d.isNotBlank() }?.let { d -> LocalDate.parse(d) },
+                bleeding = entity.bleeding,
+                painLevel = entity.painLevel,
+                bloodColor = entity.bloodColor
             )
         }
+
+        // Reverting to your previous simple prediction for the widget
         val prediction = predictCycle(cycles)
 
         // 2. FORCE COLOR RESOLUTION (The Fix)

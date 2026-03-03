@@ -11,8 +11,8 @@ import com.ben.periodt.security.DbKeyManager
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
-    entities = [PeriodCycleEntity::class],
-    version = 2,
+    entities = [PeriodCycleEntity::class, PillPackEntity::class], // Added PillPackEntity
+    version = 3, // Bumped to 3
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,6 +27,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // NEW MIGRATION: 2 -> 3
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS pill_packs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        startDate TEXT NOT NULL, 
+                        pillCount INTEGER NOT NULL, 
+                        endDate TEXT
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: build(context.applicationContext).also { INSTANCE = it }
@@ -36,17 +50,12 @@ abstract class AppDatabase : RoomDatabase() {
             val passphrase = DbKeyManager.getOrCreateDbPassphrase(ctx)
             val factory = object : SupportOpenHelperFactory(passphrase) {
                 override fun create(configuration: SupportSQLiteOpenHelper.Configuration): SupportSQLiteOpenHelper {
-                    // FIX: Zero out AFTER super.create() so SQLCipher reads the key first.
-                    // Previously passphrase.fill(0) was called before super.create(), wiping
-                    // the key before SQLCipher could use it.
-                    return super.create(configuration).also {
-                        passphrase.fill(0)
-                    }
+                    return super.create(configuration).also { passphrase.fill(0) }
                 }
             }
             return Room.databaseBuilder(ctx, AppDatabase::class.java, "period_db")
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // Added MIGRATION_2_3
                 .build()
         }
     }

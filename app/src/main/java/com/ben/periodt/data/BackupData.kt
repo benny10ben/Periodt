@@ -3,11 +3,6 @@ package com.ben.periodt.data
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
 
-/**
- * @Keep tells R8 directly on the class — no proguard rules file needed.
- * This is more reliable than proguard rules because it travels with the
- * source code and can't be missed or overridden by the base rules file.
- */
 @Keep
 data class BackupCycleDto(
     @SerializedName("startDate")  val startDate: String,
@@ -18,13 +13,43 @@ data class BackupCycleDto(
 )
 
 @Keep
-data class BackupData(
-    @SerializedName("version")   val version: Int = 1,
-    @SerializedName("timestamp") val timestamp: Long = System.currentTimeMillis(),
-    @SerializedName("cycles")    val cycles: List<BackupCycleDto>
+data class BackupPillState(
+    @SerializedName("isOnPill")        val isOnPill: Boolean = false,
+    @SerializedName("isTransitioning") val isTransitioning: Boolean = false,
+    @SerializedName("packStartDate")   val packStartDate: String? = null,
+    @SerializedName("pillCount")       val pillCount: Int = 21,
+    @SerializedName("pillStopDate")    val pillStopDate: String? = null
 )
 
-// --- Mapping helpers ---
+@Keep
+data class PillPackDto(
+    @SerializedName("startDate") val startDate: String,
+    @SerializedName("pillCount") val pillCount: Int,
+    @SerializedName("endDate")   val endDate: String?
+)
+
+@Keep
+data class BackupData(
+    @SerializedName("version")     val version: Int = CURRENT_VERSION,
+    @SerializedName("timestamp")   val timestamp: Long = System.currentTimeMillis(),
+    @SerializedName("cycles")      val cycles: List<BackupCycleDto>,
+    @SerializedName("pillHistory") val pillHistory: List<PillPackDto>? = null
+) {
+    companion object {
+        /**
+         * Export format version history:
+         * 1 → Initial release
+         * 2 → Added painLevel to cycles
+         * 3 → Moved pill state from SharedPreferences to DB (pillHistory)
+         */
+        const val CURRENT_VERSION = 3
+    }
+}
+
+// ── Mappers ──────────────────────────────────────────────────────────────────
+
+fun PillPackEntity.toDto() = PillPackDto(startDate, pillCount, endDate)
+fun PillPackDto.toEntity() = PillPackEntity(startDate = startDate, pillCount = pillCount, endDate = endDate)
 
 fun PeriodCycleEntity.toDto() = BackupCycleDto(
     startDate  = startDate,

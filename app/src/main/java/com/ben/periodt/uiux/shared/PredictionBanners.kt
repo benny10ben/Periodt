@@ -1,13 +1,15 @@
 package com.ben.periodt.uiux.shared
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,19 +37,47 @@ fun UpcomingBannerEnhanced(
     gradBottom: Color,
     onGradient: Color,
     onGradientMuted: Color,
-    mostLikelyDate: LocalDate? = null
+    mostLikelyDate: LocalDate? = null,
+    isDiscoveryMode: Boolean = false,
+    isLearningMode: Boolean = false,
+    discoveryCycle: Int = 1
 ) {
     val isDark = isSystemInDarkTheme()
 
-    val surfaceColor = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val accentColor = Color(0xFFD89046)
-    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-    val badgeAlpha = if (isDark) 0.15f else 0.1f
+    // Consistent Discovery/Learning Purple vs Normal Green/Orange
+    val discoveryAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
+    val normalAccent    = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+
+    val accentColor = when {
+        isDiscoveryMode || isLearningMode -> discoveryAccent
+        else -> normalAccent
+    }
+
+    val displayTitle = when {
+        isDiscoveryMode -> "Discovery Mode"
+        isLearningMode  -> "Learning Mode"
+        else            -> title
+    }
+
+    val displayBadge = when {
+        isDiscoveryMode -> "Paused"
+        isLearningMode  -> "Learning"
+        else            -> badge
+    }
+
+    val displayWindowText = when {
+        isDiscoveryMode -> "Predictions are paused while your body recalibrates after the pill."
+        else            -> windowText
+    }
+
+    val surfaceColor   = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val textPrimary    = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSecondary  = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val badgeAlpha     = if (isDark) 0.15f else 0.1f
 
     Card(
-        shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        shape    = RoundedCornerShape(26.dp),
+        colors   = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -60,76 +90,44 @@ fun UpcomingBannerEnhanced(
             val daysLeftLabel = remember(mostLikelyDate) {
                 mostLikelyDate?.let { target ->
                     val today = LocalDate.now()
-                    val diff = ChronoUnit.DAYS.between(today, target).toInt()
+                    val diff  = ChronoUnit.DAYS.between(today, target).toInt()
                     when {
-                        diff < 0 -> "Overdue by ${-diff}d"
+                        diff < 0  -> "Overdue by ${-diff}d"
                         diff == 0 -> "Today"
                         diff == 1 -> "Tomorrow"
-                        else -> "${diff}d left"
+                        else      -> "${diff}d left"
                     }
                 }
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
-
-                // ── Header row: title (left) + dots only (right) ──────────────
-                // The label is intentionally excluded from this Row so it cannot
-                // shift the dots upward relative to the title text.
+                // --- HEADER SECTION ---
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = title,
-                        fontFamily = BricolageGrotesque,
-                        color = textPrimary,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                        modifier = Modifier.weight(1f)
-                    )
-                    ConfidenceDots(
-                        confidence = confidence,
-                        accentColor = accentColor
-                    )
-                }
+                    if (isDiscoveryMode) {
+                        // Icon + Badge for Discovery
+                        Icon(
+                            imageVector        = Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            tint               = accentColor,
+                            modifier           = Modifier.size(24.dp)
+                        )
+                    } else {
+                        // Title for Learning/Normal
+                        Text(
+                            text       = displayTitle,
+                            fontFamily = BricolageGrotesque,
+                            color      = textPrimary,
+                            style      = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            modifier   = Modifier.weight(1f)
+                        )
+                    }
 
-                // Confidence label — flush to the end, sits just below the dots
-                Text(
-                    text = confidenceLabel,
-                    fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.Normal,
-                    color = textSecondary,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentWidth(Alignment.End)
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    text = windowText,
-                    fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.Normal,
-                    color = textPrimary.copy(alpha = 0.9f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-
-                Spacer(Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = mostLikely,
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.Normal,
-                        color = textSecondary,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    if (badge.isNotBlank()) {
+                    // Badge or Dots
+                    if (isDiscoveryMode || isLearningMode) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
@@ -137,31 +135,98 @@ fun UpcomingBannerEnhanced(
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = badge,
+                                text       = displayBadge,
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isDark) accentColor else Color(0xFFB45309),
-                                style = MaterialTheme.typography.labelSmall
+                                color      = accentColor,
+                                style      = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    } else {
+                        ConfidenceDots(confidence = confidence, accentColor = accentColor)
+                    }
+                }
+
+                // Sub-header Label
+                if (isDiscoveryMode) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text       = displayTitle,
+                        fontFamily = BricolageGrotesque,
+                        color      = textPrimary,
+                        style      = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                } else {
+                    Text(
+                        text       = if (isLearningMode) "Refining accuracy" else confidenceLabel,
+                        fontFamily = BricolageGrotesque,
+                        fontWeight = FontWeight.Normal,
+                        color      = textSecondary,
+                        style      = MaterialTheme.typography.labelSmall,
+                        modifier   = Modifier.fillMaxWidth().wrapContentWidth(Alignment.End)
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // --- CONTENT SECTION ---
+                Text(
+                    text       = displayWindowText,
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Normal,
+                    color      = textPrimary.copy(alpha = 0.9f),
+                    style      = MaterialTheme.typography.bodyMedium
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text       = mostLikely,
+                        fontFamily = BricolageGrotesque,
+                        fontWeight = FontWeight.Normal,
+                        color      = textSecondary,
+                        style      = MaterialTheme.typography.bodyMedium
+                    )
+
+                    // Secondary Badge (only for Normal mode)
+                    if (!isDiscoveryMode && !isLearningMode && badge.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(accentColor.copy(alpha = badgeAlpha))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text       = badge,
+                                fontFamily = BricolageGrotesque,
+                                fontWeight = FontWeight.SemiBold,
+                                color      = if (isDark) accentColor else Color(0xFFB45309),
+                                style      = MaterialTheme.typography.labelSmall
                             )
                         }
                     }
                 }
             }
 
-            if (!daysLeftLabel.isNullOrBlank()) {
+            // Bottom-right "Days Left" floating pill
+            if (!isDiscoveryMode && !daysLeftLabel.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF2A3825))
+                        .background(accentColor) // Uses discoveryAccent if in Learning
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = daysLeftLabel,
+                        text       = daysLeftLabel,
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall
+                        color      = Color.White,
+                        style      = MaterialTheme.typography.labelSmall
                     )
                 }
             }
@@ -169,11 +234,10 @@ fun UpcomingBannerEnhanced(
     }
 }
 
-// ── Dots only — no label, so top-alignment with title is pixel-perfect ──────
 @Composable
 fun ConfidenceDots(
     confidence: Float,
-    accentColor: Color,
+    accentColor: Color
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         repeat(5) { index ->

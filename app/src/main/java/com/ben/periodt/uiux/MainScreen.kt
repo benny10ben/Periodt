@@ -277,11 +277,17 @@ fun MainScreen() {
             }
         }
 
-        // --- DIALOGS (UI ONLY) ---
         if (showAddPillDialog) {
             PillTrackingSetupDialog(
                 onDismiss = { showAddPillDialog = false },
-                onSave = { _, _ -> showAddPillDialog = false } // Design-only closure
+                onSave = { startDate, pillCount ->
+                    // Let the ViewModel handle saving and updating the state!
+                    viewModel.enablePillTracking(startDate, pillCount)
+                    showAddPillDialog = false
+                    navController.navigate(Screen.Pill.route) {
+                        popUpTo(Screen.Pill.route) { inclusive = true }
+                    }
+                }
             )
         }
 

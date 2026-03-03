@@ -18,19 +18,24 @@ object SmallWidgetRenderer {
         val views = RemoteViews(context.packageName, R.layout.widget_small)
         val ym = YearMonth.of(year, month)
 
-        // 1. Setup Data with Named Arguments
+        // 1. Data Retrieval
         val dao = AppDatabase.getDatabase(context).periodCycleDao()
-        val rawCycles = dao.getAllCyclesNow()
-        val cycles = rawCycles.map {
+
+        // Use getAllCyclesOnce() to match the standard database retrieval pattern
+        val rawCycles = dao.getAllCyclesOnce()
+
+        // FIX: Explicitly name the lambda parameter 'entity' to resolve mapping errors
+        val cycles = rawCycles.map { entity ->
             PeriodViewModel.Cycle(
-                id = it.id,
-                startDate = LocalDate.parse(it.startDate),
-                endDate = it.endDate.takeIf { d -> d.isNotBlank() }?.let { d -> LocalDate.parse(d) },
-                bleeding = it.bleeding,
-                painLevel = it.painLevel,
-                bloodColor = it.bloodColor
+                id = entity.id,
+                startDate = LocalDate.parse(entity.startDate),
+                endDate = entity.endDate.takeIf { d -> d.isNotBlank() }?.let { d -> LocalDate.parse(d) },
+                bleeding = entity.bleeding,
+                painLevel = entity.painLevel,
+                bloodColor = entity.bloodColor
             )
         }
+
         val prediction = predictCycle(cycles)
 
         // 2. Set Header with Year for context

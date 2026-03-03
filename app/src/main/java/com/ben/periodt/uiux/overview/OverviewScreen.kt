@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
 import com.ben.periodt.uiux.shared.getConfidenceLabel
 import com.ben.periodt.uiux.shared.getCycleConfidence
@@ -73,7 +74,22 @@ fun OverviewScreen(
     viewModel: PeriodViewModel,
     isDarkTheme: Boolean = isSystemInDarkTheme()
 ) {
+    // --- 1. COLLECT STATES FROM VIEWMODEL ---
     val cycles by viewModel.cycles.collectAsState()
+    val prediction by viewModel.prediction.collectAsState()
+    val isTransitioning by viewModel.isTransitioning.collectAsState()
+    val pillStopDate by viewModel.pillStopDate.collectAsState()
+
+    // --- 2. CALCULATE DISCOVERY LOGIC ---
+    val postPillCycles = remember(cycles, pillStopDate) {
+        if (pillStopDate != null) {
+            cycles.filter { !it.startDate.isBefore(pillStopDate) }
+        } else {
+            cycles
+        }
+    }
+    val discoveryCycle = (postPillCycles.size + 1).coerceIn(1, 4)
+
     val screenScroll = rememberScrollState()
     val isDark = isDarkTheme
 
@@ -90,10 +106,18 @@ fun OverviewScreen(
     val subCol  = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
 
     // Specific Chart Colors
-    val bleedingChartColor = Color(0xFFD89046) // Darker Orange for Blood
-    val painChartColor = Color(0xFF2A3825)     // Deep Green for Pain
+    val bleedingChartColor = Color(0xFFD89046)
+    val painChartColor = Color(0xFF2A3825)
 
-    val prediction = remember(cycles) { predictCycle(cycles) }
+    // --- FIX: Capture the delegated property into a local 'val' ---
+    val currentPrediction = viewModel.prediction.collectAsState().value
+
+    // Collect this alongside isTransitioning wherever this screen's state is declared
+    val postPillState by viewModel.postPillState.collectAsState()
+
+// Derive the flags cleanly in one place
+    val isDiscoveryMode = postPillState == PostPillState.DISCOVERY
+    val isLearningMode  = postPillState == PostPillState.LEARNING
 
     Box(
         modifier = Modifier
@@ -105,7 +129,7 @@ fun OverviewScreen(
                 .fillMaxSize()
                 .verticalScroll(screenScroll)
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 90.dp) // Space for Bottom Bar
+                .padding(bottom = 90.dp)
                 .padding(top = 16.dp)
         ) {
             // --- TOP STATS ROW ---
@@ -138,62 +162,52 @@ fun OverviewScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // --- UPCOMING PERIOD BANNER ---
-            if (prediction != null) {
+            if (currentPrediction != null || isDiscoveryMode) {
                 UpcomingBannerEnhanced(
-                    title = "Upcoming period",
-                    windowText = "${prediction.minPeriodStart.pretty()} – ${prediction.maxPeriodStart.pretty()}",
-                    mostLikely = "Most likely: ${prediction.mostLikelyPeriodStart.pretty()}",
-                    badge = "",
-                    confidence = getCycleConfidence(prediction.cycleRegularity),
-                    confidenceLabel = prediction.cycleRegularity.getDisplayName(),
-                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient = onGradient, onGradientMuted = onGradientMuted,
-                    mostLikelyDate = prediction.mostLikelyPeriodStart
+                    title           = "Upcoming period",
+                    windowText      = currentPrediction?.let { "${it.minPeriodStart.pretty()} – ${it.maxPeriodStart.pretty()}" } ?: "",
+                    mostLikely      = currentPrediction?.let { "Most likely: ${it.mostLikelyPeriodStart.pretty()}" } ?: "",
+                    badge           = "",
+                    confidence      = currentPrediction?.let { getCycleConfidence(it.cycleRegularity) } ?: 0f,
+                    confidenceLabel = currentPrediction?.cycleRegularity?.getDisplayName() ?: "",
+                    gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient      = onGradient, onGradientMuted = onGradientMuted,
+                    mostLikelyDate  = currentPrediction?.mostLikelyPeriodStart,
+                    isDiscoveryMode = isDiscoveryMode,
+                    isLearningMode  = isLearningMode,
+                    discoveryCycle  = discoveryCycle
                 )
             } else {
                 UpcomingBannerEnhanced(
-                    title = "Upcoming period",
-                    windowText = "Not enough data",
-                    mostLikely = "Track more cycles for predictions",
-                    badge = "",
-                    confidence = 0f,
+                    title           = "Upcoming period",
+                    windowText      = "Not enough data",
+                    mostLikely      = "Track more cycles for predictions",
+                    badge           = "",
+                    confidence      = 0f,
                     confidenceLabel = "No data",
-                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient = onGradient, onGradientMuted = onGradientMuted
+                    gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient      = onGradient, onGradientMuted = onGradientMuted
+                )
+            }
+
+// Fertile window — hide in both discovery and learning mode
+            if (currentPrediction != null && !isDiscoveryMode && !isLearningMode) {
+                Spacer(Modifier.height(14.dp))
+                UpcomingBannerEnhanced(
+                    title           = "Fertile window",
+                    windowText      = "${currentPrediction.fertileWindow.start.pretty()} – ${currentPrediction.fertileWindow.endInclusive.pretty()}",
+                    mostLikely      = "Ovulation: ${currentPrediction.ovulationDay.pretty()}",
+                    badge           = "Confidence ${(currentPrediction.ovulationConfidence * 100).toInt()}%",
+                    confidence      = currentPrediction.ovulationConfidence,
+                    confidenceLabel = getConfidenceLabel(currentPrediction.ovulationConfidence),
+                    gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient      = onGradient, onGradientMuted = onGradientMuted
                 )
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // --- FERTILE WINDOW BANNER ---
-            if (prediction != null) {
-                UpcomingBannerEnhanced(
-                    title = "Fertile window",
-                    windowText = "${prediction.fertileWindow.start.pretty()} – ${prediction.fertileWindow.endInclusive.pretty()}",
-                    mostLikely = "Ovulation: ${prediction.ovulationDay.pretty()}",
-                    badge = "Confidence ${(prediction.ovulationConfidence * 100).toInt()}%",
-                    confidence = prediction.ovulationConfidence,
-                    confidenceLabel = getConfidenceLabel(prediction.ovulationConfidence),
-                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient = onGradient, onGradientMuted = onGradientMuted
-                )
-            } else {
-                UpcomingBannerEnhanced(
-                    title = "Fertile window",
-                    windowText = "Not enough data",
-                    mostLikely = "Track more cycles for predictions",
-                    badge = "",
-                    confidence = 0f,
-                    confidenceLabel = "No data",
-                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient = onGradient, onGradientMuted = onGradientMuted
-                )
-            }
-
-            Spacer(Modifier.height(14.dp))
-
-            // --- BLEEDING INTENSITY CHART ---
+            // --- CHARTS SECTION ---
             MinimalChartCard(
                 title = "Bleeding intensity",
                 surface = surface,
@@ -202,7 +216,7 @@ fun OverviewScreen(
                 ScrollableLineChart(
                     points = bleedingSeriesVM(cycles),
                     dates = getDateLabels(cycles),
-                    lineColor = bleedingChartColor, // Darker Orange
+                    lineColor = bleedingChartColor,
                     yLabels = listOf("S", "L", "M", "H"),
                     yMax = 3f,
                     showArea = true,
@@ -216,7 +230,6 @@ fun OverviewScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // --- PAIN LEVEL CHART ---
             MinimalChartCard(
                 title = "Pain level",
                 surface = surface,
@@ -225,7 +238,7 @@ fun OverviewScreen(
                 ScrollableLineChart(
                     points = painSeriesVM(cycles),
                     dates = getDateLabels(cycles),
-                    lineColor = painChartColor, // Deep Green
+                    lineColor = painChartColor,
                     yLabels = (0..10 step 2).map { "$it" },
                     yMax = 10f,
                     showArea = true,
@@ -239,7 +252,6 @@ fun OverviewScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            // --- BLOOD COLOR PIE CHART ---
             MinimalChartCard(
                 title = "Blood color",
                 surface = surface,
@@ -261,7 +273,6 @@ fun OverviewScreen(
         }
     }
 }
-
 @Composable
 private fun StatCard(
     title: String,
