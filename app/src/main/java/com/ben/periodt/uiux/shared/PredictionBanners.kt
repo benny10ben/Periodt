@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -40,37 +42,46 @@ fun UpcomingBannerEnhanced(
     mostLikelyDate: LocalDate? = null,
     isDiscoveryMode: Boolean = false,
     isLearningMode: Boolean = false,
+    isOnPill: Boolean = false,
     discoveryCycle: Int = 1
 ) {
     val isDark = isSystemInDarkTheme()
 
-    // Consistent Discovery/Learning Purple vs Normal Green/Orange
-    val discoveryAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
-    val normalAccent    = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    // --- COLOR LOGIC ---
 
-    val accentColor = when {
-        isDiscoveryMode || isLearningMode -> discoveryAccent
-        else -> normalAccent
-    }
+    // 1. The "Stars" icon color (Purple/Navy)
+    val starIconColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
+
+    // 2. Main theme color (Orange/Green) for Natural Cycles
+    val themeAccent = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+
+    // 3. Theme Accent 2 (Requested color for Withdrawal/Pill mode)
+    val themeAccent2 = if (isDark) Color(0xFFa68e74) else Color(0xFF2A3825).copy(alpha = 0.5f)
+
+    // Select the primary accent for pills, badges, and labels based on the state
+    val activeAccent = if (isOnPill) themeAccent2 else themeAccent
 
     val displayTitle = when {
         isDiscoveryMode -> "Discovery Mode"
         isLearningMode  -> "Learning Mode"
+        isOnPill        -> "Withdrawal Bleed"
         else            -> title
     }
 
     val displayBadge = when {
         isDiscoveryMode -> "Paused"
         isLearningMode  -> "Learning"
+        isOnPill        -> "Pill Pack"
         else            -> badge
     }
 
     val displayWindowText = when {
         isDiscoveryMode -> "Predictions are paused while your body recalibrates after the pill."
+        isOnPill        -> "Estimated date based on your active pill pack settings."
         else            -> windowText
     }
 
-    val surfaceColor   = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val surfaceColor   = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF0F172A)
     val textSecondary  = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val badgeAlpha     = if (isDark) 0.15f else 0.1f
@@ -101,22 +112,23 @@ fun UpcomingBannerEnhanced(
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
-                // --- HEADER SECTION ---
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    if (isDiscoveryMode) {
-                        // Icon + Badge for Discovery
+                    if (isDiscoveryMode || isLearningMode || isOnPill) {
                         Icon(
-                            imageVector        = Icons.Rounded.AutoAwesome,
+                            imageVector = when {
+                                isOnPill -> Icons.Rounded.Medication
+                                else     -> Icons.Rounded.AutoAwesome
+                            },
                             contentDescription = null,
-                            tint               = accentColor,
-                            modifier           = Modifier.size(24.dp)
+                            // Icon color: star color for Discovery/Learning, themeAccent2 for Pill
+                            tint = if (isDiscoveryMode || isLearningMode) starIconColor else activeAccent,
+                            modifier = Modifier.size(24.dp)
                         )
                     } else {
-                        // Title for Learning/Normal
                         Text(
                             text       = displayTitle,
                             fontFamily = BricolageGrotesque,
@@ -126,29 +138,27 @@ fun UpcomingBannerEnhanced(
                         )
                     }
 
-                    // Badge or Dots
-                    if (isDiscoveryMode || isLearningMode) {
+                    if (isDiscoveryMode || isLearningMode || isOnPill) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(accentColor.copy(alpha = badgeAlpha))
+                                .background(activeAccent.copy(alpha = badgeAlpha))
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text       = displayBadge,
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.SemiBold,
-                                color      = accentColor,
+                                color      = activeAccent,
                                 style      = MaterialTheme.typography.labelSmall
                             )
                         }
                     } else {
-                        ConfidenceDots(confidence = confidence, accentColor = accentColor)
+                        ConfidenceDots(confidence = confidence, accentColor = activeAccent)
                     }
                 }
 
-                // Sub-header Label
-                if (isDiscoveryMode) {
+                if (isDiscoveryMode || isLearningMode || isOnPill) {
                     Spacer(Modifier.height(16.dp))
                     Text(
                         text       = displayTitle,
@@ -158,7 +168,7 @@ fun UpcomingBannerEnhanced(
                     )
                 } else {
                     Text(
-                        text       = if (isLearningMode) "Refining accuracy" else confidenceLabel,
+                        text       = confidenceLabel,
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Normal,
                         color      = textSecondary,
@@ -169,7 +179,6 @@ fun UpcomingBannerEnhanced(
 
                 Spacer(Modifier.height(12.dp))
 
-                // --- CONTENT SECTION ---
                 Text(
                     text       = displayWindowText,
                     fontFamily = BricolageGrotesque,
@@ -191,34 +200,16 @@ fun UpcomingBannerEnhanced(
                         color      = textSecondary,
                         style      = MaterialTheme.typography.bodyMedium
                     )
-
-                    // Secondary Badge (only for Normal mode)
-                    if (!isDiscoveryMode && !isLearningMode && badge.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(accentColor.copy(alpha = badgeAlpha))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text       = badge,
-                                fontFamily = BricolageGrotesque,
-                                fontWeight = FontWeight.SemiBold,
-                                color      = if (isDark) accentColor else Color(0xFFB45309),
-                                style      = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
                 }
             }
 
-            // Bottom-right "Days Left" floating pill
+            // Bottom-end "Days Left" badge: Uses themeAccent2 if on pill
             if (!isDiscoveryMode && !daysLeftLabel.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .clip(RoundedCornerShape(50))
-                        .background(accentColor) // Uses discoveryAccent if in Learning
+                        .background(activeAccent)
                         .padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Text(

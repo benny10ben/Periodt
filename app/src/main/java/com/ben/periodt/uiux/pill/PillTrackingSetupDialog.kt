@@ -45,17 +45,28 @@ fun PillTrackingSetupDialog(
     val pillOptions = listOf(21, 24, 28)
     val formatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
 
-    // --- THEME ---
+    // --- THEME & COLORS (Synced with AddCycleDialog) ---
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+
+    // Dynamic accent color
+    val accentColor = if (isDark) Color(0xFFa68e74) else Color(0xFF2A3825).copy(alpha = 0.5f)
+
+    // Gradient colors for DatePicker
+    val pastelGreen = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val pastelOrange = Color(0xFFa68e74)
+    val pastelMaroon = Color(0xFF4E1A1A)
+
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val surfaceFallback = if (isDark) Color.Black else Color.White
 
     val contentSurface = if (isDark) {
         Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
     } else {
         Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
     }
+
+    val pillBackground = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -64,7 +75,7 @@ fun PillTrackingSetupDialog(
         Card(
             modifier = Modifier.fillMaxWidth(0.92f).padding(vertical = 24.dp),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = if(isDark) Color.Black else Color.White),
+            colors = CardDefaults.cardColors(containerColor = surfaceFallback),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth().background(contentSurface)) {
@@ -75,7 +86,7 @@ fun PillTrackingSetupDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Pill Settings",
+                        text = "Log Pills",
                         fontFamily = BricolageGrotesque,
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = textPrimary
@@ -97,12 +108,12 @@ fun PillTrackingSetupDialog(
                         color = textSub
                     )
 
-                    // Start Date of Current Pack
+                    // Start Date Card (Matching style)
                     CleanDateCard(
                         label = "Pack Start Date",
                         date = startDate.format(formatter),
                         icon = Icons.Rounded.CalendarToday,
-                        bg = if(isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
+                        bg = pillBackground,
                         textColor = textPrimary,
                         onClick = { showDatePicker = true },
                         modifier = Modifier.fillMaxWidth()
@@ -125,10 +136,10 @@ fun PillTrackingSetupDialog(
                                 EntryStylePill(
                                     text = "$count Pills",
                                     isSelected = selectedPillCount == count,
-                                    activeBg = accentColor,
+                                    activeBg = accentColor, // Switched from fixed purple to theme accent
                                     activeText = Color.White,
                                     inactiveText = textSub,
-                                    surface = if(isDark) Color.Black else Color.White,
+                                    surface = surfaceFallback,
                                     onClick = { selectedPillCount = count }
                                 )
                             }
@@ -137,12 +148,16 @@ fun PillTrackingSetupDialog(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Save Button
+                    // Save Button (Synced with Add Cycle style)
                     Button(
                         onClick = { onSave(startDate, selectedPillCount) },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = accentColor, // Switched to theme accent
+                            contentColor = Color.White
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(0.dp)
                     ) {
                         Icon(Icons.Rounded.Medication, null)
                         Spacer(Modifier.width(8.dp))
@@ -162,9 +177,11 @@ fun PillTrackingSetupDialog(
         MinimalDatePickerDialog(
             title = "Pack Start Date",
             brand = accentColor,
-            gradTop = Color(0xFF2A3825), gradMid = Color(0xFFD89046), gradBottom = Color(0xFF4E1A1A),
+            gradTop = pastelGreen,
+            gradMid = pastelOrange,
+            gradBottom = pastelMaroon,
             onGradient = Color.White,
-            buttonContainer = if(isDark) Color.Black else Color.White,
+            buttonContainer = surfaceFallback,
             buttonContent = textPrimary,
             onDismiss = { showDatePicker = false },
             onConfirm = { ms ->
@@ -174,4 +191,3 @@ fun PillTrackingSetupDialog(
         )
     }
 }
-

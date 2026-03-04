@@ -128,10 +128,10 @@ fun SettingsScreen(
     }
 
     // SOLID SURFACES: High contrast, no transparency in Dark Mode
-    val surfaceColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val surfaceColor = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
 
     // --- Main Layout ---
     Box(

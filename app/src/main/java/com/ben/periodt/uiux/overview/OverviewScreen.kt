@@ -74,10 +74,17 @@ fun OverviewScreen(
     viewModel: PeriodViewModel,
     isDarkTheme: Boolean = isSystemInDarkTheme()
 ) {
-    // --- 1. COLLECT STATES FROM VIEWMODEL ---
+
+    // 1. Collect from StateFlow
     val cycles by viewModel.cycles.collectAsState()
-    val prediction by viewModel.prediction.collectAsState()
-    val isTransitioning by viewModel.isTransitioning.collectAsState()
+    val rawPrediction by viewModel.prediction.collectAsState() // Rename this one
+
+    // 2. CAPTURE INTO A STABLE LOCAL VAL
+    // This allows the compiler to perform smart casting
+    val prediction = rawPrediction
+
+    val isOnPill by viewModel.isOnPill.collectAsState()
+    val postPillState by viewModel.postPillState.collectAsState()
     val pillStopDate by viewModel.pillStopDate.collectAsState()
 
     // --- 2. CALCULATE DISCOVERY LOGIC ---
@@ -85,10 +92,13 @@ fun OverviewScreen(
         if (pillStopDate != null) {
             cycles.filter { !it.startDate.isBefore(pillStopDate) }
         } else {
-            cycles
+            emptyList() // No pill history = no post-pill logic
         }
     }
     val discoveryCycle = (postPillCycles.size + 1).coerceIn(1, 4)
+
+    val isDiscoveryMode = postPillState == PostPillState.DISCOVERY
+    val isLearningMode  = postPillState == PostPillState.LEARNING
 
     val screenScroll = rememberScrollState()
     val isDark = isDarkTheme
@@ -107,17 +117,8 @@ fun OverviewScreen(
 
     // Specific Chart Colors
     val bleedingChartColor = Color(0xFFD89046)
-    val painChartColor = Color(0xFF2A3825)
+    val painChartColor = Color(0xFF2A3825).copy(alpha = 0.5f)
 
-    // --- FIX: Capture the delegated property into a local 'val' ---
-    val currentPrediction = viewModel.prediction.collectAsState().value
-
-    // Collect this alongside isTransitioning wherever this screen's state is declared
-    val postPillState by viewModel.postPillState.collectAsState()
-
-// Derive the flags cleanly in one place
-    val isDiscoveryMode = postPillState == PostPillState.DISCOVERY
-    val isLearningMode  = postPillState == PostPillState.LEARNING
 
     Box(
         modifier = Modifier
@@ -162,19 +163,21 @@ fun OverviewScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            if (currentPrediction != null || isDiscoveryMode) {
+            // --- PREDICTION BANNER ---
+            if (prediction != null || isDiscoveryMode) {
                 UpcomingBannerEnhanced(
-                    title           = "Upcoming period",
-                    windowText      = currentPrediction?.let { "${it.minPeriodStart.pretty()} – ${it.maxPeriodStart.pretty()}" } ?: "",
-                    mostLikely      = currentPrediction?.let { "Most likely: ${it.mostLikelyPeriodStart.pretty()}" } ?: "",
-                    badge           = "",
-                    confidence      = currentPrediction?.let { getCycleConfidence(it.cycleRegularity) } ?: 0f,
-                    confidenceLabel = currentPrediction?.cycleRegularity?.getDisplayName() ?: "",
+                    title           = if (isOnPill) "Withdrawal bleed" else "Upcoming period",
+                    windowText      = prediction?.let { "${it.minPeriodStart.pretty()} – ${it.maxPeriodStart.pretty()}" } ?: "",
+                    mostLikely      = prediction?.let { "Most likely: ${it.mostLikelyPeriodStart.pretty()}" } ?: "",
+                    badge           = if (isOnPill) "Pill Pack" else "",
+                    confidence      = prediction?.let { getCycleConfidence(it.cycleRegularity) } ?: 0f,
+                    confidenceLabel = prediction?.cycleRegularity?.getDisplayName() ?: "",
                     gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
                     onGradient      = onGradient, onGradientMuted = onGradientMuted,
-                    mostLikelyDate  = currentPrediction?.mostLikelyPeriodStart,
+                    mostLikelyDate  = prediction?.mostLikelyPeriodStart,
                     isDiscoveryMode = isDiscoveryMode,
                     isLearningMode  = isLearningMode,
+                    isOnPill        = isOnPill, // Pass the flag down
                     discoveryCycle  = discoveryCycle
                 )
             } else {
@@ -190,16 +193,17 @@ fun OverviewScreen(
                 )
             }
 
-// Fertile window — hide in both discovery and learning mode
-            if (currentPrediction != null && !isDiscoveryMode && !isLearningMode) {
+            // --- FERTILE WINDOW ---
+            // Hide if on Pill (ovulation suppressed), in Discovery, or in Learning
+            if (prediction != null && !isOnPill && !isDiscoveryMode && !isLearningMode) {
                 Spacer(Modifier.height(14.dp))
                 UpcomingBannerEnhanced(
                     title           = "Fertile window",
-                    windowText      = "${currentPrediction.fertileWindow.start.pretty()} – ${currentPrediction.fertileWindow.endInclusive.pretty()}",
-                    mostLikely      = "Ovulation: ${currentPrediction.ovulationDay.pretty()}",
-                    badge           = "Confidence ${(currentPrediction.ovulationConfidence * 100).toInt()}%",
-                    confidence      = currentPrediction.ovulationConfidence,
-                    confidenceLabel = getConfidenceLabel(currentPrediction.ovulationConfidence),
+                    windowText      = "${prediction.fertileWindow.start.pretty()} – ${prediction.fertileWindow.endInclusive.pretty()}",
+                    mostLikely      = "Ovulation: ${prediction.ovulationDay.pretty()}",
+                    badge           = "Confidence ${(prediction.ovulationConfidence * 100).toInt()}%",
+                    confidence      = prediction.ovulationConfidence,
+                    confidenceLabel = getConfidenceLabel(prediction.ovulationConfidence),
                     gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
                     onGradient      = onGradient, onGradientMuted = onGradientMuted
                 )
@@ -208,11 +212,7 @@ fun OverviewScreen(
             Spacer(Modifier.height(14.dp))
 
             // --- CHARTS SECTION ---
-            MinimalChartCard(
-                title = "Bleeding intensity",
-                surface = surface,
-                titleColor = textCol
-            ) {
+            MinimalChartCard("Bleeding intensity", surface, textCol) {
                 ScrollableLineChart(
                     points = bleedingSeriesVM(cycles),
                     dates = getDateLabels(cycles),
@@ -230,11 +230,7 @@ fun OverviewScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            MinimalChartCard(
-                title = "Pain level",
-                surface = surface,
-                titleColor = textCol
-            ) {
+            MinimalChartCard("Pain level", surface, textCol) {
                 ScrollableLineChart(
                     points = painSeriesVM(cycles),
                     dates = getDateLabels(cycles),
@@ -252,11 +248,7 @@ fun OverviewScreen(
 
             Spacer(Modifier.height(14.dp))
 
-            MinimalChartCard(
-                title = "Blood color",
-                surface = surface,
-                titleColor = textCol
-            ) {
+            MinimalChartCard("Blood color", surface, textCol) {
                 BloodColorPieChart(
                     data = bloodColorDistributionVM(cycles),
                     surface = surface,
@@ -273,6 +265,7 @@ fun OverviewScreen(
         }
     }
 }
+
 @Composable
 private fun StatCard(
     title: String,
@@ -288,7 +281,7 @@ private fun StatCard(
 
     // AESTHETIC MAPPING
     // Surface: Dark #1B1B1B / Light White
-    val surfaceColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val surfaceColor = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
 
     // Changed to Card to remove elevation/shadows
     Card(
@@ -337,7 +330,7 @@ private fun MinimalChartCard(
 ) {
     val isDark = isSystemInDarkTheme()
     // Explicitly override surface for dark mode if needed
-    val cardSurface = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val cardSurface = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
 
 
     Card(
@@ -504,7 +497,7 @@ private fun YAxisLabels(
 fun ScrollableLineChart(
     points: List<Pair<Float, Float>>,
     dates: List<String>,
-    lineColor: Color, // 0xFFB45309 for Blood | 0xFF2A3825 for Pain
+    lineColor: Color, // 0xFFB45309 for Blood | 0xFF424530 for Pain
     yLabels: List<String>,
     yMax: Float,
     showArea: Boolean,

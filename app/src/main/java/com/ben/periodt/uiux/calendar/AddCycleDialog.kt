@@ -1,8 +1,6 @@
 package com.ben.periodt.uiux.calendar
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -11,27 +9,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.EventAvailable
-import androidx.compose.material.icons.rounded.Healing
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Update
-import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -81,11 +71,11 @@ fun AddCycleDialog(
     }
 
     // Yellow accent for Slider and Buttons in Dark Mode
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
     val surfaceFallback = if (isDark) Color.Black else Color.White
 
     // Synchronized Pastel Palette
-    val pastelGreen = Color(0xFF2A3825)
+    val pastelGreen = Color(0xFF2A3825).copy(alpha = 0.5f)
     val pastelOrange = Color(0xFFD89046)
     val pastelMaroon = Color(0xFF4E1A1A)
 
@@ -384,7 +374,7 @@ fun MinimalDatePickerDialog(
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
 
     // UPDATED: Yellow accent for dark mode
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
     val buttonText = Color.White // Forced White only
 
     Dialog(

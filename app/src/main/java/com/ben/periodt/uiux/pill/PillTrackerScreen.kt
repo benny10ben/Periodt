@@ -1,9 +1,9 @@
 package com.ben.periodt.uiux.pill
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -50,14 +51,15 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val cardBg         = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
-    val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
-    val discoveryAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
 
-    val activeAccent = when {
-        isOnPill                            -> accentColor
-        postPillState == PostPillState.DISCOVERY -> discoveryAccent
-        postPillState == PostPillState.LEARNING  -> discoveryAccent
-        else                                -> accentColor
+    // The "Stars" icon color (Discovery/Learning)
+    val starAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
+    // Your main theme color (Pill tracking / Natural)
+    val themeAccent = if (isDark) Color(0xFFa68e74) else Color(0xFF2A3825).copy(alpha = 0.5f)
+
+    val activeAccent = when (postPillState) {
+        PostPillState.DISCOVERY, PostPillState.LEARNING -> starAccent
+        else -> themeAccent
     }
 
     LaunchedEffect(Unit) {
@@ -78,18 +80,22 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
             targetState = Pair(isOnPill, postPillState),
             label       = "HeaderState"
         ) { (active, pillState) ->
+            val isStarMode = pillState == PostPillState.DISCOVERY || pillState == PostPillState.LEARNING && !active
+
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier         = Modifier
                         .size(80.dp)
                         .clip(CircleShape)
-                        .background(pillBackground),
+                        // REMOVED: Background is now Transparent if in Star mode
+                        .background(Color.Transparent),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = when {
-                            !active && pillState == PostPillState.DISCOVERY -> Icons.Rounded.AutoAwesome
-                            !active && pillState == PostPillState.LEARNING  -> Icons.Rounded.AutoAwesome
+                            active                                          -> Icons.Rounded.Medication
+                            pillState == PostPillState.DISCOVERY            -> Icons.Rounded.AutoAwesome
+                            pillState == PostPillState.LEARNING             -> Icons.Rounded.AutoAwesome
                             else                                            -> Icons.Rounded.Medication
                         },
                         contentDescription = null,
@@ -134,7 +140,16 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
 
         Spacer(Modifier.height(40.dp))
 
+        // 1. LifeAfterPillCard is now ALWAYS above and visible
+        LifeAfterPillCard(
+            cardBg         = cardBg,
+            textPrimary    = textPrimary,
+            textSub        = textSub,
+            postPillState  = postPillState
+        )
+
         if (isOnPill && startDate != null) {
+            Spacer(Modifier.height(32.dp))
             ActivePackSection(
                 startDate      = startDate!!,
                 pillCount      = pillCount,
@@ -142,15 +157,8 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                 pillBackground = pillBackground,
                 textPrimary    = textPrimary,
                 textSub        = textSub,
-                accentColor    = accentColor,
+                accentColor    = themeAccent,
                 onStop         = { viewModel.stopPillTracking() }
-            )
-        } else {
-            LifeAfterPillCard(
-                cardBg         = cardBg,
-                textPrimary    = textPrimary,
-                textSub        = textSub,
-                postPillState  = postPillState
             )
         }
 
@@ -163,7 +171,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                 fontWeight = FontWeight.Bold,
                 fontSize   = 20.sp,
                 color      = textPrimary,
-                modifier   = Modifier.align(Alignment.Start)
+                modifier   = Modifier.align(Alignment.CenterHorizontally)
             )
 
             Spacer(Modifier.height(16.dp))
@@ -182,14 +190,16 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                 }
             } else {
                 pillHistory.sortedByDescending { it.startDate }.forEach { pack ->
-                    SwipeToDeleteCard(onDelete = { viewModel.deletePillPack(pack.id) }) {
+                    SwipeToDeleteCard(onDelete = { viewModel.deletePillPack(pack.id) }) { isSwiping ->
                         PillHistoryItem(
                             pack           = pack,
                             cardBg         = cardBg,
                             textPrimary    = textPrimary,
                             textSub        = textSub,
                             pillBackground = pillBackground,
-                            accentColor    = accentColor
+                            activeAccent   = themeAccent,
+                            normalAccent   = textPrimary,
+                            isSwiping      = isSwiping   // THIS WAS MISSING
                         )
                     }
                     Spacer(Modifier.height(12.dp))
@@ -210,106 +220,135 @@ private fun ActivePackSection(
     accentColor: Color,
     onStop: () -> Unit
 ) {
+    val isDark = isSystemInDarkTheme()
     val daysElapsed      = ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt().coerceAtLeast(0)
     val daysTaken        = minOf(daysElapsed + 1, pillCount)
-    val progressTarget   = daysTaken.toFloat() / pillCount.toFloat()
+    val progressTarget   = (daysTaken.toFloat() / pillCount.toFloat()).coerceIn(0f, 1f)
+
     val animatedProgress by animateFloatAsState(
         targetValue   = progressTarget,
-        animationSpec = tween(1000),
+        animationSpec = tween(1200),
         label         = "PillProgress"
     )
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.Bottom
-        ) {
-            Text(
-                "Pack Progress",
-                fontFamily = BricolageGrotesque,
-                fontWeight = FontWeight.SemiBold,
-                color      = textPrimary
-            )
-            Text(
-                "$daysTaken / $pillCount",
-                fontFamily = BricolageGrotesque,
-                fontWeight = FontWeight.Bold,
-                color      = accentColor
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
-
-        LinearProgressIndicator(
-            progress   = { animatedProgress },
-            modifier   = Modifier.fillMaxWidth().height(12.dp).clip(CircleShape),
-            color      = accentColor,
-            trackColor = pillBackground,
-            strokeCap  = StrokeCap.Round
+    // Match the brush from PredictionBanner
+    val progressBrush = remember(isDark, accentColor) {
+        Brush.linearGradient(
+            colors = listOf(accentColor, accentColor)
         )
+    }
 
-        Spacer(Modifier.height(32.dp))
-
+    Column(modifier = Modifier.fillMaxWidth()) {
         Card(
             colors    = CardDefaults.cardColors(containerColor = cardBg),
             shape     = RoundedCornerShape(22.dp),
             elevation = CardDefaults.cardElevation(0.dp),
             modifier  = Modifier.fillMaxWidth()
         ) {
-            Row(
-                modifier          = Modifier.fillMaxWidth().padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier         = Modifier.size(42.dp).clip(CircleShape).background(pillBackground),
-                    contentAlignment = Alignment.Center
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
+                // Top Row: Icon and Pill Count Badge
+                Row(
+                    modifier          = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Rounded.Medication,
-                        contentDescription = null,
-                        tint     = textPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Box(
+                        modifier         = Modifier.size(42.dp).clip(CircleShape).background(pillBackground),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.Medication,
+                            contentDescription = null,
+                            tint     = textPrimary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Active Pill Pack",
+                            fontFamily = BricolageGrotesque,
+                            color      = textPrimary,
+                            fontSize   = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Started ${startDate.pretty()}",
+                            fontFamily = BricolageGrotesque,
+                            color      = textSub,
+                            fontSize   = 13.sp
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(pillBackground)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            "$pillCount Pills",
+                            fontFamily = BricolageGrotesque,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = textPrimary,
+                            fontSize   = 11.sp
+                        )
+                    }
                 }
 
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.height(20.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Active Pill Pack",
-                        fontFamily = BricolageGrotesque,
-                        color      = textPrimary,
-                        fontSize   = 17.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        "Started ${startDate.pretty()}",
-                        fontFamily = BricolageGrotesque,
-                        color      = textSub,
-                        fontSize   = 13.sp
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(accentColor)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                // Progress Label Row (Mirrors Banner text style)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "$pillCount Pills",
+                        text = "Pack Progress",
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.SemiBold,
-                        color      = Color.White,
-                        fontSize   = 12.sp
+                        color = textPrimary,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "$daysTaken / $pillCount",
+                        fontFamily = BricolageGrotesque,
+                        color = textSub,
+                        fontSize = 13.sp
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // The Progress Bar (Mirrors PredictionBanner Canvas logic)
+                Canvas(
+                    Modifier
+                        .fillMaxWidth(0.95f) // Slightly reduced width as requested
+                        .height(6.dp)
+                        .clip(CircleShape)
+                        .align(Alignment.CenterHorizontally)
+                ) {
+                    // Track
+                    drawRoundRect(
+                        color = pillBackground.copy(alpha = 0.4f),
+                        size = size,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f)
+                    )
+                    // Progress
+                    drawRoundRect(
+                        brush = progressBrush,
+                        size = androidx.compose.ui.geometry.Size(animatedProgress * size.width, size.height),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f)
                     )
                 }
             }
         }
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
+        // Stop Button
         Button(
             onClick   = onStop,
             modifier  = Modifier.fillMaxWidth().height(56.dp),
@@ -350,7 +389,7 @@ fun LifeAfterPillCard(
             .fillMaxWidth()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null, // No ripple, matches EntryRow
+                indication = null,
                 onClick = { expanded = !expanded }
             )
     ) {
@@ -359,15 +398,14 @@ fun LifeAfterPillCard(
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            // --- HEADER ROW ---
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = when (postPillState) {
-                        PostPillState.DISCOVERY -> "You're in Discovery Mode"
-                        PostPillState.LEARNING  -> "You're in Learning Mode"
+                        PostPillState.DISCOVERY -> "What is Discovery Mode?"
+                        PostPillState.LEARNING  -> "What is Learning Mode?"
                         PostPillState.NORMAL    -> "Life after the pill"
                     },
                     fontFamily = BricolageGrotesque,
@@ -387,11 +425,9 @@ fun LifeAfterPillCard(
                 )
             }
 
-            // --- COLLAPSIBLE CONTENT ---
             AnimatedVisibility(visible = expanded) {
                 Column {
-                    Spacer(Modifier.height(18.dp)) // Matches EntryRow spacing
-
+                    Spacer(Modifier.height(18.dp))
                     when (postPillState) {
                         PostPillState.DISCOVERY -> {
                             InfoRow("Why predictions are paused", "Hormonal birth control suppresses ovulation. After stopping, your body needs to restart signaling — this can take weeks to months.", textPrimary, textSub)
@@ -450,11 +486,15 @@ fun PillHistoryItem(
     textPrimary: Color,
     textSub: Color,
     pillBackground: Color,
-    accentColor: Color
+    activeAccent: Color,
+    normalAccent: Color,
+    isSwiping: Boolean = false
 ) {
     Card(
         shape     = RoundedCornerShape(22.dp),
-        colors    = CardDefaults.cardColors(containerColor = cardBg),
+        colors    = CardDefaults.cardColors(
+            containerColor = cardBg  // ADD THIS
+        ),
         modifier  = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
@@ -469,7 +509,7 @@ fun PillHistoryItem(
                 Icon(
                     imageVector        = if (pack.endDate == null) Icons.Rounded.Medication else Icons.Rounded.History,
                     contentDescription = null,
-                    tint               = if (pack.endDate == null) accentColor else textPrimary,
+                    tint               = if (pack.endDate == null) activeAccent else normalAccent,
                     modifier           = Modifier.size(22.dp)
                 )
             }
@@ -480,7 +520,7 @@ fun PillHistoryItem(
                     fontFamily = BricolageGrotesque,
                     fontWeight = FontWeight.SemiBold,
                     fontSize   = 15.sp,
-                    color      = if (pack.endDate == null) accentColor else textPrimary
+                    color      = if (pack.endDate == null) activeAccent else textPrimary
                 )
                 Text(
                     text       = "${pack.startDate.pretty()} — ${pack.endDate?.pretty() ?: "Ongoing"}",

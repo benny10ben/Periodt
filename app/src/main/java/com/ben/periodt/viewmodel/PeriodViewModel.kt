@@ -77,6 +77,13 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PostPillState.NORMAL)
 
+    val pillWindowStartDate: StateFlow<LocalDate?> = pillPacks.map { packs ->
+        // Active pack start OR most recently stopped pack start
+        packs.firstOrNull { it.endDate == null }?.startDate
+            ?: packs.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.startDate
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+
     // Kept for backward compatibility with CalendarScreen, DayCellEnhanced,
     // PredictionBanner, and the broadcast receivers. True only in DISCOVERY.
     val isTransitioning: StateFlow<Boolean> = postPillState.map { state ->
@@ -95,24 +102,26 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
 
         when {
             onPill && activeStart != null -> {
-                val predictedDate = activeStart.plusDays(activeCount.toLong())
+                // FIXED: Added a 2-day offset for a more realistic withdrawal prediction
+                val withdrawalStart = activeStart.plusDays(activeCount.toLong() + 2)
+
                 Prediction(
-                    minPeriodStart        = predictedDate,
-                    maxPeriodStart        = predictedDate.plusDays(2),
-                    mostLikelyPeriodStart = predictedDate,
-                    periodLength          = 5,
-                    ovulationDay          = predictedDate,
-                    ovulationConfidence   = 0.0f,
+                    minPeriodStart        = withdrawalStart.minusDays(1),
+                    maxPeriodStart        = withdrawalStart.plusDays(1),
+                    mostLikelyPeriodStart = withdrawalStart,
+                    periodLength          = 4, // Withdrawal bleeds are typically shorter
+                    ovulationDay          = withdrawalStart, // Placeholder
+                    ovulationConfidence   = 1.0f, // High confidence due to chemical timing
                     fertileWindow         = LocalDate.MIN..LocalDate.MIN,
                     cycleLength           = activeCount + 7,
                     cycleRegularity       = com.ben.periodt.uiux.shared.CycleRegularity.VERY_REGULAR
+
                 )
             }
             // DISCOVERY — no prediction
             transitioning -> null
-            // LEARNING and NORMAL — both produce predictions
-            // LEARNING will naturally have lower confidence and wider windows
-            // because there are fewer cycles for the algorithm to work with
+
+            // LEARNING and NORMAL
             else -> {
                 val validCycles = if (stopDate != null)
                     cycleList.filter { !it.startDate.isBefore(stopDate) }

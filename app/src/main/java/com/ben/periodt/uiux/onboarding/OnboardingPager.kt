@@ -431,8 +431,9 @@ fun ModeSelectionPage(onStart: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(horizontal = 56.dp),
-            pageSpacing = 24.dp
+            // Tweak these values if you want to show more/less of the adjacent cards
+            contentPadding = PaddingValues(horizontal = 48.dp),
+            pageSpacing = 16.dp
         ) { page ->
             val pageOffset = ((infoPagerState.currentPage - page) + infoPagerState.currentPageOffsetFraction)
                 .let { kotlin.math.abs(it) }
@@ -441,13 +442,15 @@ fun ModeSelectionPage(onStart: () -> Unit) {
 
             Box(
                 modifier = Modifier
+                    .fillMaxWidth() // <--- Ensures consistent width for accurate peeking
+                    .fillMaxHeight(0.9f)
+                    // Removed aspectRatio(0.75f) to prevent clipping on small screens
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
                     }
-                    .alpha(cardAlpha)
-                    .fillMaxHeight(0.9f)
-                    .aspectRatio(0.75f)
+                    .alpha(cardAlpha),
+                contentAlignment = Alignment.Center
             ) {
                 when (page) {
                     0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, Color(0xFF2A3825))
@@ -481,11 +484,12 @@ fun InfoCard(title: String, subtitle: String, icon: ImageVector, backgroundColor
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(36.dp))
+            .clip(RoundedCornerShape(32.dp))
             .background(backgroundColor)
-            .padding(32.dp)
+            .padding(24.dp) // Slightly reduced padding to give text more room
     ) {
-        Column(modifier = Modifier.align(Alignment.TopStart)) {
+        // Changed align to fillMaxSize so the weight(1f) spacer works properly
+        Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -495,11 +499,25 @@ fun InfoCard(title: String, subtitle: String, icon: ImageVector, backgroundColor
             ) {
                 Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
             }
+
+            // This spacer now perfectly pushes the text to the bottom without overlapping
             Spacer(Modifier.weight(1f))
-            Text(title, fontFamily = BricolageGrotesque, style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(12.dp))
-            Text(subtitle, fontFamily = BricolageGrotesque, style = MaterialTheme.typography.bodyLarge, color = Color.White.copy(alpha = 0.85f), lineHeight = 24.sp)
+
+            Text(
+                title,
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(Modifier.height(8.dp))
+            Text(
+                subtitle,
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.bodyMedium, // Stepped down to bodyMedium for safety
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 22.sp
+            )
         }
     }
 }

@@ -48,7 +48,7 @@ fun SuccessFeedbackDialog(
     }
 
     // 2. UPDATED ACCENT COLOR
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
 
     val surfaceFallback = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textMain = if (isDark) Color.White else Color(0xFF1B1B1B)

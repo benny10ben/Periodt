@@ -5,25 +5,19 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -41,7 +35,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -61,10 +55,12 @@ import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.DirectionsWalk
-import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.EventRepeat
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FitnessCenter
+import androidx.compose.material.icons.rounded.Grain
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LocalCafe
 import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Restaurant
@@ -85,23 +81,32 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -111,18 +116,20 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ben.periodt.R
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.Prediction
+import com.ben.periodt.uiux.shared.getPostPillState
 import com.ben.periodt.uiux.shared.pretty
 import com.ben.periodt.viewmodel.PeriodViewModel
 import com.kizitonwose.calendar.compose.CalendarState
@@ -141,23 +148,11 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.absoluteValue
-import androidx.compose.material.icons.rounded.Grain
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.rounded.EventRepeat
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Medication
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.res.painterResource
-import com.ben.periodt.R
-import com.ben.periodt.uiux.shared.PostPillState
-import com.ben.periodt.uiux.shared.getPostPillState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -172,19 +167,16 @@ fun CalendarScreen() {
     val isOnPill by viewModel.isOnPill.collectAsState()
     val pillStartDate by viewModel.pillPackStartDate.collectAsState()
     val pillStopDate by viewModel.pillStopDate.collectAsState()
+    val pillPacks by viewModel.pillPacks.collectAsState()
 
-    // --- STATE: History Toggle ---
     var showFullHistory by remember { mutableStateOf(false) }
 
-    // --- FILTER & SORT LOGIC ---
     val sortedCycles = remember(cycles, isOnPill, pillStartDate, pillStopDate, showFullHistory) {
         val rawSorted = cycles.sortedByDescending { it.startDate }
         val wallDate = if (isOnPill) pillStartDate else pillStopDate
         if (wallDate != null && !showFullHistory) {
             rawSorted.filter { !it.startDate.isBefore(wallDate) }
-        } else {
-            rawSorted
-        }
+        } else rawSorted
     }
 
     val hasHiddenHistory = remember(cycles, isOnPill, pillStartDate, pillStopDate) {
@@ -198,21 +190,34 @@ fun CalendarScreen() {
     }
 
     val currentMonth = remember { YearMonth.now() }
-    val currentDate = remember { LocalDate.now() }
+    val currentDate  = remember { LocalDate.now() }
 
     val state = rememberCalendarState(
-        startMonth = currentMonth.minusMonths(12),
-        endMonth = currentMonth.plusMonths(12),
+        startMonth        = currentMonth.minusMonths(12),
+        endMonth          = currentMonth.plusMonths(12),
         firstVisibleMonth = currentMonth
     )
     val weekState = rememberWeekCalendarState(
-        startDate = currentDate.minusWeeks(52),
-        endDate = currentDate.plusWeeks(52),
+        startDate            = currentDate.minusWeeks(52),
+        endDate              = currentDate.plusWeeks(52),
         firstVisibleWeekDate = currentDate
     )
 
-    val listState = rememberLazyListState()
+    val listState  = rememberLazyListState()
     var isCollapsed by remember { mutableStateOf(false) }
+    val scope      = rememberCoroutineScope()
+
+    // Sync calendars when toggling collapsed state
+    LaunchedEffect(isCollapsed) {
+        if (isCollapsed) {
+            val targetDate = state.firstVisibleMonth.weekDays.flatten()
+                .firstOrNull { it.position == DayPosition.MonthDate }?.date ?: currentDate
+            weekState.animateScrollToWeek(targetDate)
+        } else {
+            val targetDate = weekState.firstVisibleWeek.days.getOrNull(3)?.date ?: currentDate
+            state.animateScrollToMonth(YearMonth.from(targetDate))
+        }
+    }
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
@@ -220,7 +225,6 @@ fun CalendarScreen() {
                 val delta = available.y
                 if (delta < 0 && !isCollapsed) {
                     isCollapsed = true
-                    // FIX: return Zero so the list also scrolls on the same gesture
                     return Offset.Zero
                 }
                 if (delta > 0 && isCollapsed
@@ -236,18 +240,15 @@ fun CalendarScreen() {
     }
 
     val entrySurface = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val entryText = if (isDark) Color.White else Color(0xFF0F172A)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val entryText    = if (isDark) Color.White else Color(0xFF0F172A)
+    val accentColor  = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
 
     var cycleToEdit by remember { mutableStateOf<PeriodViewModel.Cycle?>(null) }
 
-    // --- ADD THIS LINE ---
-    val postPillState by viewModel.postPillState.collectAsState()
+    val postPillState  by viewModel.postPillState.collectAsState()
     val isLearningMode = postPillState == PostPillState.LEARNING
 
-    LaunchedEffect(Unit) {
-        viewModel.refreshState()
-    }
+    LaunchedEffect(Unit) { viewModel.refreshState() }
 
     Column(
         modifier = Modifier
@@ -258,11 +259,8 @@ fun CalendarScreen() {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(
-                    animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing)
-                )
+                .animateContentSize(animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing))
         ) {
-            // FIX: removed duplicate collectAsState inside here; use the ones declared above
             CalendarCard(
                 isCollapsed     = isCollapsed,
                 state           = state,
@@ -271,40 +269,49 @@ fun CalendarScreen() {
                 prediction      = prediction,
                 isTransitioning = isTransitioning,
                 isLearningMode  = isLearningMode,
-                isOnPill        = isOnPill
+                isOnPill        = isOnPill,
+                pillPacks       = pillPacks
             )
         }
 
         LazyColumn(
-            modifier = Modifier
+            modifier        = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
-            state = listState,
+            state           = listState,
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 115.dp)
+            contentPadding  = PaddingValues(bottom = 115.dp)
         ) {
+
             item { WellnessCardsRow(cycles = cycles, prediction = prediction) }
 
             item {
                 PredictionBanner(
-                    prediction      = prediction,
-                    cycles          = cycles,
-                    isTransitioning = isTransitioning,
-                    isOnPill        = isOnPill,
-                    pillStopDate    = pillStopDate
+                    prediction        = prediction,
+                    cycles            = cycles,
+                    isTransitioning   = isTransitioning,
+                    isOnPill          = isOnPill,
+                    pillStopDate      = pillStopDate,
+                    pillPackStartDate = viewModel.pillPackStartDate.collectAsState().value,
+                    pillPackCount     = viewModel.pillPackCount.collectAsState().value
                 )
             }
 
+            // --- Cycle History Header ---
             item {
                 Text(
-                    text        = "Cycle history",
-                    fontFamily  = BricolageGrotesque,
-                    fontWeight  = FontWeight.Bold,
-                    fontSize    = 20.sp,
-                    color       = entryText,
-                    modifier    = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                    text       = "Cycle history",
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Bold,
+                    fontSize   = 20.sp,
+                    color      = entryText,
+                    textAlign  = TextAlign.Center,
+                    modifier   = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
                 )
+                Spacer(Modifier.height(10.dp))
             }
 
             items(displayedCycles, key = { it.id }) { cycle ->
@@ -332,8 +339,8 @@ fun CalendarScreen() {
 
             item {
                 Column(
-                    modifier              = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    horizontalAlignment   = Alignment.CenterHorizontally
+                    modifier            = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (sortedCycles.size > visibleCyclesCount) {
                         TextButton(
@@ -375,20 +382,60 @@ fun CalendarScreen() {
 }
 
 @Composable
-fun CalendarLegend() {
-    val isDark = isSystemInDarkTheme()
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+fun CalendarLegend(
+    isOnPill: Boolean = false,
+    pillPacks: List<PeriodViewModel.PillPack> = emptyList()
+) {
+    val isDark           = isSystemInDarkTheme()
+    val textSub          = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val colorPeriodSolid = Color(0xFFA5231C)
+    val packColor        = Color(0xFFa68e74)
+    val today            = LocalDate.now()
 
     Row(
         modifier              = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment     = Alignment.CenterVertically
     ) {
-        LegendItem(color = ColorPeriodSolid.copy(alpha = 0.6f), label = "Completed",  textColor = textSub)
-        Spacer(Modifier.width(16.dp))
-        LegendItem(color = ColorFertileSolid,                   label = "Fertile",    textColor = textSub)
-        Spacer(Modifier.width(16.dp))
-        LegendItem(color = ColorPeriodSolid,                    label = "Upcoming",   textColor = textSub)
+        if (isOnPill) {
+            // Active pill: Completed | Days Done | Days Left
+            LegendItem(
+                color     = colorPeriodSolid.copy(alpha = 0.6f),
+                label     = "Logged",
+                textColor = textSub
+            )
+            Spacer(Modifier.width(12.dp))
+            LegendItem(
+                color     = packColor.copy(alpha = 0.2f),
+                label     = "Pills Done",
+                textColor = textSub
+            )
+            Spacer(Modifier.width(12.dp))
+            LegendItem(
+                color     = packColor,
+                label     = "Pills Left",
+                textColor = textSub
+            )
+        } else {
+            // Natural cycle: Completed | Fertile | Upcoming
+            LegendItem(
+                color     = colorPeriodSolid.copy(alpha = 0.6f),
+                label     = "Logged",
+                textColor = textSub
+            )
+            Spacer(Modifier.width(12.dp))
+            LegendItem(
+                color     = ColorFertileSolid,
+                label     = "Fertile",
+                textColor = textSub
+            )
+            Spacer(Modifier.width(12.dp))
+            LegendItem(
+                color     = colorPeriodSolid,
+                label     = "Upcoming",
+                textColor = textSub
+            )
+        }
     }
 }
 
@@ -413,7 +460,7 @@ private fun LegendItem(color: Color, label: String, textColor: Color) {
 }
 
 private val ColorPeriodSolid  = Color(0xFFA5231C)
-private val ColorFertileSolid = Color(0xFF2A3825)
+private val ColorFertileSolid = Color(0xFF2A3825).copy(alpha = 0.5f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -424,8 +471,9 @@ fun CalendarCard(
     cycles: List<PeriodViewModel.Cycle>,
     prediction: Prediction?,
     isTransitioning: Boolean = false,
-    isLearningMode: Boolean = false,        // ADDED: New state parameter
-    isOnPill: Boolean = false
+    isLearningMode: Boolean = false,
+    isOnPill: Boolean = false,
+    pillPacks: List<PeriodViewModel.PillPack> = emptyList()
 ) {
     val isDark = isSystemInDarkTheme()
     val scope  = rememberCoroutineScope()
@@ -435,8 +483,8 @@ fun CalendarCard(
     val onCardContentMuted = onCardContent.copy(alpha = 0.70f)
 
     Card(
-        shape  = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        shape    = RoundedCornerShape(24.dp),
+        colors   = CardDefaults.cardColors(containerColor = Color.Transparent),
         modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
     ) {
         Box(
@@ -445,11 +493,10 @@ fun CalendarCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Column {
-                // --- HEADER ---
+                // Header
                 val headerText = if (isCollapsed) {
                     val currentWeek  = weekState.firstVisibleWeek
-                    val dominantDate = currentWeek.days.getOrNull(3)?.date
-                        ?: currentWeek.days.first().date
+                    val dominantDate = currentWeek.days.getOrNull(3)?.date ?: currentWeek.days.first().date
                     dominantDate.format(DateTimeFormatter.ofPattern("MMM yyyy"))
                 } else {
                     state.firstVisibleMonth.yearMonth.month
@@ -457,75 +504,56 @@ fun CalendarCard(
                             " " + state.firstVisibleMonth.yearMonth.year
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier          = Modifier.fillMaxWidth()
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text      = headerText,
+                        text       = headerText,
                         fontFamily = BricolageGrotesque,
-                        color     = onCardContent,
-                        style     = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        modifier  = Modifier.padding(start = 4.dp)
+                        color      = onCardContent,
+                        style      = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier   = Modifier.padding(start = 4.dp)
                     )
-
                     Spacer(Modifier.width(12.dp))
-
-                    // Back arrow ‹
                     Text(
                         "‹",
-                        color      = onCardContentMuted,
-                        fontSize   = 24.sp,
-                        fontFamily = BricolageGrotesque,
-                        modifier   = Modifier
+                        color     = onCardContentMuted,
+                        fontSize  = 24.sp,
+                        modifier  = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
                             .clickable {
                                 scope.launch {
-                                    if (isCollapsed)
-                                        weekState.animateScrollToWeek(
-                                            weekState.firstVisibleWeek.days.first().date.minusWeeks(1)
-                                        )
-                                    else
-                                        state.animateScrollToMonth(
-                                            state.firstVisibleMonth.yearMonth.minusMonths(1)
-                                        )
+                                    if (isCollapsed) weekState.animateScrollToWeek(
+                                        weekState.firstVisibleWeek.days.first().date.minusWeeks(1)
+                                    ) else state.animateScrollToMonth(
+                                        state.firstVisibleMonth.yearMonth.minusMonths(1)
+                                    )
                                 }
                             }
                             .wrapContentSize(Alignment.Center),
-                        textAlign  = TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
-
-                    // Forward arrow ›
                     Text(
                         "›",
-                        color      = onCardContentMuted,
-                        fontSize   = 24.sp,
-                        fontFamily = BricolageGrotesque,
-                        modifier   = Modifier
+                        color     = onCardContentMuted,
+                        fontSize  = 24.sp,
+                        modifier  = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
                             .clickable {
                                 scope.launch {
-                                    if (isCollapsed)
-                                        weekState.animateScrollToWeek(
-                                            weekState.firstVisibleWeek.days.first().date.plusWeeks(1)
-                                        )
-                                    else
-                                        state.animateScrollToMonth(
-                                            state.firstVisibleMonth.yearMonth.plusMonths(1)
-                                        )
+                                    if (isCollapsed) weekState.animateScrollToWeek(
+                                        weekState.firstVisibleWeek.days.first().date.plusWeeks(1)
+                                    ) else state.animateScrollToMonth(
+                                        state.firstVisibleMonth.yearMonth.plusMonths(1)
+                                    )
                                 }
                             }
                             .wrapContentSize(Alignment.Center),
-                        textAlign  = TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
-
                     Spacer(Modifier.weight(1f))
-
-                    // Today button
                     Box(
-                        modifier           = Modifier
+                        modifier         = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
                             .clickable {
@@ -534,20 +562,14 @@ fun CalendarCard(
                                     else state.animateScrollToMonth(YearMonth.now())
                                 }
                             },
-                        contentAlignment   = Alignment.Center
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector    = Icons.Rounded.EventRepeat,
-                            contentDescription = null,
-                            tint           = onCardContent,
-                            modifier       = Modifier.size(16.dp)
-                        )
+                        Icon(Icons.Rounded.EventRepeat, null, tint = onCardContent, modifier = Modifier.size(16.dp))
                     }
                 }
 
                 Spacer(Modifier.height(14.dp))
 
-                // Day-of-week labels
                 Row(Modifier.fillMaxWidth()) {
                     listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT").forEach { label ->
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -564,43 +586,51 @@ fun CalendarCard(
 
                 Spacer(Modifier.height(8.dp))
 
-                AnimatedContent(
-                    targetState    = isCollapsed,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(500)) togetherWith
-                                fadeOut(animationSpec = tween(500))
-                    }
-                ) { collapsed ->
+                AnimatedContent(targetState = isCollapsed, label = "CalendarType") { collapsed ->
                     if (collapsed) {
-                        WeekCalendar(state = weekState, dayContent = {
+                        WeekCalendar(state = weekState, dayContent = { weekDay ->
                             DayCellEnhanced(
-                                date            = it.date,
+                                date            = weekDay.date,
                                 isCurrentMonth  = true,
                                 cycles          = cycles,
                                 prediction      = prediction,
                                 isTransitioning = isTransitioning,
-                                isLearningMode  = isLearningMode,  // PASSED
-                                isOnPill        = isOnPill
+                                isLearningMode  = isLearningMode,
+                                isOnPill        = isOnPill,
+                                pillPacks       = pillPacks
                             )
                         })
                     } else {
-                        HorizontalCalendar(state = state, dayContent = {
+                        HorizontalCalendar(state = state, dayContent = { calendarDay ->
                             DayCellEnhanced(
-                                date            = it.date,
-                                isCurrentMonth  = it.position == DayPosition.MonthDate,
+                                date            = calendarDay.date,
+                                isCurrentMonth  = calendarDay.position == DayPosition.MonthDate,
                                 cycles          = cycles,
                                 prediction      = prediction,
                                 isTransitioning = isTransitioning,
-                                isLearningMode  = isLearningMode,  // PASSED
-                                isOnPill        = isOnPill
+                                isLearningMode  = isLearningMode,
+                                isOnPill        = isOnPill,
+                                pillPacks       = pillPacks
                             )
                         })
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
-                CalendarLegend()
-                Spacer(Modifier.height(4.dp))
+                // Legend hidden when collapsed
+                AnimatedVisibility(
+                    visible = !isCollapsed,
+                    enter   = fadeIn() + expandVertically(),
+                    exit    = fadeOut() + shrinkVertically()
+                ) {
+                    Column {
+                        Spacer(Modifier.height(12.dp))
+                        CalendarLegend(
+                            isOnPill  = isOnPill,
+                            pillPacks = pillPacks
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
             }
         }
     }
@@ -614,15 +644,25 @@ fun DayCellEnhanced(
     prediction: Prediction?,
     isTransitioning: Boolean = false,
     isLearningMode: Boolean = false,
-    isOnPill: Boolean = false
+    isOnPill: Boolean = false,
+    pillPacks: List<PeriodViewModel.PillPack> = emptyList()
 ) {
     val isDark  = isSystemInDarkTheme()
     val isToday = date == LocalDate.now()
+    val today   = LocalDate.now()
 
-    val isOvulation = if (isTransitioning || isOnPill) false
-    else prediction?.ovulationDay == date
+    // --- COLOR PALETTE ---
+    val themeAccent      = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val starAccent       = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70) // Star icon color
+    val colorPeriodSolid = Color(0xFFA5231C)
+    val packColor        = Color(0xFFa68e74)
 
-    val discoveryAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
+    val matchingPack = pillPacks.firstOrNull { pack ->
+        val end = pack.endDate ?: pack.startDate.plusDays((pack.pillCount - 1).toLong())
+        !date.isBefore(pack.startDate) && !date.isAfter(end)
+    }
+    val isInPillWindow   = matchingPack != null
+    val isPillWindowPast = isInPillWindow && date.isBefore(today)
 
     fun checkPhase(d: LocalDate): Int {
         val isLoggedPeriod = cycles.any { c ->
@@ -632,17 +672,18 @@ fun DayCellEnhanced(
         }
         if (isLoggedPeriod) return 1
 
-        if (!isTransitioning) {
-            if (prediction?.let { p ->
-                    val s = p.mostLikelyPeriodStart
-                    val l = p.periodLength ?: 5
-                    !d.isBefore(s) && d.isBefore(s.plusDays(l.toLong()))
-                } == true) return 2
+        val inWindow = pillPacks.any { pack ->
+            val end = pack.endDate ?: pack.startDate.plusDays((pack.pillCount - 1).toLong())
+            !d.isBefore(pack.startDate) && !d.isAfter(end)
+        }
+        if (inWindow) return 5
 
-            if (prediction?.fertileWindow != null
-                && prediction.fertileWindow.start != LocalDate.MIN
-                && prediction.fertileWindow.contains(d)
-            ) return 3
+        if (pillPacks.isEmpty() && !isTransitioning && prediction != null) {
+            val s            = prediction.mostLikelyPeriodStart
+            val windowLength = prediction.periodLength?.toLong() ?: 5L
+            if (!d.isBefore(s) && d.isBefore(s.plusDays(windowLength))) return 2
+            if (!isOnPill && prediction.fertileWindow.start != LocalDate.MIN
+                && prediction.fertileWindow.contains(d)) return 3
         }
         return 0
     }
@@ -651,91 +692,74 @@ fun DayCellEnhanced(
     val prevPhase    = checkPhase(date.minusDays(1))
     val nextPhase    = checkPhase(date.plusDays(1))
 
-    val isStart      = currentPhase != prevPhase
-    val isEnd        = currentPhase != nextPhase
+    val isStart     = currentPhase != prevPhase
+    val isEnd       = currentPhase != nextPhase
     val stripRadius = 100.dp
 
     val shape = when {
-        currentPhase == 0    -> CircleShape
-        isStart && isEnd     -> RoundedCornerShape(stripRadius)
-        isStart              -> RoundedCornerShape(topStart = stripRadius, bottomStart = stripRadius)
-        isEnd                -> RoundedCornerShape(topEnd = stripRadius, bottomEnd = stripRadius)
-        else                 -> RectangleShape
+        currentPhase == 0 -> CircleShape
+        isStart && isEnd  -> CircleShape
+        isStart           -> RoundedCornerShape(topStart = stripRadius, bottomStart = stripRadius)
+        isEnd             -> RoundedCornerShape(topEnd = stripRadius, bottomEnd = stripRadius)
+        else              -> RectangleShape
     }
 
     val padding = when {
         currentPhase == 0 -> PaddingValues(2.dp)
-        isStart && isEnd  -> PaddingValues(all = 4.dp)
-        isStart           -> PaddingValues(start = 4.dp, top = 4.dp, end = 0.dp, bottom = 4.dp)
-        isEnd             -> PaddingValues(start = 0.dp, top = 4.dp, end = 4.dp, bottom = 4.dp)
+        isStart && isEnd  -> PaddingValues(4.dp)
+        isStart           -> PaddingValues(start = 4.dp, top = 4.dp, bottom = 4.dp)
+        isEnd             -> PaddingValues(end = 4.dp, top = 4.dp, bottom = 4.dp)
         else              -> PaddingValues(vertical = 4.dp)
     }
 
     val bgColor = when (currentPhase) {
-        1    -> ColorPeriodSolid.copy(alpha = 0.6f)
-        2    -> ColorPeriodSolid
+        1    -> colorPeriodSolid.copy(alpha = 0.6f)
+        2    -> colorPeriodSolid
         3    -> ColorFertileSolid
+        5    -> if (isPillWindowPast) packColor.copy(alpha = 0.2f) else packColor
         else -> Color.Transparent
     }
 
+    val isHighlighted = when (currentPhase) {
+        5    -> !isPillWindowPast
+        0    -> false
+        else -> true
+    }
+
     Box(
-        modifier         = Modifier
-            .aspectRatio(1f)
-            .padding(padding)
-            .clip(shape)
-            .background(bgColor),
+        modifier         = Modifier.aspectRatio(1f),
         contentAlignment = Alignment.Center
     ) {
-        if (isOvulation) {
-            val ovulationBg = if (isDark) Color(0xFF1B1B1B) else Color.White.copy(alpha = 0.4f)
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .shadow(
-                        elevation  = if (isDark) 0.dp else 4.dp,
-                        shape      = CircleShape,
-                        spotColor  = Color.Black.copy(alpha = 0.2f)
-                    )
-                    .background(ovulationBg, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text       = date.dayOfMonth.toString(),
-                    color      = Color.White,
-                    fontSize   = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = BricolageGrotesque
-                )
-            }
-        } else {
-            DayText(date, isCurrentMonth, isHighlighted = currentPhase != 0)
-        }
+        // Strip background
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .clip(shape)
+                .background(bgColor)
+        )
+
+        DayText(date, isCurrentMonth, isHighlighted = isHighlighted)
 
         if (isToday) {
-            Box(
-                modifier         = Modifier.fillMaxSize().padding(1.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter        = painterResource(id = R.drawable.bg_widget_day_today),
-                    contentDescription = null,
-                    modifier       = Modifier
-                        .fillMaxSize()
-                        .scale(scaleX = 1.4f, scaleY = 1.1f)
-                        .rotate(-4f),
-                    colorFilter    = ColorFilter.tint(
-                        when {
-                            // If it's a period/fertile day, keep the ring white for contrast
-                            currentPhase != 0 -> Color.White
+            Canvas(modifier = Modifier.fillMaxSize().padding(2.dp)) {
+                drawCircle(
+                    color  = when {
+                        // Priority 1: White if inside a colored strip/period
+                        currentPhase != 0 -> Color.White
 
-                            // Apply the purple accent if in Discovery OR Learning mode
-                            isTransitioning || isLearningMode -> discoveryAccent
+                        // Priority 2: Star color if in Discovery or Learning mode
+                        isTransitioning || isLearningMode -> starAccent
 
-                            // Standard fallbacks
-                            isDark -> Color.White
-                            else -> Color.Black
-                        }
-                    )
+                        // Priority 3: Orange/Green theme if pill packs exist
+                        pillPacks.isNotEmpty() -> themeAccent
+
+                        // Fallback
+                        isDark -> Color.White
+                        else   -> Color.Black
+                    },
+                    radius = size.minDimension / 2.8f,
+                    style  = Stroke(width = 2.dp.toPx())
                 )
             }
         }
@@ -769,22 +793,20 @@ fun SwipeToDeleteCard(
     content: @Composable (Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    val scope = rememberCoroutineScope()
+    val scope   = rememberCoroutineScope()
 
-    val offsetX = remember { Animatable(0f) }
-    val revealDp = 80.dp // The "Pause" or "Sticky" width
-    val revealPx = with(density) { revealDp.toPx() }
-
-    // Threshold to trigger the actual deletion (swipe further to delete)
+    val offsetX       = remember { Animatable(0f) }
+    val revealDp      = 80.dp
+    val revealPx      = with(density) { revealDp.toPx() }
     val deleteThreshold = with(density) { 180.dp.toPx() }
-    val maxRevealPx = with(density) { 220.dp.toPx() }
+    val maxRevealPx   = with(density) { 220.dp.toPx() }
 
     var widthPx by remember { mutableStateOf(0f) }
     val itemShape = RoundedCornerShape(22.dp)
 
     val bounceSpring = spring<Float>(
         dampingRatio = Spring.DampingRatioLowBouncy,
-        stiffness = Spring.StiffnessMedium
+        stiffness    = Spring.StiffnessMedium
     )
 
     val isRevealed by remember {
@@ -796,15 +818,16 @@ fun SwipeToDeleteCard(
     }
 
     Card(
-        shape = itemShape,
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        shape     = itemShape,
+        colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
+        modifier  = Modifier
             .fillMaxWidth()
             .onSizeChanged { widthPx = it.width.toFloat() }
     ) {
-        Box {
-            // Background (Red delete area)
+        Box(modifier = Modifier.fillMaxWidth()) {
+
+            // Background — red delete area
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -819,18 +842,16 @@ fun SwipeToDeleteCard(
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = Color.White,
+                        tint     = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
-
-                    // This Box makes the red area clickable to delete once paused
                     Box(
                         modifier = Modifier
                             .fillMaxHeight()
                             .width(revealDp)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
-                                indication = null
+                                indication        = null
                             ) {
                                 scope.launch {
                                     val target = if (offsetX.value >= 0f) widthPx else -widthPx
@@ -842,9 +863,10 @@ fun SwipeToDeleteCard(
                 }
             }
 
-            // Foreground (The Content)
+            // Foreground — the actual card content
             Box(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .graphicsLayer { shape = itemShape; clip = true }
                     .offset { IntOffset(offsetX.value.toInt(), 0) }
                     .pointerInput(Unit) {
@@ -853,18 +875,12 @@ fun SwipeToDeleteCard(
                                 scope.launch {
                                     val currentOff = offsetX.value
                                     val target = when {
-                                        // 1. Swipe far enough -> DELETE
                                         currentOff <= -deleteThreshold -> -widthPx
-                                        currentOff >= deleteThreshold -> widthPx
-
-                                        // 2. Swipe past half-reveal -> PAUSE IN MIDDLE
-                                        currentOff <= -revealPx / 2f -> -revealPx
-                                        currentOff >= revealPx / 2f -> revealPx
-
-                                        // 3. Otherwise -> RESET
-                                        else -> 0f
+                                        currentOff >= deleteThreshold  ->  widthPx
+                                        currentOff <= -revealPx / 2f  -> -revealPx
+                                        currentOff >= revealPx / 2f   ->  revealPx
+                                        else                           ->  0f
                                     }
-
                                     if (kotlin.math.abs(target) == widthPx && widthPx > 0f) {
                                         offsetX.animateTo(target, bounceSpring)
                                         onDelete()
@@ -926,10 +942,10 @@ fun EditCycleDialog(
     }
 
     // Yellow accent for Slider and Buttons in Dark Mode
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
     val surfaceFallback = if (isDark) Color.Black else Color.White
 
-    val pastelGreen = Color(0xFF2A3825)
+    val pastelGreen = Color(0xFF2A3825).copy(alpha = 0.5f)
     val pastelOrange = Color(0xFFD89046)
     val pastelMaroon = Color(0xFF4E1A1A)
 
@@ -1426,13 +1442,22 @@ fun PredictionBanner(
     cycles: List<PeriodViewModel.Cycle>,
     isTransitioning: Boolean,
     isOnPill: Boolean,
-    pillStopDate: LocalDate?
+    pillStopDate: LocalDate?,
+    pillPackStartDate: LocalDate? = null,
+    pillPackCount: Int = 21
 ) {
     val today = LocalDate.now()
     val now = LocalDateTime.now()
 
+    // --- LOGIC: PACK END CALCULATION ---
+    val packEndDate = remember(pillPackStartDate, pillPackCount) {
+        pillPackStartDate?.plusDays((pillPackCount - 1).toLong())
+    }
+
+    // Formatter to show "Mar 27"
+    val endFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("MMM dd") }
+
     // --- LOGIC: DERIVE POST-PILL STATE ---
-    // We only consider "Post-Pill" cycles if a pill stop date actually exists.
     val postPillCycles = remember(cycles, pillStopDate) {
         if (pillStopDate != null) {
             cycles.filter { !it.startDate.isBefore(pillStopDate) }
@@ -1441,23 +1466,19 @@ fun PredictionBanner(
         }
     }
 
-    // Single source of truth: If on pill or no pill history exists, it's NORMAL mode.
     val postPillState = remember(postPillCycles, isOnPill, pillStopDate) {
         if (isOnPill || pillStopDate == null) PostPillState.NORMAL
         else getPostPillState(postPillCycles)
     }
 
-    // Priority: Check the main cycles list for active bleeding so it shows even without pill history.
     val activeCycle = cycles.firstOrNull {
         it.endDate == null || (today >= it.startDate && today <= it.endDate)
     }
 
-    // SAFETY: If no active period, no prediction, and no transition mode, hide the banner entirely.
     if (prediction == null && postPillState == PostPillState.NORMAL && activeCycle == null) return
 
     val isDark = isSystemInDarkTheme()
     val cardBackground = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
-
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
@@ -1465,7 +1486,8 @@ fun PredictionBanner(
 
     val progressBrush = remember(isDark) {
         Brush.linearGradient(
-            colors = if (isDark) listOf(Color(0xFFD89046), Color(0xFFD89046)) else listOf(Color(0xFF2A3825), Color(0xFF2A3825))
+            colors = if (isDark) listOf(Color(0xFFD89046), Color(0xFFD89046))
+            else listOf(Color(0xFF2A3825).copy(alpha = 0.5f), Color(0xFF2A3825).copy(alpha = 0.5f))
         )
     }
 
@@ -1480,32 +1502,37 @@ fun PredictionBanner(
 
     // --- PRIORITY LOGIC ---
 
-    // 1. ACTIVE BLEEDING
     if (activeCycle != null) {
         val dayOfPeriod = ChronoUnit.DAYS.between(activeCycle.startDate, today).toInt() + 1
         val label = if (isOnPill) "Withdrawal Bleed" else "Period"
         icon = Icons.Rounded.Opacity
         accentColor = Color(0xFFEF5350)
         statusTitle = "$label Day $dayOfPeriod"
-        personalMessage = "Focus on self-care and hydration today."
-        dateBadgeText = "Active"
 
-        val startDt = activeCycle.startDate
-        val endDt = activeCycle.endDate
-        val totalDays: Long = endDt?.let { ChronoUnit.DAYS.between(startDt, it) + 1 } ?: 6L
-        val elapsedMinutes = ChronoUnit.MINUTES.between(startDt.atStartOfDay(), now)
-
-        progTarget = if (endDt != null && today.isAfter(endDt)) 1f
-        else (elapsedMinutes.toFloat() / (totalDays * 1440f)).coerceIn(0f, 0.95f)
-
-        compliment = when {
-            progTarget >= 1f -> "Cycle completed. You did it! 🌟"
-            progTarget > 0.8f -> "Almost there. You're strong. 💪"
-            progTarget > 0.5f -> "Halfway through. Keep going! 🌈"
-            else -> "Taking it day by day. 💖"
+        // Append post-pill context to the message
+        personalMessage = when (postPillState) {
+            PostPillState.DISCOVERY -> "First cycle after stopping pills — your body is recalibrating. 🌿"
+            PostPillState.LEARNING  -> "Learning your natural rhythm. Keep logging!  🌿"
+            else                    -> "Focus on self-care and hydration today."
         }
+
+        dateBadgeText = when (postPillState) {
+            PostPillState.DISCOVERY -> "Discovery"
+            PostPillState.LEARNING  -> "Learning"
+            else                    -> "Active"
+        }
+
+        val totalDays: Long = activeCycle.endDate?.let {
+            ChronoUnit.DAYS.between(activeCycle.startDate, it) + 1
+        } ?: 6L
+        progTarget = (ChronoUnit.MINUTES.between(activeCycle.startDate.atStartOfDay(), now).toFloat() / (totalDays * 1440f)).coerceIn(0f, 0.95f)
+
+//        compliment = when (postPillState) {
+//            PostPillState.DISCOVERY -> "This cycle helps unlock predictions. 💊"
+//            PostPillState.LEARNING  -> "Every cycle logged improves accuracy. 💖"
+//            else -> if (isOnPill) "Stay consistent with your pack! 💊" else "Taking it day by day. 💖"
+//        }
     }
-    // 2. DISCOVERY MODE (0-1 post-pill cycles)
     else if (postPillState == PostPillState.DISCOVERY) {
         icon = Icons.Rounded.AutoAwesome
         accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
@@ -1513,7 +1540,6 @@ fun PredictionBanner(
         personalMessage = "Predictions are paused while recalibrating."
         dateBadgeText = "Paused"
     }
-    // 3. LEARNING MODE (2-3 post-pill cycles)
     else if (postPillState == PostPillState.LEARNING) {
         icon = Icons.Rounded.AutoAwesome
         accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
@@ -1521,23 +1547,35 @@ fun PredictionBanner(
         personalMessage = "Predictions are active, but we're still refining accuracy."
         dateBadgeText = prediction?.mostLikelyPeriodStart?.pretty() ?: "Learning"
     }
-    // 4. FALLBACK / NO DATA
     else if (prediction == null) {
         icon = Icons.Rounded.AutoAwesome
-        accentColor = if (isDark) Color(0xFF66BB6A) else Color(0xFF2A3825)
+        accentColor = if (isDark) Color(0xFF66BB6A) else Color(0xFF2A3825).copy(alpha = 0.5f)
         statusTitle = "Learning your rhythm"
         personalMessage = "Keep tracking to unlock predictions."
         dateBadgeText = "Learning"
     }
-    // 5. NORMAL PREDICTIONS
     else {
         val daysUntil = ChronoUnit.DAYS.between(today, prediction.mostLikelyPeriodStart)
         val cycleTypeLabel = if (isOnPill) "withdrawal bleed" else "cycle"
+
+        // --- UPDATED PACK INFO: DISPLAYING THE DATE ---
+        val packInfo = if (isOnPill && packEndDate != null) {
+            when {
+                today.isAfter(packEndDate) -> "Pack finished"
+                today.isEqual(packEndDate) -> "Last pill today"
+                else -> "Pack ends on ${packEndDate.format(endFormatter)}" // Shows "Pack ends on Mar 27"
+            }
+        } else null
+
         val quad = when {
             daysUntil < 0 -> Quadruple(Icons.Rounded.Warning, Color(0xFFEF5350), "Late by ${kotlin.math.abs(daysUntil)} days", "No stress—cycles can shift! 🧘‍♀️")
-            daysUntil == 0L -> Quadruple(Icons.Rounded.Opacity, if (isDark) Color(0xFFC8D4E5) else Color(0xFF8089D2), "Starts today", "Ready for your period? 🍫")
+            daysUntil == 0L -> Quadruple(Icons.Rounded.Opacity, if (isDark) Color(0xFFC8D4E5) else Color(0xFF8089D2), "Starts today", if (isOnPill) "Withdrawal bleed expected today." else "Ready for your period? 🍫")
             daysUntil <= 3 -> Quadruple(Icons.Rounded.Bolt, Color(0xFFFFB74D), "Almost time", "Rest up and stay cozy. 💧")
-            else -> Quadruple(Icons.Rounded.Spa, Color(0xFF66BB6A), "$daysUntil days until next $cycleTypeLabel", "Enjoy your natural flow. ✨")
+            else -> {
+                // Prioritize pack end date over natural flow text
+                val message = if (packInfo != null) "$packInfo • Stay consistent! ✨" else "Enjoy your natural flow. ✨"
+                Quadruple(Icons.Rounded.Spa, Color(0xFF66BB6A), "$daysUntil days until next $cycleTypeLabel", message)
+            }
         }
         icon = quad.first
         accentColor = quad.second
@@ -1644,7 +1682,7 @@ fun WellnessCardsRow(
             title = "Do",
             content = doText,
             icon = doIcon,
-            backgroundColor = Color(0xFF2A3825), // Applied Privacy Card Green
+            backgroundColor = Color(0xFF2A3825).copy(alpha = 0.4f), // Applied Privacy Card Green
             modifier = Modifier.weight(1f),
         )
         WellnessCardItem(
@@ -1658,7 +1696,7 @@ fun WellnessCardsRow(
             title = "Eat",
             content = eatText,
             icon = eatIcon,
-            backgroundColor = Color(0xFF4E1A1A), // Applied Tips Card Maroon
+            backgroundColor = Color(0xFFa68e74), // Applied Tips Card Maroon
             modifier = Modifier.weight(1f)
         )
     }

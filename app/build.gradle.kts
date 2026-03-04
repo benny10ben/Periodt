@@ -111,6 +111,7 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
+    implementation("dev.chrisbanes.haze:haze:0.5.4") // check for the latest version
 
     // --- TESTING ---
     testImplementation("junit:junit:4.13.2")
