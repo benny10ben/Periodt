@@ -7,7 +7,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -23,13 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.calendar.SwipeToDeleteCard
 import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.pretty
@@ -45,7 +44,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
     val pillCount     by viewModel.pillPackCount.collectAsState()
     val pillHistory   by viewModel.pillPacks.collectAsState()
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     val textPrimary    = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
@@ -220,7 +219,7 @@ private fun ActivePackSection(
     accentColor: Color,
     onStop: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val daysElapsed      = ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt().coerceAtLeast(0)
     val daysTaken        = minOf(daysElapsed + 1, pillCount)
     val progressTarget   = (daysTaken.toFloat() / pillCount.toFloat()).coerceIn(0f, 1f)

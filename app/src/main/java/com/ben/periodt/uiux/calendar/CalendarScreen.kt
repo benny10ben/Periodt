@@ -12,12 +12,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -62,7 +60,6 @@ import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Grain
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LocalCafe
-import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.SelfImprovement
 import androidx.compose.material.icons.rounded.SoupKitchen
@@ -96,15 +93,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.PaintingStyle.Companion.Stroke
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -116,7 +109,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
@@ -125,7 +117,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ben.periodt.R
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.Prediction
@@ -153,6 +144,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import com.ben.periodt.ui.theme.LocalAppIsDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,8 +153,7 @@ fun CalendarScreen() {
     val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context))
     val cycles by viewModel.cycles.collectAsState()
     val prediction by viewModel.prediction.collectAsState()
-    val isDark = isSystemInDarkTheme()
-
+    val isDark = LocalAppIsDark.current
     val isTransitioning by viewModel.isTransitioning.collectAsState()
     val isOnPill by viewModel.isOnPill.collectAsState()
     val pillStartDate by viewModel.pillPackStartDate.collectAsState()
@@ -386,7 +377,7 @@ fun CalendarLegend(
     isOnPill: Boolean = false,
     pillPacks: List<PeriodViewModel.PillPack> = emptyList()
 ) {
-    val isDark           = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val textSub          = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val colorPeriodSolid = Color(0xFFA5231C)
     val packColor        = Color(0xFFa68e74)
@@ -473,7 +464,7 @@ fun CalendarCard(
     isOnPill: Boolean = false,
     pillPacks: List<PeriodViewModel.PillPack> = emptyList()
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val scope  = rememberCoroutineScope()
 
     val backgroundBrush    = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
@@ -645,7 +636,7 @@ fun DayCellEnhanced(
     isOnPill: Boolean = false,
     pillPacks: List<PeriodViewModel.PillPack> = emptyList()
 ) {
-    val isDark  = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val isToday = date == LocalDate.now()
     val today   = LocalDate.now()
 
@@ -781,7 +772,7 @@ fun DayCellEnhanced(
 
 @Composable
 fun DayText(date: LocalDate, isCurrentMonth: Boolean, isHighlighted: Boolean) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val alpha  = if (isHighlighted || isCurrentMonth) 1f else 0.3f
 
     val color = if (isDark) {
@@ -940,7 +931,7 @@ fun EditCycleDialog(
     val colorOptions = listOf("Bright Red", "Dark Red", "Brown")
 
     // --- THEME & COLORS ---
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // Dark Mode background: Pure Black to Deep Gray
     val contentSurface = if (isDark) {
@@ -1314,7 +1305,7 @@ fun EntryRow(
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "arrowRotation")
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val cardBackground = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
 
@@ -1500,7 +1491,7 @@ fun PredictionBanner(
 ) {
     val today = LocalDate.now()
     val now   = LocalDateTime.now()
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     val packEndDate = remember(pillPackStartDate, pillPackCount) {
         pillPackStartDate?.plusDays((pillPackCount - 1).toLong())

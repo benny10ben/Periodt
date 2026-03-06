@@ -4,13 +4,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -21,21 +19,20 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 
 // --- HIGH PERFORMANCE CANVAS BACKGROUND ---
 @Composable
 fun AnimatedIconBackground() {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val iconColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1B1B1B).copy(alpha = 0.6f)
 
     // --- 1. ICON TO TEXT MAPPING ---
@@ -145,7 +142,7 @@ fun AnimatedIconBackground() {
 
 @Composable
 fun OnboardingButton(text: String, onClick: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val btnColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val txtColor = if (isDark) Color(0xFF1B1B1B) else Color.White
 

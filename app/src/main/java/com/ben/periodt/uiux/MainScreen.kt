@@ -28,7 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -36,12 +36,16 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.calendar.AddCycleDialog
 import com.ben.periodt.uiux.calendar.CalendarScreen
 import com.ben.periodt.uiux.overview.OverviewScreen
 import com.ben.periodt.uiux.overview.SettingsScreen
+import com.ben.periodt.uiux.overview.ThemeMode
+import com.ben.periodt.uiux.overview.THEME_MODE_KEY
 import com.ben.periodt.uiux.pill.PillTrackerScreen
 import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
+import com.ben.periodt.uiux.shared.dataStore
 import com.ben.periodt.viewmodel.PeriodViewModel
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
@@ -51,7 +55,7 @@ import dev.chrisbanes.haze.hazeChild
 // --- NAVIGATION CONFIGURATION ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "Calendar", Icons.Rounded.CalendarMonth)
-    object Pill : Screen("pill", "Pills", Icons.Default.Medication)
+    object Pill     : Screen("pill",     "Pills",    Icons.Default.Medication)
     object Overview : Screen("overview", "Overview", Icons.Rounded.SpaceDashboard)
     object Settings : Screen("settings", "Settings", Icons.Rounded.Settings)
 }
@@ -64,44 +68,39 @@ fun SmoothBottomNavigation(
     hazeState: HazeState,
     modifier: Modifier = Modifier
 ) {
-    val navBarBg = Color(0xFF6d9567).copy(alpha = 0.5f)
-    val selectedContent = Color.White
+    val navBarBg          = Color(0xFF6d9567).copy(alpha = 0.5f)
+    val selectedContent   = Color.White
     val unselectedContent = Color.White.copy(alpha = 0.4f)
 
     val slotWidth = 72.dp
     val barHeight = 58.dp
-    val navShape = RoundedCornerShape(29.dp)
+    val navShape  = RoundedCornerShape(29.dp)
 
     Box(
         modifier = modifier
             .wrapContentWidth()
             .height(barHeight)
             .shadow(
-                elevation = 16.dp,
-                shape = navShape,
+                elevation    = 16.dp,
+                shape        = navShape,
                 ambientColor = Color.Black.copy(alpha = 0.6f),
-                spotColor = Color.Black.copy(alpha = 0.6f)
+                spotColor    = Color.Black.copy(alpha = 0.6f)
             )
-            // Apply the custom style here to reduce the blur radius
-            .hazeChild(
-                state = hazeState,
-                shape = navShape,
-                style = HazeStyle(blurRadius = 14.dp)
-            )
+            .hazeChild(state = hazeState, shape = navShape, style = HazeStyle(blurRadius = 14.dp))
             .clip(navShape)
             .background(navBarBg)
     ) {
         Row(
-            modifier = Modifier.fillMaxHeight(),
+            modifier          = Modifier.fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             screens.forEach { screen ->
                 val isSelected = screen.route == currentRoute
 
                 val contentColor by animateColorAsState(
-                    targetValue = if (isSelected) selectedContent else unselectedContent,
+                    targetValue   = if (isSelected) selectedContent else unselectedContent,
                     animationSpec = tween(durationMillis = 400),
-                    label = "contentColor"
+                    label         = "contentColor"
                 )
 
                 Box(
@@ -110,16 +109,16 @@ fun SmoothBottomNavigation(
                         .fillMaxHeight()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { onNavigate(screen.route) }
+                            indication        = null,
+                            onClick           = { onNavigate(screen.route) }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = screen.icon,
+                        imageVector        = screen.icon,
                         contentDescription = screen.label,
-                        tint = contentColor,
-                        modifier = Modifier.size(24.dp)
+                        tint               = contentColor,
+                        modifier           = Modifier.size(24.dp)
                     )
                 }
             }
@@ -127,68 +126,101 @@ fun SmoothBottomNavigation(
     }
 }
 
+// ROOT COMPOSABLE — resolves the theme once for the entire app
 @Composable
 fun MainScreen() {
-    val isDark = isSystemInDarkTheme()
+    val context = LocalContext.current
 
+    // 1. Read the saved ThemeMode from DataStore
+    val prefs by context.dataStore.data.collectAsState(initial = null)
+    val savedThemeMode = prefs?.get(THEME_MODE_KEY) ?: ThemeMode.SYSTEM.name
+
+    // 2. Resolve to a concrete boolean.
+    //    isSystemInDarkTheme() is called ONLY here, once, at the root.
+    val systemIsDark = isSystemInDarkTheme()
+    val isDark = when (ThemeMode.valueOf(savedThemeMode)) {
+        ThemeMode.LIGHT  -> false
+        ThemeMode.DARK   -> true
+        ThemeMode.SYSTEM -> systemIsDark
+    }
+
+    // 3. Provide the resolved flag to every child composable
+    CompositionLocalProvider(LocalAppIsDark provides isDark) {
+        MainScreenContent(isDark = isDark)
+    }
+}
+
+// MAIN LAYOUT
+
+@Composable
+private fun MainScreenContent(isDark: Boolean) {
+
+    // System bar icons
+    // Transparent bar so the background gradient shows through.
+    // darkIcons = !isDark  →  light mode gets dark (readable) icons,
+    //                         dark mode gets light (readable) icons.
+    SetSystemBars(
+        statusBarColor = Color.Transparent,
+        darkIcons      = !isDark
+    )
+
+    // Background gradient
     val bgGradient = if (isDark) {
         Brush.linearGradient(
             0.0f to Color.Black,
             0.7f to Color.Black,
             1.0f to Color(0xFF1b1b1b),
             start = Offset(0f, 0f),
-            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+            end   = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
         )
     } else {
         Brush.linearGradient(
             colors = listOf(Color(0xFFe8ebed), Color(0xFFf2f0e3)),
-            start = Offset(0f, 0f),
-            end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+            start  = Offset(0f, 0f),
+            end    = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
         )
     }
 
-    val navBarBg = Color(0xFF6d9567).copy(alpha = 0.5f)
-    val fabShape = RoundedCornerShape(29.dp)
+    val navBarBg  = Color(0xFF6d9567).copy(alpha = 0.5f)
+    val fabShape  = RoundedCornerShape(29.dp)
 
+    val context       = LocalContext.current.applicationContext as Application
     val navController = rememberNavController()
-    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application
     val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context))
     val screens = listOf(Screen.Calendar, Screen.Pill, Screen.Overview)
 
     var showAddCycleDialog by remember { mutableStateOf(false) }
-    var showAddPillDialog by remember { mutableStateOf(false) }
+    var showAddPillDialog  by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Create the HazeState bridge
     val hazeState = remember { HazeState() }
 
     Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
         NavHost(
-            navController = navController,
+            navController    = navController,
             startDestination = Screen.Calendar.route,
-            modifier = Modifier
+            modifier         = Modifier
                 .fillMaxSize()
-                .haze(state = hazeState) // Capture the background content for blurring
+                .haze(state = hazeState)
                 .windowInsetsPadding(WindowInsets.statusBars)
         ) {
             composable(Screen.Calendar.route) { CalendarScreen() }
-            composable(Screen.Pill.route) { PillTrackerScreen(viewModel) }
+            composable(Screen.Pill.route)     { PillTrackerScreen(viewModel) }
             composable(Screen.Overview.route) { OverviewScreen(viewModel) }
 
-            // Added slide animations for the Settings Screen
             composable(
-                route = Screen.Settings.route,
-                enterTransition = {
+                route             = Screen.Settings.route,
+                enterTransition   = {
                     slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                        towards       = AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(400)
                     )
                 },
                 popExitTransition = {
                     slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                        towards       = AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(400)
                     )
                 }
@@ -200,9 +232,9 @@ fun MainScreen() {
         val showBottomUi = currentRoute != Screen.Settings.route
 
         AnimatedVisibility(
-            visible = showBottomUi,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
+            visible  = showBottomUi,
+            enter    = slideInVertically { it } + fadeIn(),
+            exit     = slideOutVertically { it } + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             Box(
@@ -211,27 +243,25 @@ fun MainScreen() {
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {
+                // FAB (left)
                 Box(modifier = Modifier.align(Alignment.CenterStart).width(60.dp).height(58.dp)) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .shadow(
-                                elevation = 16.dp,
-                                shape = fabShape,
+                                elevation    = 16.dp,
+                                shape        = fabShape,
                                 ambientColor = Color.Black.copy(alpha = 0.6f),
-                                spotColor = Color.Black.copy(alpha = 0.6f)
+                                spotColor    = Color.Black.copy(alpha = 0.6f)
                             )
-                            // 1. Apply the haze effect to the FAB
                             .hazeChild(state = hazeState, shape = fabShape, style = HazeStyle(blurRadius = 14.dp))
                             .clip(fabShape)
-                            // 2. Apply the translucent background
                             .background(navBarBg)
-                            // 3. Make it clickable
                             .clickable {
                                 when (currentRoute) {
-                                    Screen.Pill.route -> showAddPillDialog = true
+                                    Screen.Pill.route     -> showAddPillDialog = true
                                     Screen.Overview.route -> navController.navigate(Screen.Settings.route)
-                                    else -> showAddCycleDialog = true
+                                    else                  -> showAddCycleDialog = true
                                 }
                             },
                         contentAlignment = Alignment.Center
@@ -239,12 +269,12 @@ fun MainScreen() {
                         val iconColor = Color.White
                         AnimatedContent(targetState = currentRoute, label = "FABIconTransition") { route ->
                             when (route) {
-                                Screen.Pill.route -> CapsuleIcon(color = iconColor)
+                                Screen.Pill.route     -> CapsuleIcon(color = iconColor)
                                 Screen.Overview.route -> Icon(
-                                    imageVector = Icons.Rounded.Settings,
+                                    imageVector        = Icons.Rounded.Settings,
                                     contentDescription = "Settings",
-                                    tint = iconColor,
-                                    modifier = Modifier.size(24.dp)
+                                    tint               = iconColor,
+                                    modifier           = Modifier.size(24.dp)
                                 )
                                 else -> ClickyAddIcon(tint = iconColor)
                             }
@@ -252,17 +282,17 @@ fun MainScreen() {
                     }
                 }
 
-                // --- NAVBAR ON THE RIGHT ---
+                // Navbar (right)
                 Box(modifier = Modifier.align(Alignment.BottomEnd).height(58.dp)) {
                     SmoothBottomNavigation(
-                        screens = screens,
+                        screens      = screens,
                         currentRoute = currentRoute,
-                        hazeState = hazeState, // Pass the state to the navbar
-                        onNavigate = { route ->
+                        hazeState    = hazeState,
+                        onNavigate   = { route ->
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
-                                restoreState = true
+                                restoreState    = true
                             }
                         }
                     )
@@ -273,7 +303,7 @@ fun MainScreen() {
         if (showAddPillDialog) {
             PillTrackingSetupDialog(
                 onDismiss = { showAddPillDialog = false },
-                onSave = { startDate, pillCount ->
+                onSave    = { startDate, pillCount ->
                     viewModel.enablePillTracking(startDate, pillCount)
                     showAddPillDialog = false
                 }
@@ -283,7 +313,7 @@ fun MainScreen() {
         if (showAddCycleDialog) {
             AddCycleDialog(
                 onDismiss = { showAddCycleDialog = false },
-                onSave = { start, end, bleed, color, pain ->
+                onSave    = { start, end, bleed, color, pain ->
                     viewModel.addCycle(start, end, bleed, color, pain)
                     showAddCycleDialog = false
                 }
@@ -292,12 +322,12 @@ fun MainScreen() {
     }
 }
 
+// SMALL ICON COMPOSABLES
+
 @Composable
 fun CapsuleIcon(color: Color) {
     Box(
-        modifier = Modifier
-            .size(24.dp)
-            .rotate(-45f),
+        modifier         = Modifier.size(24.dp).rotate(-45f),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -313,7 +343,6 @@ fun CapsuleIcon(color: Color) {
     }
 }
 
-// Updated to use the Add (+) icon and removed the redundant click listener
 @Composable
 fun ClickyAddIcon(tint: Color) {
     Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {

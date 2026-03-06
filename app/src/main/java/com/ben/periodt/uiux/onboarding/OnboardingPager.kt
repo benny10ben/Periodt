@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ben.periodt.R
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.SetSystemBars
 import com.ben.periodt.uiux.overview.ContentDialog
 
@@ -51,7 +51,7 @@ fun OnboardingPager(
     onBack: () -> Unit,
     onAllow: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     SetSystemBars(statusBarColor = Color.Transparent, darkIcons = !isDark)
 
     OnboardingRoot {
@@ -101,7 +101,7 @@ fun OnboardingPager(
 // --- PAGE 1: WELCOME ---
 @Composable
 fun WelcomePage(onGetStarted: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val titleColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val logoBoxColor = if (isDark) Color.Black else Color.White
     val logoBorder = if (isDark) Color(0xFF333333) else Color(0xFFE2E8F0)
@@ -261,7 +261,7 @@ fun LanguageItem(
 // --- PAGE 2: FEATURES ---
 @Composable
 fun FeaturesPage(onNext: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val subTextColor = textColor.copy(alpha = 0.6f)
 
@@ -375,7 +375,7 @@ fun FeaturesPage(onNext: () -> Unit) {
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ModeSelectionPage(onStart: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val subTextColor = textColor.copy(alpha = 0.7f)
 

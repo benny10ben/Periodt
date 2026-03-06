@@ -2,7 +2,6 @@ package com.ben.periodt.uiux.calendar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -56,7 +56,7 @@ fun AddCycleDialog(
     val colorOptions = listOf("Bright Red", "Dark Red", "Brown")
 
     // --- THEME & COLORS ---
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // Dark Mode background: Pure Black to Deep Gray
     val contentSurface = if (isDark) {
@@ -345,7 +345,7 @@ fun MinimalDatePickerDialog(
     onDismiss: () -> Unit,
     onConfirm: (Long) -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val zone = remember { ZoneId.systemDefault() }
     var selectedMillis by remember {
         mutableStateOf(Instant.now().atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli())
@@ -460,7 +460,7 @@ fun MinimalMonthPicker(
     accentColor: Color,
     weekStartsOnMonday: Boolean
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val zone = remember { ZoneId.systemDefault() }
     val today = remember { LocalDate.now(zone) }
     val selectedDate = selectedMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }

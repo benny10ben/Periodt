@@ -1,7 +1,6 @@
 package com.ben.periodt.uiux.overview
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,15 +15,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.ben.periodt.ui.theme.BricolageGrotesque
-import nl.dionsegijn.konfetti.core.Party
-import nl.dionsegijn.konfetti.core.Position
-import nl.dionsegijn.konfetti.core.emitter.Emitter
-import java.util.concurrent.TimeUnit
+import com.ben.periodt.ui.theme.LocalAppIsDark
 
 @Composable
 fun SuccessFeedbackDialog(
@@ -33,7 +28,7 @@ fun SuccessFeedbackDialog(
     buttonText: String = "Awesome",
     onDismiss: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // 1. UPDATED GRADIENT SURFACE
     val contentSurface = if (isDark) {
@@ -136,7 +131,7 @@ fun DestructiveConfirmationDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // 1. UPDATED GRADIENT SURFACE
     val contentSurface = if (isDark) {
@@ -250,7 +245,7 @@ fun DestructiveConfirmationDialog(
 
 @Composable
 fun WhatsNewDialog(onDismiss: () -> Unit) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
 
@@ -260,27 +255,31 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Version 1.0.5",
+                text = "Version 1.1.6",
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary,
                 fontSize = 18.sp
             )
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("✨ Fresh New Look", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("A complete UI/UX overhaul with smoother transitions, better accessibility, and a more intuitive layout.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+                Text("💊 Pill Tracker", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Full contraceptive pill tracking added. Log your pack, track daily pills, and get new predictions timed to your pack end.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("💾 Data Export & Import", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Your data is now fully portable. Backup your history to a file or migrate it to a new device in seconds.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+                Text("🌿 Discovery & Learning Mode", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("After stopping the pill, the app now enters Discovery mode — pausing predictions while your natural cycle re-establishes — then Learning mode as it builds confidence over your first few cycles.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("📱 Homescreen Widgets", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Added two new highly customizable home-screen widgets to track your cycle at a glance.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+                Text("🧠 Smarter Algorithm", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Predictions now use trend-aware regression, outlier filtering, regularity scoring, and personalised luteal phase data for a significantly more accurate forecast.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("🎨 Made for You", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Deep personalization options added to make the app truly feel like your own.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+                Text("🔔 Notification Reminders", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Set personalised reminders for your period, fertile window, and daily pill. Choose how many days in advance and exactly what time to be notified.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("✨ Refined UI & Experience", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
+                Text("Smoother transitions, a polished appearance with light and dark mode support, and a more intuitive layout throughout.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
             }
         }
     }

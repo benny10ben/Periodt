@@ -1,7 +1,6 @@
 package com.ben.periodt.uiux.shared
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,8 +20,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -45,7 +44,7 @@ fun UpcomingBannerEnhanced(
     isOnPill: Boolean = false,
     discoveryCycle: Int = 1
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // --- COLOR LOGIC ---
 

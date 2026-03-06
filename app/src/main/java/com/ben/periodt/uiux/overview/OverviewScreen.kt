@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,12 +57,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
 import com.ben.periodt.uiux.shared.getConfidenceLabel
 import com.ben.periodt.uiux.shared.getCycleConfidence
 import com.ben.periodt.uiux.shared.getDisplayName
-import com.ben.periodt.uiux.shared.predictCycle
 import com.ben.periodt.uiux.shared.pretty
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.launch
@@ -72,7 +71,6 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun OverviewScreen(
     viewModel: PeriodViewModel,
-    isDarkTheme: Boolean = isSystemInDarkTheme()
 ) {
 
     // 1. Collect from StateFlow
@@ -101,7 +99,7 @@ fun OverviewScreen(
     val isLearningMode  = postPillState == PostPillState.LEARNING
 
     val screenScroll = rememberScrollState()
-    val isDark = isDarkTheme
+    val isDark = LocalAppIsDark.current
 
     // Gradient palette for Stat Cards
     val gradTop = if (isDark) Color(0xFF7B8FA3) else Color(0xFF8FA0B1)
@@ -277,7 +275,7 @@ private fun StatCard(
     onGradientMuted: Color, // Used as Secondary Text
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // AESTHETIC MAPPING
     // Surface: Dark #1B1B1B / Light White
@@ -328,7 +326,7 @@ private fun MinimalChartCard(
     titleColor: Color,
     content: @Composable () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     // Explicitly override surface for dark mode if needed
     val cardSurface = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
 
@@ -369,7 +367,7 @@ private fun BloodColorPieChart(
         return
     }
 
-    val isDark = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val colorMap = mapOf(
         "bright red" to Color(0xFFFF8B94),
         "dark red"   to Color(0xFF4E1A1A),

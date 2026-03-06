@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.calendar.CleanDateCard
 import com.ben.periodt.uiux.calendar.EntryStylePill
 import com.ben.periodt.uiux.calendar.MinimalDatePickerDialog
@@ -46,7 +47,7 @@ fun PillTrackingSetupDialog(
     val formatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
 
     // --- THEME & COLORS (Synced with AddCycleDialog) ---
-    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
 
     // Dynamic accent color
     val accentColor = Color(0xFFa68e74)

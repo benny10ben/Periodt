@@ -1,22 +1,22 @@
 <p align="center">
-    <img width="200" height="200" alt="logo 1" src="https://github.com/user-attachments/assets/09fc91eb-6b14-4814-846d-60ba2aa4669f" />
+  <img width="200" height="200" alt="logo 1" src="fastlane/metadata/android/en-US/images/icon.png" />
 </p>
 
 <h1 align="center">Periodt: Track & Predict Cycles</h1>
 
 <p align="center">
-  Periodt is a privacy‑first Android app that keeps cycle data on the device and uses on‑device logic to predict upcoming periods, fertile windows, and ovulation estimates.
+  Periodt is a privacy‑first Android app that keeps cycle data on the device and uses on‑device logic to predict upcoming periods, fertile windows, and ovulation estimates.
 </p>
 
 <br />
 
 <p align="center">
-<img width="160" alt="Screenshot_20260226_054358" src="https://github.com/user-attachments/assets/86c837df-7766-40ef-b5bc-074921c6a786" />
-<img width="160" alt="Screenshot_20260226_054412" src="https://github.com/user-attachments/assets/7169d0b4-4fc5-4fd2-847f-c7d5da1b9e3f" />
-<img width="160" alt="Screenshot_20260226_054424" src="https://github.com/user-attachments/assets/61348706-70ce-48d3-bcfc-9a49966f49ba" />
-<img width="160" alt="Screenshot_20260226_053641" src="https://github.com/user-attachments/assets/d477430c-d7cd-4fd3-b76f-8df9f45c0fb1" />
-<img width="160" alt="Screenshot_20260226_053620" src="https://github.com/user-attachments/assets/e1ebed87-03f1-4370-a559-415a0ec8ba17" />
-<img width="160" alt="Screenshot_20260226_053721" src="https://github.com/user-attachments/assets/33734492-89dc-4f7d-b9f3-318356efccc4" />
+<img width="160" alt="Screen 1" src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" />
+<img width="160" alt="Screen 2" src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" />
+<img width="160" alt="Screen 3" src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" />
+<img width="160" alt="Screen 4" src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" />
+<img width="160" alt="Screen 5" src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" />
+<img width="160" alt="Screen 6" src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" />
 </p>
 
 <br />
@@ -37,7 +37,6 @@
 - [ ] **Advanced Cycle Insights** – Statistical trends and symptom correlation analysis.
 - [ ] **Automated Backups** – Support for periodic local backups to custom directories.
 - [ ] **Lock Screen Support** – Privacy-focused widgets specifically for the Android Lock Screen.
-- [ ] **Pill/Medication Reminders** – Integrated notifications for birth control and wellness habits.
 - [ ] **Localization** – Expanding support for the languages currently listed as "Coming Soon."
 
 ## Contributing

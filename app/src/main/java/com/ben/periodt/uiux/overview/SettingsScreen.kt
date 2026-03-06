@@ -12,7 +12,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,7 +44,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ben.periodt.ui.theme.BricolageGrotesque
+import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.shared.ReminderPrefs
 import com.ben.periodt.uiux.shared.ReminderScheduler
 import com.ben.periodt.uiux.shared.dataStore
@@ -63,6 +64,9 @@ import java.util.concurrent.TimeUnit
 
 const val GITHUB_REPO_URL = "https://github.com/benny10ben/Periodt/"
 
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -73,7 +77,7 @@ fun SettingsScreen(
     val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
-    // ── Feedback states ───────────────────────────────────────────
+    // Feedback states
     var showExportSuccess  by remember { mutableStateOf(false) }
     var showImportSuccess  by remember { mutableStateOf(false) }
     var showClearConfirm   by remember { mutableStateOf(false) }
@@ -81,15 +85,16 @@ fun SettingsScreen(
     var importResultMessage by remember { mutableStateOf("") }
     var showConfetti       by remember { mutableStateOf(false) }
 
-    // ── Info dialog states ────────────────────────────────────────
+    // Info dialog states
     var showFaq        by remember { mutableStateOf(false) }
     var showPrivacy    by remember { mutableStateOf(false) }
     var showAbout      by remember { mutableStateOf(false) }
     var showAlgorithm  by remember { mutableStateOf(false) }
     var showWhatsNew   by remember { mutableStateOf(false) }
     var showWidgetInfo by remember { mutableStateOf(false) }
+    var showAppearance by remember { mutableStateOf(false) }
 
-    // ── DataStore / reminder state ────────────────────────────────
+    // DataStore / reminder state
     val prefs by context.dataStore.data.collectAsState(initial = null)
 
     var periodEnabled    by remember(prefs) { mutableStateOf(prefs?.get(ReminderPrefs.IS_ENABLED) ?: false) }
@@ -106,6 +111,13 @@ fun SettingsScreen(
     var periodExpanded    by remember { mutableStateOf(false) }
     var fertilityExpanded by remember { mutableStateOf(false) }
     var pillExpanded      by remember { mutableStateOf(false) }
+
+    val themeModeString by context.dataStore.data.collectAsState(initial = null)
+    var themeMode by remember(themeModeString) {
+        mutableStateOf(
+            ThemeMode.valueOf(themeModeString?.get(THEME_MODE_KEY) ?: ThemeMode.SYSTEM.name)
+        )
+    }
 
     val powerManager       = remember { context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager }
     val isBatteryOptimized = remember { !powerManager.isIgnoringBatteryOptimizations(context.packageName) }
@@ -146,7 +158,7 @@ fun SettingsScreen(
         }
     }
 
-    // ── Launchers ─────────────────────────────────────────────────
+    // Launchers
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
@@ -174,8 +186,8 @@ fun SettingsScreen(
         }
     }
 
-    // ── Theme ─────────────────────────────────────────────────────
-    val isDark = isSystemInDarkTheme()
+    // Theme
+    val isDark = LocalAppIsDark.current
 
     val bgGradient = if (isDark) {
         Brush.linearGradient(
@@ -197,7 +209,7 @@ fun SettingsScreen(
     val fertilityAccent = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val pillAccent = Color(0xFFa68e74)
 
-    // ── Layout ────────────────────────────────────────────────────
+    // Layout
     Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
         Column(
             modifier = Modifier
@@ -234,7 +246,7 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp)
             ) {
 
-                // ── 0. TOP WARNING (BATTERY) ─────────────────────
+                // 0. TOP WARNING (BATTERY)
                 if (isBatteryOptimized) {
                     BatteryWarning(
                         pillBg = surfaceColor, // Using surface color so it looks like its own card
@@ -246,7 +258,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(24.dp))
                 }
 
-                // ── 1. NOTIFICATIONS ─────────────────────────────
+                // 1. NOTIFICATIONS
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         "NOTIFICATIONS", fontFamily = BricolageGrotesque,
@@ -357,7 +369,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // ── 2. DATA & BACKUP ─────────────────────────────
+                //2. DATA & BACKUP
                 SettingsSection(title = "DATA & BACKUP", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Upload,
@@ -388,7 +400,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // ── 3. CUSTOMIZE ─────────────────────────────────
+                //3. CUSTOMIZE
                 SettingsSection(title = "CUSTOMIZE", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Widgets,
@@ -400,14 +412,19 @@ fun SettingsScreen(
                     SettingsItem(
                         icon = Icons.Rounded.Palette,
                         title = "Appearance",
+                        subtitle = when (themeMode) {
+                            ThemeMode.SYSTEM -> "System default"
+                            ThemeMode.LIGHT  -> "Light mode"
+                            ThemeMode.DARK   -> "Dark mode"
+                        },
                         tint = textPrimary,
-                        onClick = { Toast.makeText(context, "Coming soon!", Toast.LENGTH_SHORT).show() }
+                        onClick = { showAppearance = true }
                     )
                 }
 
                 Spacer(Modifier.height(24.dp))
 
-                // ── 4. HELP CENTER ───────────────────────────────
+                // 4. HELP CENTER
                 SettingsSection(title = "HELP CENTER", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Calculate,
@@ -441,12 +458,12 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // ── 5. MORE ──────────────────────────────────────
+                //5. MORE
                 SettingsSection(title = "MORE", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Info,
                         title = "About Periodt",
-                        subtitle = "v1.0.5",
+                        subtitle = "v1.1.6",
                         tint = textPrimary,
                         onClick = { showAbout = true }
                     )
@@ -464,7 +481,21 @@ fun SettingsScreen(
         }
     }
 
-    // ── Dialogs ───────────────────────────────────────────────────
+    // Dialogs
+
+    if (showAppearance) {
+        AppearanceDialog(
+            current = themeMode,
+            onSelect = { selected ->
+                themeMode = selected
+                coroutineScope.launch {
+                    context.dataStore.edit { p -> p[THEME_MODE_KEY] = selected.name }
+                }
+                showAppearance = false
+            },
+            onDismiss = { showAppearance = false }
+        )
+    }
 
     if (showWidgetInfo) {
         ContentDialog(title = "Home Screen Widgets", onDismiss = { showWidgetInfo = false }) {
@@ -481,11 +512,18 @@ fun SettingsScreen(
     if (showAlgorithm) {
         ContentDialog(title = "How we calculate", onDismiss = { showAlgorithm = false }) {
             Text(
-                text = "Periodt uses a dynamic prediction algorithm designed to adapt to your unique cycle.\n\n" +
-                        "1. We start with a standard 28-day cycle model.\n\n" +
-                        "2. As you log more data, we calculate the average length of your last 3 completed cycles.\n\n" +
-                        "3. This rolling average is used to predict your next period start date and fertile window.\n\n" +
-                        "The more you log, the smarter it gets.",
+                text = "Periodt uses a dynamic prediction algorithm that adapts to your unique cycle over time.\n\n" +
+                        "1. Smart outlier filtering\n" +
+                        "Unusually long gaps — likely missed logs — are detected and excluded so they don't skew your predictions.\n\n" +
+                        "2. Trend-aware cycle length\n" +
+                        "Rather than a simple average, we run a weighted linear regression across your last 6 cycles to detect if your cycle is shifting shorter or longer, then blend that trend with a recency-weighted average.\n\n" +
+                        "3. Regularity scoring\n" +
+                        "We calculate the standard deviation of your cycle lengths and classify your pattern as Very Regular, Regular, Somewhat Irregular, or Irregular — which directly widens or narrows your prediction window.\n\n" +
+                        "4. Personalised ovulation & fertile window\n" +
+                        "Ovulation is estimated from your actual logged luteal phase data where available, not a fixed 14-day assumption. The fertile window expands or contracts based on prediction confidence.\n\n" +
+                        "5. Post-pill awareness\n" +
+                        "After stopping the pill, predictions are paused during Discovery (first 1–2 cycles) and flagged as learning during cycles 3–4, reflecting that your natural rhythm is still re-establishing.\n\n" +
+                        "The more you log, the smarter and more personalised your predictions become.",
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = BricolageGrotesque,
                 color = textSub, lineHeight = 22.sp
@@ -523,7 +561,7 @@ fun SettingsScreen(
         ContentDialog(title = "About Periodt", onDismiss = { showAbout = false }) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Periodt", style = MaterialTheme.typography.headlineMedium, fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, color = textPrimary)
-                Text("v1.0.5", style = MaterialTheme.typography.labelLarge, fontFamily = BricolageGrotesque, color = textSub)
+                Text("v1.1.6", style = MaterialTheme.typography.labelLarge, fontFamily = BricolageGrotesque, color = textSub)
                 Spacer(Modifier.height(16.dp))
                 Text("Designed to be simple, private, and aesthetic.", style = MaterialTheme.typography.bodyMedium, fontFamily = BricolageGrotesque, color = textSub, lineHeight = 22.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(24.dp))
@@ -562,10 +600,7 @@ fun SettingsScreen(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────
 // REMINDER SUBCOMPONENTS
-// ─────────────────────────────────────────────────────────────────
-
 @Composable
 private fun ReminderSection(
     title: String,
@@ -734,17 +769,14 @@ private fun BatteryWarning(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────
 // SHARED COMPONENTS
-// ─────────────────────────────────────────────────────────────────
-
 @Composable
 fun ContentDialog(
     title: String,
     onDismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val isDark          = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val bgGradient      = if (isDark) Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
     else Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
     val surfaceFallback = if (isDark) Color(0xFF1B1B1B) else Color.White
@@ -792,10 +824,12 @@ fun SettingsSection(
     surfaceColor: Color,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val isDark = LocalAppIsDark.current
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             title, fontFamily = BricolageGrotesque, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-            color = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.4f),
+            color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.4f),
             modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
         )
         Card(
@@ -820,7 +854,7 @@ fun SettingsItem(
     showChevron: Boolean = true,
     onClick: () -> Unit
 ) {
-    val isDark       = isSystemInDarkTheme()
+    val isDark = LocalAppIsDark.current
     val subTextColor = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f)
 
     Row(
@@ -853,3 +887,130 @@ fun rainConfetti(): List<Party> = listOf(
         emitter = Emitter(duration = 100, TimeUnit.MILLISECONDS).max(100)
     )
 )
+
+// APPEARANCE DIALOG
+@Composable
+fun AppearanceDialog(
+    current: ThemeMode,
+    onSelect: (ThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val isDark = LocalAppIsDark.current
+
+    val bgGradient = if (isDark) {
+        Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
+    } else {
+        Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
+    }
+    val surfaceFallback = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val textPrimary     = if (isDark) Color.White else Color(0xFF0F172A)
+    val accentColor     = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val pillBg          = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier  = Modifier.fillMaxWidth(0.9f).padding(vertical = 24.dp),
+            shape     = RoundedCornerShape(26.dp),
+            colors    = CardDefaults.cardColors(containerColor = surfaceFallback),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxWidth().background(bgGradient)) {
+                Column(modifier = Modifier.padding(24.dp)) {
+
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Appearance",
+                            fontFamily = BricolageGrotesque,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = textPrimary
+                        )
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Rounded.Close, "Close", tint = textPrimary)
+                        }
+                    }
+
+                    // Options
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ThemeOptionRow(
+                            label = "System Default",
+                            isSelected = current == ThemeMode.SYSTEM,
+                            textPrimary = textPrimary,
+                            pillBg = pillBg,
+                            accentColor = accentColor,
+                            onClick = { onSelect(ThemeMode.SYSTEM) }
+                        )
+                        ThemeOptionRow(
+                            label = "Light Mode",
+                            isSelected = current == ThemeMode.LIGHT,
+                            textPrimary = textPrimary,
+                            pillBg = pillBg,
+                            accentColor = accentColor,
+                            onClick = { onSelect(ThemeMode.LIGHT) }
+                        )
+                        ThemeOptionRow(
+                            label = "Dark Mode",
+                            isSelected = current == ThemeMode.DARK,
+                            textPrimary = textPrimary,
+                            pillBg = pillBg,
+                            accentColor = accentColor,
+                            onClick = { onSelect(ThemeMode.DARK) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeOptionRow(
+    label: String,
+    isSelected: Boolean,
+    textPrimary: Color,
+    pillBg: Color,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (isSelected) accentColor.copy(alpha = 0.15f) else pillBg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            fontFamily = BricolageGrotesque,
+            color = if (isSelected) accentColor else textPrimary,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 15.sp
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                tint = accentColor,
+                modifier = Modifier.size(22.dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = textPrimary.copy(alpha = 0.4f),
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}

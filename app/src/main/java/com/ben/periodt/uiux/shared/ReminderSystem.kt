@@ -24,9 +24,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-// ─────────────────────────────────────────────
 // 1. DATASTORE
-// ─────────────────────────────────────────────
 
 val Context.dataStore by preferencesDataStore(name = "reminder_prefs")
 
@@ -49,9 +47,7 @@ object ReminderPrefs {
     val PILL_MINUTE  = intPreferencesKey("pill_reminder_minute")
 }
 
-// ─────────────────────────────────────────────
 // 2. SCHEDULER
-// ─────────────────────────────────────────────
 
 object ReminderScheduler {
     private const val PERIOD_CODE    = 1001
@@ -115,9 +111,9 @@ object ReminderScheduler {
     )
 }
 
-// ─────────────────────────────────────────────
+
 // 3. PERIOD RECEIVER
-// ─────────────────────────────────────────────
+
 
 class ModernReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -191,9 +187,7 @@ class ModernReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// ─────────────────────────────────────────────
 // 4. FERTILITY RECEIVER
-// ─────────────────────────────────────────────
 
 class FertilityReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -238,22 +232,31 @@ class FertilityReminderReceiver : BroadcastReceiver() {
                     cycles.filter { !it.startDate.isBefore(pillStopDate) } else cycles
                 if (pillStopDate != null && isStillTransitioning(validCycles)) return@launch
 
+                // Inside FertilityReminderReceiver
                 val prediction = predictCycle(validCycles) ?: return@launch
                 val ovulationDay = prediction.ovulationDay
                 val daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), ovulationDay).toInt()
 
                 if (daysUntil == daysBefore) {
                     val dateStr = ovulationDay.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))
+
+                    val (notifTitle, notifText) = when {
+                        daysUntil == 0 ->
+                            "Ovulation Day" to "Today is your predicted ovulation day."
+
+                        daysUntil <= 2 ->
+                            "Peak Fertility" to "You are in your peak fertile window. Ovulation is expected on $dateStr."
+
+                        else ->
+                            "Fertile Window Approaching" to "Your fertile window is opening soon. Ovulation predicted for $dateStr."
+                    }
+
                     fireNotification(
                         context = appCtx,
                         channelId = "fertility_reminders_v1",
-                        channelName = "Fertility Reminders",
-                        title = if (daysBefore == 0) "Ovulation day" else "Fertile window opening soon",
-                        text = when (daysBefore) {
-                            0    -> "Today is your predicted ovulation day."
-                            1    -> "Your fertile window peaks tomorrow, around $dateStr."
-                            else -> "Your fertile window is predicted to open in $daysBefore days, around $dateStr."
-                        }
+                        channelName = "Fertility",
+                        title = notifTitle,
+                        text = notifText
                     )
                 }
             } catch (e: Throwable) {
@@ -265,9 +268,7 @@ class FertilityReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// ─────────────────────────────────────────────
 // 5. PILL RECEIVER
-// ─────────────────────────────────────────────
 
 class PillReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -316,9 +317,7 @@ class PillReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// ─────────────────────────────────────────────
 // 6. SHARED NOTIFICATION HELPER
-// ─────────────────────────────────────────────
 
 private fun fireNotification(
     context: Context,
