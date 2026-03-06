@@ -46,4 +46,4 @@ GNU General Public License (GPL). See [LICENSE](./LICENSE) for details.
 ## Developer
 Built by [Benny](https://github.com/benny10ben)
 
-[![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?logo=Instagram&logoColor=white)](https://instagram.com/https://www.instagram.com/ben.bytee?igsh=MzRtZXB4cjcwYWEx) [![X](https://img.shields.io/badge/X-black.svg?logo=X&logoColor=white)](https://x.com/https://x.com/benbytee) [![email](https://img.shields.io/badge/Email-D14836?logo=gmail&logoColor=white)](mailto:developer.ben10@gmail.com) 
+[![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?logo=Instagram&logoColor=white)](https://www.instagram.com/ben.bytee?igsh=MzRtZXB4cjcwYWEx) [![X](https://img.shields.io/badge/X-black.svg?logo=X&logoColor=white)](https://x.com/benbytee) [![email](https://img.shields.io/badge/Email-D14836?logo=gmail&logoColor=white)](mailto:developer.ben10@gmail.com) 
