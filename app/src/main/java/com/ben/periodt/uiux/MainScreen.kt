@@ -2,6 +2,8 @@ package com.ben.periodt.uiux
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -55,6 +57,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // ── Version key (shared with SettingsScreen) ──────────────────────────────────
@@ -135,6 +138,7 @@ fun SmoothBottomNavigation(
 }
 
 // ROOT COMPOSABLE — resolves the theme once for the entire app
+@RequiresApi(Build.VERSION_CODES.P)
 @Composable
 fun MainScreen() {
     val context = LocalContext.current
@@ -161,6 +165,7 @@ fun MainScreen() {
 }
 
 // MAIN LAYOUT
+@RequiresApi(Build.VERSION_CODES.P)
 @Composable
 private fun MainScreenContent(isDark: Boolean) {
 
@@ -183,6 +188,7 @@ private fun MainScreenContent(isDark: Boolean) {
         prefs ?: return@LaunchedEffect
         val lastSeen = prefs?.get(LAST_SEEN_VERSION_KEY) ?: 0
         if (lastSeen < currentVersion) {
+            delay(3000L)
             showWhatsNew = true
             coroutineScope.launch {
                 context.dataStore.edit { p -> p[LAST_SEEN_VERSION_KEY] = currentVersion }
