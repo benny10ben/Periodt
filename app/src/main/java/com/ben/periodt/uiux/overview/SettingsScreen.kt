@@ -66,6 +66,7 @@ const val GITHUB_REPO_URL = "https://github.com/benny10ben/Periodt/"
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+val LAST_SEEN_VERSION_KEY = androidx.datastore.preferences.core.intPreferencesKey("last_seen_version")
 
 @Composable
 fun SettingsScreen(

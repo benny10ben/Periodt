@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Medication
@@ -31,6 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -44,6 +45,7 @@ import com.ben.periodt.uiux.overview.OverviewScreen
 import com.ben.periodt.uiux.overview.SettingsScreen
 import com.ben.periodt.uiux.overview.ThemeMode
 import com.ben.periodt.uiux.overview.THEME_MODE_KEY
+import com.ben.periodt.uiux.overview.WhatsNewDialog
 import com.ben.periodt.uiux.pill.PillTrackerScreen
 import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
 import com.ben.periodt.uiux.shared.dataStore
@@ -53,6 +55,10 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
+import kotlinx.coroutines.launch
+
+// ── Version key (shared with SettingsScreen) ──────────────────────────────────
+val LAST_SEEN_VERSION_KEY = intPreferencesKey("last_seen_version")
 
 // --- NAVIGATION CONFIGURATION ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
@@ -143,7 +149,6 @@ fun MainScreen() {
         ThemeMode.SYSTEM -> systemIsDark
     }
 
-    // In your root composable, after resolving isDark:
     LaunchedEffect(isDark) {
         context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
             .edit().putBoolean("is_dark", isDark).apply()
@@ -156,7 +161,6 @@ fun MainScreen() {
 }
 
 // MAIN LAYOUT
-
 @Composable
 private fun MainScreenContent(isDark: Boolean) {
 
@@ -164,6 +168,28 @@ private fun MainScreenContent(isDark: Boolean) {
         statusBarColor = Color.Transparent,
         darkIcons      = !isDark
     )
+
+    // ── What's New auto-show ───────────────────────────────────────────────
+    val context        = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val prefs          by context.dataStore.data.collectAsState(initial = null)
+    var showWhatsNew   by remember { mutableStateOf(false) }
+
+    val currentVersion = remember {
+        context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt()
+    }
+
+    LaunchedEffect(prefs) {
+        prefs ?: return@LaunchedEffect
+        val lastSeen = prefs?.get(LAST_SEEN_VERSION_KEY) ?: 0
+        if (lastSeen < currentVersion) {
+            showWhatsNew = true
+            coroutineScope.launch {
+                context.dataStore.edit { p -> p[LAST_SEEN_VERSION_KEY] = currentVersion }
+            }
+        }
+    }
+    // ──────────────────────────────────────────────────────────────────────
 
     val bgGradient = if (isDark) {
         Brush.linearGradient(
@@ -184,9 +210,9 @@ private fun MainScreenContent(isDark: Boolean) {
     val navBarBg  = Color(0xFF6d9567).copy(alpha = 0.5f)
     val fabShape  = RoundedCornerShape(29.dp)
 
-    val context       = LocalContext.current.applicationContext as Application
+    val appContext    = context.applicationContext as Application
     val navController = rememberNavController()
-    val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context))
+    val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(appContext))
     val screens = listOf(Screen.Calendar, Screen.Pill, Screen.Overview)
 
     var showAddCycleDialog by remember { mutableStateOf(false) }
@@ -237,8 +263,6 @@ private fun MainScreenContent(isDark: Boolean) {
             exit     = slideOutVertically { it } + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            // FAB + Navbar sit in a centered Row so the gap between them is
-            // always exactly 12.dp regardless of screen width.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -304,6 +328,7 @@ private fun MainScreenContent(isDark: Boolean) {
             }
         }
 
+        // ── Dialogs ───────────────────────────────────────────────────────
         if (showAddPillDialog) {
             PillTrackingSetupDialog(
                 onDismiss = { showAddPillDialog = false },
@@ -322,6 +347,10 @@ private fun MainScreenContent(isDark: Boolean) {
                     showAddCycleDialog = false
                 }
             )
+        }
+
+        if (showWhatsNew) {
+            WhatsNewDialog(onDismiss = { showWhatsNew = false })
         }
     }
 }
