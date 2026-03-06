@@ -255,7 +255,7 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Version 1.1.6",
+                text = "Version 1.1.7",
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary,
