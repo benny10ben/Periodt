@@ -8,14 +8,30 @@
 <br />
 
 <p align="center">
-  <img src="assets/1.png" width="100%" />
+  <img src="assets/1.png" width="80%" />
 </p>
 
 <br />
 
 <p align="center">
-  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.benny10ben.periodt%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fbenny10ben%2FPeriodt%22%2C%22author%22%3A%22benny10ben%22%2C%22name%22%3A%22Periodt%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22dontSortReleasesList%5C%22%3Atrue%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D">
+  <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/benny10ben/Periodt">
     <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" height="40" alt="Get it on Obtainium" />
+  </a>
+</p>
+
+<br />
+
+<p align="center">
+  <a href="https://x.com/benbytee">
+    <img src="https://cdn.simpleicons.org/x/000000" width="28" alt="X" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://www.instagram.com/ben.bytee">
+    <img src="https://cdn.simpleicons.org/instagram/E4405F" width="28" alt="Instagram" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="mailto:developer.ben10@gmail.com">
+    <img src="https://cdn.simpleicons.org/gmail/EA4335" width="28" alt="Email" />
   </a>
 </p>
 
@@ -58,19 +74,4 @@ Issues and pull requests are welcome. Please open an issue to discuss significan
 GNU General Public License (GPL). See [LICENSE](./LICENSE) for details.
 
 ## Developer
-Built by [Benny](https://github.com/benny10ben) — [@benbytee](https://x.com/benbytee)
-
-
-<p align="left">
-  <a href="https://x.com/benbytee">
-    <img src="https://cdn.simpleicons.org/x/000000" width="28" alt="X" />
-  </a>
-  &nbsp;&nbsp;
-  <a href="https://www.instagram.com/ben.bytee">
-    <img src="https://cdn.simpleicons.org/instagram/E4405F" width="28" alt="Instagram" />
-  </a>
-  &nbsp;&nbsp;
-  <a href="mailto:developer.ben10@gmail.com">
-    <img src="https://cdn.simpleicons.org/gmail/EA4335" width="28" alt="Email" />
-  </a>
-</p>
+Built by [Ben](https://github.com/benny10ben) — [@benbytee](https://x.com/benbytee)
