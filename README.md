@@ -21,45 +21,15 @@
 
 <br />
 
-<p align="center">
-  <a href="https://x.com/benbytee">
-    <img src="https://cdn.simpleicons.org/x/000000" width="28" alt="X" />
-  </a>
-  &nbsp;&nbsp;
-  <a href="https://www.instagram.com/ben.bytee">
-    <img src="https://cdn.simpleicons.org/instagram/E4405F" width="28" alt="Instagram" />
-  </a>
-  &nbsp;&nbsp;
-  <a href="mailto:developer.ben10@gmail.com">
-    <img src="https://cdn.simpleicons.org/gmail/EA4335" width="28" alt="Email" />
-  </a>
-</p>
-
-<br />
-
 > ⚠️ **Medical disclaimer:** Predictions are for informational purposes only and are not medical advice. Please consult a healthcare professional for accurate results.
 
-## Highlights
-- **Private by design** — data stays on the device; no analytics, no ads, no cloud sync.
-- **Encrypted at rest** — Room database secured with SQLCipher and an Android Keystore–protected key.
-- **Modern Android** — Jetpack Compose UI, Room, Coroutines, DataStore, and home‑screen widgets.
-- **Pill tracker** — log contraceptive packs, track daily pills, and get withdrawal bleed predictions timed to pack end.
-- **Discovery & Learning mode** — predictions pause after stopping the pill and gradually re-enable as natural cycles re-establish.
-- **Smart algorithm** — trend-aware regression, outlier filtering, regularity scoring, and personalised luteal phase data.
-- **Reminders** — optional notifications for period, fertile window, and daily pill, each with custom timing.
-- **Offline** — no internet permission required.
-
-## How it works
-
-### Prediction algorithm
-
-Periodt uses a multi-stage on-device prediction engine:
-
-1. **Outlier filtering** — unusually long gaps (likely missed logs) are detected using the user's own median cycle length and excluded before any statistics are run.
-2. **Trend-aware cycle length** — a weighted linear regression across the last 6 cycles detects whether cycles are shifting shorter or longer, blended with a recency-weighted average.
-3. **Regularity scoring** — standard deviation of cycle lengths classifies the pattern as Very Regular, Regular, Somewhat Irregular, or Irregular, which directly widens or narrows the prediction window.
-4. **Personalised ovulation** — ovulation is estimated from actual logged luteal phase data where available, not a fixed 14-day assumption. The fertile window expands or contracts based on confidence.
-5. **Post-pill awareness** — after stopping the pill, predictions pause during Discovery (0–1 post-pill cycles) and are flagged as Learning (2–3 cycles) before returning to full Normal confidence.
+## Features
+- **Period tracker** — log cycles, track flow, and predict upcoming periods
+- **Private** — no internet permission, no analytics, no cloud sync
+- **Encrypted** — SQLCipher + Android Keystore
+- **Pill tracker** — pack logging, daily pills, withdrawal bleed predictions
+- **Smart predictions** — trend-aware regression, outlier filtering, personalised luteal phase
+- **Reminders** — period, fertile window, and pill notifications
 
 ## Roadmap
 - [ ] **Advanced Cycle Insights** – Statistical trends and symptom correlation analysis.
@@ -75,3 +45,5 @@ GNU General Public License (GPL). See [LICENSE](./LICENSE) for details.
 
 ## Developer
 Built by [Ben](https://github.com/benny10ben) — [@benbytee](https://x.com/benbytee)
+
+[![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?logo=Instagram&logoColor=white)](https://instagram.com/https://www.instagram.com/ben.bytee?igsh=MzRtZXB4cjcwYWEx) [![X](https://img.shields.io/badge/X-black.svg?logo=X&logoColor=white)](https://x.com/https://x.com/benbytee) [![email](https://img.shields.io/badge/Email-D14836?logo=gmail&logoColor=white)](mailto:developer.ben10@gmail.com) 
