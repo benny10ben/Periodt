@@ -117,7 +117,7 @@ fun OverviewScreen(
 
     // Specific Chart Colors
     val bleedingChartColor = Color(0xFFD89046)
-    val painChartColor = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val painChartColor = Color(0xFF6d9567).copy(alpha = 0.4f)
 
 
     Box(

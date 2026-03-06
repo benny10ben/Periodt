@@ -241,7 +241,7 @@ fun CalendarScreen() {
 
     val entrySurface = if (isDark) Color(0xFF1B1B1B) else Color.White
     val entryText    = if (isDark) Color.White else Color(0xFF0F172A)
-    val accentColor  = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val accentColor  = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
 
     var cycleToEdit by remember { mutableStateOf<PeriodViewModel.Cycle?>(null) }
 
@@ -458,10 +458,8 @@ private fun LegendItem(color: Color, label: String, textColor: Color) {
         )
     }
 }
-
 private val ColorPeriodSolid  = Color(0xFFA5231C)
-private val ColorFertileSolid = Color(0xFF2A3825).copy(alpha = 0.5f)
-
+private val ColorFertileSolid = Color(0xFF6d9567).copy(alpha = 0.6f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarCard(
@@ -652,10 +650,12 @@ fun DayCellEnhanced(
     val today   = LocalDate.now()
 
     // --- COLOR PALETTE ---
-    val themeAccent      = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val themeAccent      = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val starAccent       = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70) // Star icon color
     val colorPeriodSolid = Color(0xFFA5231C)
     val packColor        = Color(0xFFa68e74)
+
+    val colorOvulationBg = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.2f)
 
     val matchingPack = pillPacks.firstOrNull { pack ->
         val end = pack.endDate ?: pack.startDate.plusDays((pack.pillCount - 1).toLong())
@@ -663,6 +663,9 @@ fun DayCellEnhanced(
     }
     val isInPillWindow   = matchingPack != null
     val isPillWindowPast = isInPillWindow && date.isBefore(today)
+
+    // Check if the date is the predicted ovulation day
+    val isOvulationDay = !isOnPill && prediction?.ovulationDay == date
 
     fun checkPhase(d: LocalDate): Int {
         val isLoggedPeriod = cycles.any { c ->
@@ -738,6 +741,16 @@ fun DayCellEnhanced(
                 .clip(shape)
                 .background(bgColor)
         )
+
+        // Solid circle overlay specifically for the ovulation day
+        if (isOvulationDay) {
+            Box(
+                modifier = Modifier
+                    .size(35.dp)
+                    .clip(CircleShape)
+                    .background(colorOvulationBg)
+            )
+        }
 
         DayText(date, isCurrentMonth, isHighlighted = isHighlighted)
 
@@ -942,10 +955,10 @@ fun EditCycleDialog(
     }
 
     // Yellow accent for Slider and Buttons in Dark Mode
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val surfaceFallback = if (isDark) Color.Black else Color.White
 
-    val pastelGreen = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val pastelGreen = Color(0xFF6d9567).copy(alpha = 0.6f)
     val pastelOrange = Color(0xFFD89046)
     val pastelMaroon = Color(0xFF4E1A1A)
 
@@ -1436,6 +1449,45 @@ fun RowScope.InfoBox(
     }
 }
 
+private val activeCycleMessages = listOf(
+    "Focus on self-care and hydration today.",
+    "Warm baths and rest go a long way right now.",
+    "Your body is doing a lot — be gentle with yourself.",
+    "A heating pad and something comforting sounds right.",
+    "This is a great time to slow down and recharge.",
+    "Listen to what your body needs today.",
+    "Dark chocolate counts as self-care. 🍫",
+    "Rest is productive. You're allowed to take it easy.",
+    "Check in with yourself — how are you feeling today?",
+    "Hydrate, rest, repeat. You've got this. 💪"
+)
+
+private val naturalFlowMessages = listOf(
+    "Enjoy your natural flow. ✨",
+    "Your cycle is doing its thing. ✨",
+    "A calm phase — make the most of it. 🌿",
+    "Good things ahead. Keep logging for better predictions.",
+    "You're in a great window right now. 🌸",
+    "Feeling yourself? This phase tends to be the best. ✨",
+    "Your body is in rhythm. Stay consistent. 🌿",
+    "The quiet before the storm — rest up and enjoy! ☀️",
+    "Track how you feel today — patterns matter. 📊",
+    "Energy up? Use it well. ✨"
+)
+
+private val pillFlowMessages = listOf(
+    "Stay consistent with your pack! 💊",
+    "One pill a day keeps the guesswork away. 💊",
+    "Consistency is key — keep it up! ✨",
+    "On track with your pack. Great work! 💊",
+    "Remember to take your pill at the same time each day.",
+    "Staying consistent helps your body stay regulated. 💊",
+    "You're doing great — keep the streak going! ✨",
+    "Same time every day is the goal. You've got this! 💊",
+    "Your pack is on track. Stay consistent! 🌿",
+    "Pill taken? Check. You're doing amazing. ✨"
+)
+
 @Composable
 fun PredictionBanner(
     prediction: Prediction?,
@@ -1447,23 +1499,18 @@ fun PredictionBanner(
     pillPackCount: Int = 21
 ) {
     val today = LocalDate.now()
-    val now = LocalDateTime.now()
+    val now   = LocalDateTime.now()
+    val isDark = isSystemInDarkTheme()
 
-    // --- LOGIC: PACK END CALCULATION ---
     val packEndDate = remember(pillPackStartDate, pillPackCount) {
         pillPackStartDate?.plusDays((pillPackCount - 1).toLong())
     }
 
-    // Formatter to show "Mar 27"
     val endFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("MMM dd") }
 
-    // --- LOGIC: DERIVE POST-PILL STATE ---
     val postPillCycles = remember(cycles, pillStopDate) {
-        if (pillStopDate != null) {
-            cycles.filter { !it.startDate.isBefore(pillStopDate) }
-        } else {
-            emptyList()
-        }
+        if (pillStopDate != null) cycles.filter { !it.startDate.isBefore(pillStopDate) }
+        else emptyList()
     }
 
     val postPillState = remember(postPillCycles, isOnPill, pillStopDate) {
@@ -1477,20 +1524,38 @@ fun PredictionBanner(
 
     if (prediction == null && postPillState == PostPillState.NORMAL && activeCycle == null) return
 
-    val isDark = isSystemInDarkTheme()
+    // ── Colors ───────────────────────────────────────────────────
     val cardBackground = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
-    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSecondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-    val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
-    val pillTextColor = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textPrimary    = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSecondary  = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
 
-    val progressBrush = remember(isDark) {
-        Brush.linearGradient(
-            colors = if (isDark) listOf(Color(0xFFD89046), Color(0xFFD89046))
-            else listOf(Color(0xFF2A3825).copy(alpha = 0.5f), Color(0xFF2A3825).copy(alpha = 0.5f))
-        )
+    val pillBackground = remember(isDark, isOnPill) {
+        when {
+            isOnPill && isDark -> Color(0xFFa68e74).copy(alpha = 0.15f)
+            isOnPill           -> Color(0xFFa68e74).copy(alpha = 0.10f)
+            isDark             -> Color(0xFFD89046).copy(alpha = 0.15f)
+            else               -> Color(0xFF6d9567).copy(alpha = 0.10f)
+        }
     }
 
+    val pillTextColor = remember(isDark, isOnPill) {
+        when {
+            isOnPill -> Color(0xFFa68e74)
+            isDark   -> Color(0xFFD89046)
+            else     -> Color(0xFF6d9567)
+        }
+    }
+
+    val progressBrush = remember(isDark, isOnPill) {
+        val color = when {
+            isOnPill -> Color(0xFFa68e74)
+            isDark   -> Color(0xFFD89046)
+            else     -> Color(0xFF6d9567).copy(alpha = 0.6f)
+        }
+        Brush.linearGradient(colors = listOf(color, color))
+    }
+
+    // ── Priority logic ───────────────────────────────────────────
     val icon: ImageVector
     val accentColor: Color
     val statusTitle: String
@@ -1500,26 +1565,32 @@ fun PredictionBanner(
     var progTarget by remember { mutableFloatStateOf(0f) }
     var compliment by remember { mutableStateOf("") }
 
-    // --- PRIORITY LOGIC ---
-
     if (activeCycle != null) {
         val dayOfPeriod = ChronoUnit.DAYS.between(activeCycle.startDate, today).toInt() + 1
+        val pillDayIndex = if (pillPackStartDate != null)
+            (today.toEpochDay() - pillPackStartDate.toEpochDay()).toInt().coerceAtLeast(0)
+        else
+            today.toEpochDay().toInt()
         val label = if (isOnPill) "Withdrawal Bleed" else "Period"
-        icon = Icons.Rounded.Opacity
-        accentColor = Color(0xFFEF5350)
+
+        icon        = Icons.Rounded.Favorite
+        accentColor = if (isOnPill) Color(0xFFa68e74) else Color(0xFFEF5350)
         statusTitle = "$label Day $dayOfPeriod"
 
-        // Append post-pill context to the message
         personalMessage = when (postPillState) {
-            PostPillState.DISCOVERY -> "First cycle after stopping pills — your body is recalibrating. 🌿"
-            PostPillState.LEARNING  -> "Learning your natural rhythm. Keep logging!  🌿"
-            else                    -> "Focus on self-care and hydration today."
+            PostPillState.DISCOVERY -> "First cycle after stopping pills — recalibrating. 🌿"
+            PostPillState.LEARNING  -> "Learning your natural rhythm. Keep logging! 🌿"
+            else -> if (isOnPill)
+                pillFlowMessages[pillDayIndex % pillFlowMessages.size]
+            else
+                activeCycleMessages[(dayOfPeriod - 1) % activeCycleMessages.size]
         }
 
-        dateBadgeText = when (postPillState) {
-            PostPillState.DISCOVERY -> "Discovery"
-            PostPillState.LEARNING  -> "Learning"
-            else                    -> "Active"
+        dateBadgeText = when {
+            isOnPill                                  -> "Pill Pack"
+            postPillState == PostPillState.DISCOVERY  -> "Discovery"
+            postPillState == PostPillState.LEARNING   -> "Learning"
+            else                                      -> "Active"
         }
 
         val totalDays: Long = activeCycle.endDate?.let {
@@ -1527,93 +1598,138 @@ fun PredictionBanner(
         } ?: 6L
         progTarget = (ChronoUnit.MINUTES.between(activeCycle.startDate.atStartOfDay(), now).toFloat() / (totalDays * 1440f)).coerceIn(0f, 0.95f)
 
-//        compliment = when (postPillState) {
-//            PostPillState.DISCOVERY -> "This cycle helps unlock predictions. 💊"
-//            PostPillState.LEARNING  -> "Every cycle logged improves accuracy. 💖"
-//            else -> if (isOnPill) "Stay consistent with your pack! 💊" else "Taking it day by day. 💖"
-//        }
-    }
-    else if (postPillState == PostPillState.DISCOVERY) {
-        icon = Icons.Rounded.AutoAwesome
-        accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
-        statusTitle = "Discovery Mode"
+    } else if (postPillState == PostPillState.DISCOVERY) {
+        icon            = Icons.Rounded.AutoAwesome
+        accentColor     = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
+        statusTitle     = "Discovery Mode"
         personalMessage = "Predictions are paused while recalibrating."
-        dateBadgeText = "Paused"
-    }
-    else if (postPillState == PostPillState.LEARNING) {
-        icon = Icons.Rounded.AutoAwesome
-        accentColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
-        statusTitle = "Learning Mode"
+        dateBadgeText   = "Paused"
+
+    } else if (postPillState == PostPillState.LEARNING) {
+        icon            = Icons.Rounded.AutoAwesome
+        accentColor     = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
+        statusTitle     = "Learning Mode"
         personalMessage = "Predictions are active, but we're still refining accuracy."
-        dateBadgeText = prediction?.mostLikelyPeriodStart?.pretty() ?: "Learning"
-    }
-    else if (prediction == null) {
-        icon = Icons.Rounded.AutoAwesome
-        accentColor = if (isDark) Color(0xFF66BB6A) else Color(0xFF2A3825).copy(alpha = 0.5f)
-        statusTitle = "Learning your rhythm"
+        dateBadgeText   = prediction?.mostLikelyPeriodStart?.pretty() ?: "Learning"
+
+    } else if (prediction == null) {
+        icon            = Icons.Rounded.AutoAwesome
+        accentColor     = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+        statusTitle     = "Learning your rhythm"
         personalMessage = "Keep tracking to unlock predictions."
-        dateBadgeText = "Learning"
-    }
-    else {
-        val daysUntil = ChronoUnit.DAYS.between(today, prediction.mostLikelyPeriodStart)
+        dateBadgeText   = "Learning"
+
+    } else {
+        val daysUntil      = ChronoUnit.DAYS.between(today, prediction.mostLikelyPeriodStart)
         val cycleTypeLabel = if (isOnPill) "withdrawal bleed" else "cycle"
 
-        // --- UPDATED PACK INFO: DISPLAYING THE DATE ---
         val packInfo = if (isOnPill && packEndDate != null) {
             when {
                 today.isAfter(packEndDate) -> "Pack finished"
                 today.isEqual(packEndDate) -> "Last pill today"
-                else -> "Pack ends on ${packEndDate.format(endFormatter)}" // Shows "Pack ends on Mar 27"
+                else -> "Pack ends on ${packEndDate.format(endFormatter)}"
             }
         } else null
 
         val quad = when {
-            daysUntil < 0 -> Quadruple(Icons.Rounded.Warning, Color(0xFFEF5350), "Late by ${kotlin.math.abs(daysUntil)} days", "No stress—cycles can shift! 🧘‍♀️")
-            daysUntil == 0L -> Quadruple(Icons.Rounded.Opacity, if (isDark) Color(0xFFC8D4E5) else Color(0xFF8089D2), "Starts today", if (isOnPill) "Withdrawal bleed expected today." else "Ready for your period? 🍫")
-            daysUntil <= 3 -> Quadruple(Icons.Rounded.Bolt, Color(0xFFFFB74D), "Almost time", "Rest up and stay cozy. 💧")
-            else -> {
-                // Prioritize pack end date over natural flow text
-                val message = if (packInfo != null) "$packInfo • Stay consistent! ✨" else "Enjoy your natural flow. ✨"
-                Quadruple(Icons.Rounded.Spa, Color(0xFF66BB6A), "$daysUntil days until next $cycleTypeLabel", message)
+            daysUntil < 0   -> Quadruple(
+                Icons.Rounded.Warning,
+                Color(0xFFEF5350),
+                "Late by ${kotlin.math.abs(daysUntil)} days",
+                "No stress — cycles can shift! 🧘‍♀️"
+            )
+            daysUntil == 0L -> Quadruple(
+                Icons.Rounded.Favorite,
+                if (isOnPill) Color(0xFFa68e74) else if (isDark) Color(0xFFC8D4E5) else Color(0xFF8089D2),
+                "Starts today",
+                if (isOnPill) "Withdrawal bleed expected today." else "Ready for your period? 🍫"
+            )
+            daysUntil <= 3  -> Quadruple(
+                Icons.Rounded.Bolt,
+                Color(0xFFFFB74D),
+                "Almost time",
+                "Rest up and stay cozy. 💧"
+            )
+            else            -> {
+                val message = if (packInfo != null)
+                    "$packInfo • ${pillFlowMessages[today.dayOfYear % pillFlowMessages.size]}"
+                else
+                    naturalFlowMessages[today.dayOfYear % naturalFlowMessages.size]
+                Quadruple(
+                    Icons.Rounded.Spa,
+                    if (isOnPill) Color(0xFFa68e74) else if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f),
+                    "$daysUntil days until next $cycleTypeLabel",
+                    message
+                )
             }
         }
-        icon = quad.first
-        accentColor = quad.second
-        statusTitle = quad.third
+
+        icon            = quad.first
+        accentColor     = quad.second
+        statusTitle     = quad.third
         personalMessage = quad.fourth
-        dateBadgeText = prediction.mostLikelyPeriodStart.pretty()
+        dateBadgeText   = prediction.mostLikelyPeriodStart.pretty()
     }
 
-    val animatedProgress by animateFloatAsState(targetValue = progTarget, animationSpec = tween(1200), label = "BannerProgress")
+    val animatedProgress by animateFloatAsState(
+        targetValue   = progTarget,
+        animationSpec = tween(1200),
+        label         = "BannerProgress"
+    )
 
+    // ── UI ───────────────────────────────────────────────────────
     Card(
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBackground),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        shape     = RoundedCornerShape(22.dp),
+        colors    = CardDefaults.cardColors(containerColor = cardBackground),
+        modifier  = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
                 Icon(imageVector = icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(24.dp))
-                Box(modifier = Modifier.clip(RoundedCornerShape(50)).background(pillBackground).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Text(text = dateBadgeText, fontFamily = BricolageGrotesque, color = pillTextColor, fontSize = 11.sp)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text       = dateBadgeText,
+                        fontFamily = BricolageGrotesque,
+                        color      = accentColor,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize   = 11.sp
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            Text(text = statusTitle, fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-            Text(text = personalMessage, fontFamily = BricolageGrotesque, color = textSecondary, fontSize = 13.sp)
+            Text(text = statusTitle,     fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary,   fontSize = 15.sp)
+            Text(text = personalMessage, fontFamily = BricolageGrotesque,                                  color = textSecondary, fontSize = 13.sp)
 
             AnimatedVisibility(visible = activeCycle != null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(Modifier.height(16.dp))
                     Canvas(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape)) {
-                        drawRoundRect(color = pillBackground.copy(alpha = 0.4f), size = size, cornerRadius = CornerRadius(50f))
+                        drawRoundRect(color = pillBackground, size = size, cornerRadius = CornerRadius(50f))
                         drawRoundRect(brush = progressBrush, size = Size(animatedProgress * size.width, size.height), cornerRadius = CornerRadius(50f))
                     }
                     if (compliment.isNotEmpty()) {
                         Spacer(Modifier.height(10.dp))
-                        Text(text = compliment, fontFamily = BricolageGrotesque, style = androidx.compose.ui.text.TextStyle(brush = progressBrush, fontSize = 15.sp, fontWeight = FontWeight.Medium))
+                        Text(
+                            text       = compliment,
+                            fontFamily = BricolageGrotesque,
+                            style      = androidx.compose.ui.text.TextStyle(
+                                brush      = progressBrush,
+                                fontSize   = 15.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
                     }
                 }
             }
@@ -1621,83 +1737,101 @@ fun PredictionBanner(
     }
 }
 
+private val bleedingDo     = listOf("Take it slow and rest up.", "Curl up with something cozy.", "Give yourself permission to do nothing.", "A warm bath can do wonders today.", "Journal how you're feeling today.", "Low effort, high reward — rest wins.", "Cancel what you can. Rest first.")
+private val bleedingMove   = listOf("Try gentle stretching or yoga.", "A slow walk outside is enough.", "Restorative yoga is perfect right now.", "Light stretching before bed tonight.", "Child's pose. That's it. That's enough.", "Breathwork counts as movement today.", "Gentle mobility work if you have energy.")
+private val bleedingEat    = listOf("Comfort food rich in iron.", "Dark leafy greens and lentils today.", "Warm soups are your best friend.", "Iron-rich foods help with fatigue.", "Magnesium-rich foods ease cramps.", "Bone broth or a hearty stew.", "Dark chocolate has iron — treat yourself.")
+
+private val follicularDo   = listOf("Plan new goals or projects.", "Start that thing you've been putting off.", "Your focus is sharp — use it.", "Write down your intentions for the month.", "Great time to learn something new.", "Energy is building — lean into it.", "Tackle your to-do list with confidence.")
+private val follicularMove = listOf("Go for a run or a hike.", "Try a new workout class today.", "Cardio feels easier this week — use it.", "Push a little harder than usual.", "HIIT, cycling, or a long run all work.", "Your body is primed for challenge.", "Set a new personal record today.")
+private val follicularEat  = listOf("Fresh salads and protein.", "Lean protein fuels your rising energy.", "Colorful vegetables are your best bet.", "Fermented foods support your gut now.", "Light and fresh keeps energy steady.", "Eggs, legumes, and greens are great.", "Antioxidant-rich foods are perfect now.")
+
+private val ovulationDo    = listOf("Connect with your friends.", "Say yes to social plans today.", "Your confidence is peaking — own it.", "Great day for an important conversation.", "Collaborate, pitch, present — you've got this.", "Reach out to someone you've been meaning to.", "Charisma is up. Use it wisely. ✨")
+private val ovulationMove  = listOf("Push limits with a workout.", "Your strength is at its peak today.", "HIIT, lifting, or dancing — all great.", "High-intensity feels good this week.", "Try something physically challenging.", "Spin class, climbing, or sprints.", "Your body can handle more right now.")
+private val ovulationEat   = listOf("Light meals keep you going.", "Anti-inflammatory foods support ovulation.", "Raw veggies and lean proteins today.", "Zinc-rich foods are great right now.", "Hydrate well — your body needs it.", "Fibre-rich foods keep things balanced.", "Whole grains and fresh fruit are ideal.")
+
+private val lutealDo       = listOf("Tidy up your personal space.", "Nesting mode is valid and productive.", "Wind down your schedule a little.", "Reflect on the month — what worked?", "Creative, low-key activities suit you now.", "Great time for a digital detox evening.", "Prep meals for the week ahead.")
+private val lutealMove     = listOf("Pilates or strength training.", "Lower intensity feels better this week.", "A long walk clears the mind.", "Swimming or cycling are great options.", "Yoga and stretching suit this phase.", "Listen to your energy and adjust.", "Moderate movement supports your mood.")
+private val lutealEat      = listOf("Complex carbs stabilize mood.", "Magnesium helps with PMS symptoms.", "Whole grains and root vegetables help.", "Reduce caffeine and sugar if you can.", "Omega-3s support mood this phase.", "Warm, nourishing meals are ideal.", "Dark chocolate for magnesium. 🍫")
+
+private val defaultDo      = listOf("Take some time to unwind today.", "A moment of stillness goes a long way.", "Check in with yourself today.", "Do one thing that brings you joy.", "Rest and intention go hand in hand.", "Be kind to yourself today.", "Small acts of self-care add up.")
+private val defaultMove    = listOf("A gentle walk is perfect.", "Movement is medicine — any amount counts.", "Stretch for 10 minutes today.", "Fresh air and a short walk.", "Even 5 minutes of movement helps.", "Put on music and move freely.", "Your pace is the right pace.")
+private val defaultEat     = listOf("Stay hydrated and drink water.", "Whole foods over processed today.", "A nourishing meal changes everything.", "Eat something colourful today.", "Slow down and enjoy your food.", "Hydration is self-care.", "Listen to what your body is craving.")
+
 @Composable
 fun WellnessCardsRow(
     cycles: List<PeriodViewModel.Cycle>,
     prediction: Prediction?
 ) {
-    val today = LocalDate.now()
+    val today     = LocalDate.now()
     val lastCycle = cycles.maxByOrNull { it.startDate }
 
-    // Defaults
-    var doText = "Take some time to unwind today."
-    var doIcon = Icons.Rounded.SelfImprovement
-
-    var moveText = "A gentle walk is perfect."
+    var doList   = defaultDo
+    var moveList = defaultMove
+    var eatList  = defaultEat
+    var doIcon   = Icons.Rounded.SelfImprovement
     var moveIcon = Icons.Rounded.DirectionsWalk
+    var eatIcon  = Icons.Rounded.LocalCafe
 
-    var eatText = "Stay hydrated and drink water."
-    var eatIcon = Icons.Rounded.LocalCafe
+    val isBleeding = lastCycle != null &&
+            (lastCycle.endDate == null || today <= lastCycle.endDate)
+
+    val daysSinceStart = lastCycle?.let {
+        ChronoUnit.DAYS.between(it.startDate, today).toInt()
+    } ?: 0
+
+    // Index: per-period-day during bleed, per-calendar-day otherwise
+    val cardIndex = if (isBleeding) daysSinceStart
+    else today.toEpochDay().toInt()
 
     if (lastCycle != null) {
-        val daysSinceStart = ChronoUnit.DAYS.between(lastCycle.startDate, today).toInt()
-        val isBleeding = lastCycle.endDate == null || today <= lastCycle.endDate
-
-        if (isBleeding) {
-            doText = "Take it slow and rest up."
-            doIcon = Icons.Rounded.Bedtime
-            moveText = "Try gentle stretching or yoga."
-            moveIcon = Icons.Rounded.SelfImprovement
-            eatText = "Comfort food rich in iron."
-            eatIcon = Icons.Rounded.SoupKitchen
-        } else if (daysSinceStart in 6..13) {
-            doText = "Plan new goals or projects."
-            doIcon = Icons.Rounded.Checklist
-            moveText = "Go for a run or a hike."
-            moveIcon = Icons.Rounded.DirectionsRun
-            eatText = "Fresh salads and protein."
-            eatIcon = Icons.Rounded.Restaurant
-        } else if (daysSinceStart in 14..17) {
-            doText = "Connect with your friends."
-            doIcon = Icons.Rounded.Favorite
-            moveText = "Push limits with a workout."
-            moveIcon = Icons.Rounded.FitnessCenter
-            eatText = "Light meals keep you going."
-            eatIcon = Icons.Rounded.Tapas
-        } else if (daysSinceStart in 18..28) {
-            doText = "Tidy up your personal space."
-            doIcon = Icons.Rounded.AutoAwesome
-            moveText = "Pilates or strength training."
-            moveIcon = Icons.Rounded.SelfImprovement
-            eatText = "Complex carbs stabilize mood."
-            eatIcon = Icons.Rounded.Grain
+        when {
+            isBleeding -> {
+                doList   = bleedingDo;   doIcon   = Icons.Rounded.Bedtime
+                moveList = bleedingMove; moveIcon = Icons.Rounded.SelfImprovement
+                eatList  = bleedingEat;  eatIcon  = Icons.Rounded.SoupKitchen
+            }
+            daysSinceStart in 6..13 -> {
+                doList   = follicularDo;   doIcon   = Icons.Rounded.Checklist
+                moveList = follicularMove; moveIcon = Icons.Rounded.DirectionsRun
+                eatList  = follicularEat;  eatIcon  = Icons.Rounded.Restaurant
+            }
+            daysSinceStart in 14..17 -> {
+                doList   = ovulationDo;   doIcon   = Icons.Rounded.Favorite
+                moveList = ovulationMove; moveIcon = Icons.Rounded.FitnessCenter
+                eatList  = ovulationEat;  eatIcon  = Icons.Rounded.Tapas
+            }
+            daysSinceStart in 18..28 -> {
+                doList   = lutealDo;   doIcon   = Icons.Rounded.AutoAwesome
+                moveList = lutealMove; moveIcon = Icons.Rounded.SelfImprovement
+                eatList  = lutealEat;  eatIcon  = Icons.Rounded.Grain
+            }
         }
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         WellnessCardItem(
-            title = "Do",
-            content = doText,
-            icon = doIcon,
-            backgroundColor = Color(0xFF2A3825).copy(alpha = 0.4f), // Applied Privacy Card Green
-            modifier = Modifier.weight(1f),
+            title           = "Do",
+            content         = doList[cardIndex % doList.size],
+            icon            = doIcon,
+            backgroundColor = Color(0xFF6d9567).copy(alpha = 0.4f),
+            modifier        = Modifier.weight(1f)
         )
         WellnessCardItem(
-            title = "Move",
-            content = moveText,
-            icon = moveIcon,
-            backgroundColor = Color(0xFFD89046), // Applied Prediction Card Orange
-            modifier = Modifier.weight(1f)
+            title           = "Move",
+            content         = moveList[cardIndex % moveList.size],
+            icon            = moveIcon,
+            backgroundColor = Color(0xFFD89046),
+            modifier        = Modifier.weight(1f)
         )
         WellnessCardItem(
-            title = "Eat",
-            content = eatText,
-            icon = eatIcon,
-            backgroundColor = Color(0xFFa68e74), // Applied Tips Card Maroon
-            modifier = Modifier.weight(1f)
+            title           = "Eat",
+            content         = eatList[cardIndex % eatList.size],
+            icon            = eatIcon,
+            backgroundColor = Color(0xFFa68e74),
+            modifier        = Modifier.weight(1f)
         )
     }
 }
@@ -1707,71 +1841,57 @@ fun WellnessCardItem(
     title: String,
     content: String,
     icon: ImageVector,
-    backgroundColor: Color, // New parameter for card identity
+    backgroundColor: Color,
     modifier: Modifier = Modifier
 ) {
-    val isDark = isSystemInDarkTheme()
-
-    // Base card color matches the passed onboarding color
-    val cardBg = backgroundColor
-    // Title, content, and icon made white to ensure contrast on colored backgrounds
-    val titleColor = Color.White.copy(alpha = 0.8f)
-    val contentColor = Color.White
-    val iconTint = Color.White
-
     Card(
-        modifier = modifier.height(165.dp),
-        shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
+        modifier  = modifier.height(165.dp),
+        shape     = RoundedCornerShape(26.dp),
+        colors    = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(cardBg)
-                .padding(16.dp),
+            modifier         = Modifier.fillMaxSize().background(backgroundColor).padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier            = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    imageVector = icon,
+                    imageVector        = icon,
                     contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(24.dp)
+                    tint               = Color.White,
+                    modifier           = Modifier.size(24.dp)
                 )
-
                 Spacer(Modifier.height(8.dp))
-
                 Text(
-                    text = title.uppercase(),
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
+                    text       = title.uppercase(),
+                    style      = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight    = FontWeight.SemiBold,
                         letterSpacing = 1.sp
                     ),
                     fontFamily = BricolageGrotesque,
-                    color = titleColor,
-                    fontSize = 11.sp
+                    color      = Color.White.copy(alpha = 0.8f),
+                    fontSize   = 11.sp
                 )
-
                 Spacer(Modifier.height(8.dp))
-
                 Text(
-                    text = content,
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                    text       = content,
+                    style      = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Normal
                     ),
                     fontFamily = BricolageGrotesque,
-                    color = contentColor,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
+                    color      = Color.White,
+                    textAlign  = TextAlign.Center,
+                    lineHeight = 18.sp,
+                    fontSize   = 12.sp
                 )
             }
         }
     }
 }
+
 // Simple helper class for the 'when' block return values
 data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

@@ -1,9 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Boot reschedule + runtime notifications (API 33+) -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" /> <!-- reschedule after reboot --> <!-- [web:6] -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- Android 13+ runtime permission --> <!-- [web:6] -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:allowBackup="true"
@@ -14,6 +15,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.PeriodT">
+
+        <receiver android:name=".uiux.shared.ModernReminderReceiver" android:exported="false" />
+        <receiver android:name=".uiux.shared.FertilityReminderReceiver" android:exported="false" />
+        <receiver android:name=".uiux.shared.PillReminderReceiver"      android:exported="false" />
 
         <activity
             android:name=".MainActivity"
@@ -26,17 +31,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Posts notifications (internal only) -->
-        <receiver
-            android:name=".uiux.shared.ReminderReceiver"
-            android:exported="false" /> <!-- [web:6] -->
-
-        <!-- Daily checker scheduled by AlarmManager (internal only) -->
-        <receiver
-            android:name=".uiux.shared.DailyPredictionChecker"
-            android:exported="false" /> <!-- [web:6] -->
-
-        <!-- Reschedule after device reboot -->
         <receiver
             android:name=".uiux.shared.BootReceiver"
             android:exported="true"
@@ -45,6 +39,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

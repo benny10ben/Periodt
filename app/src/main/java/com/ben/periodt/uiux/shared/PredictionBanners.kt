@@ -53,11 +53,10 @@ fun UpcomingBannerEnhanced(
     val starIconColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
 
     // 2. Main theme color (Orange/Green) for Natural Cycles
-    val themeAccent = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val themeAccent = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
 
     // 3. Theme Accent 2 (Requested color for Withdrawal/Pill mode)
-    val themeAccent2 = if (isDark) Color(0xFFa68e74) else Color(0xFF2A3825).copy(alpha = 0.5f)
-
+    val themeAccent2 = Color(0xFFa68e74)
     // Select the primary accent for pills, badges, and labels based on the state
     val activeAccent = if (isOnPill) themeAccent2 else themeAccent
 
@@ -68,6 +67,7 @@ fun UpcomingBannerEnhanced(
         else            -> title
     }
 
+    // This badge is used for the top right corner in special modes
     val displayBadge = when {
         isDiscoveryMode -> "Paused"
         isLearningMode  -> "Learning"
@@ -124,7 +124,6 @@ fun UpcomingBannerEnhanced(
                                 else     -> Icons.Rounded.AutoAwesome
                             },
                             contentDescription = null,
-                            // Icon color: star color for Discovery/Learning, themeAccent2 for Pill
                             tint = if (isDiscoveryMode || isLearningMode) starIconColor else activeAccent,
                             modifier = Modifier.size(24.dp)
                         )
@@ -138,6 +137,7 @@ fun UpcomingBannerEnhanced(
                         )
                     }
 
+                    // Top right corner logic restored: Special modes get a badge, otherwise dots
                     if (isDiscoveryMode || isLearningMode || isOnPill) {
                         Box(
                             modifier = Modifier
@@ -200,10 +200,28 @@ fun UpcomingBannerEnhanced(
                         color      = textSecondary,
                         style      = MaterialTheme.typography.bodyMedium
                     )
+
+                    // Inline confidence pill beside the mostLikely/ovulation date
+                    if (!isDiscoveryMode && !isLearningMode && !isOnPill && badge.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(activeAccent)
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text       = badge,
+                                fontFamily = BricolageGrotesque,
+                                fontWeight = FontWeight.Bold,
+                                color      = Color.White,
+                                style      = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                 }
             }
 
-            // Bottom-end "Days Left" badge: Uses themeAccent2 if on pill
+            // Bottom-end "Days Left" badge
             if (!isDiscoveryMode && !daysLeftLabel.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
@@ -215,7 +233,7 @@ fun UpcomingBannerEnhanced(
                     Text(
                         text       = daysLeftLabel,
                         fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color      = Color.White,
                         style      = MaterialTheme.typography.labelSmall
                     )
@@ -224,7 +242,6 @@ fun UpcomingBannerEnhanced(
         }
     }
 }
-
 @Composable
 fun ConfidenceDots(
     confidence: Float,
@@ -237,7 +254,7 @@ fun ConfidenceDots(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(if (isActive) accentColor else accentColor.copy(alpha = 0.2f))
+                    .background(if (isActive) accentColor else accentColor.copy(alpha = 0.1f))
             )
         }
     }

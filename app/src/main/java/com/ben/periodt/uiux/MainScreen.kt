@@ -44,6 +44,7 @@ import com.ben.periodt.uiux.pill.PillTrackerScreen
 import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
 import com.ben.periodt.viewmodel.PeriodViewModel
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
 import dev.chrisbanes.haze.hazeChild
 
@@ -63,7 +64,7 @@ fun SmoothBottomNavigation(
     hazeState: HazeState,
     modifier: Modifier = Modifier
 ) {
-    val navBarBg = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val navBarBg = Color(0xFF6d9567).copy(alpha = 0.5f)
     val selectedContent = Color.White
     val unselectedContent = Color.White.copy(alpha = 0.4f)
 
@@ -81,7 +82,12 @@ fun SmoothBottomNavigation(
                 ambientColor = Color.Black.copy(alpha = 0.6f),
                 spotColor = Color.Black.copy(alpha = 0.6f)
             )
-            .hazeChild(state = hazeState, shape = navShape)
+            // Apply the custom style here to reduce the blur radius
+            .hazeChild(
+                state = hazeState,
+                shape = navShape,
+                style = HazeStyle(blurRadius = 14.dp)
+            )
             .clip(navShape)
             .background(navBarBg)
     ) {
@@ -141,7 +147,7 @@ fun MainScreen() {
         )
     }
 
-    val navBarBg = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val navBarBg = Color(0xFF6d9567).copy(alpha = 0.5f)
     val fabShape = RoundedCornerShape(29.dp)
 
     val navController = rememberNavController()
@@ -216,7 +222,7 @@ fun MainScreen() {
                                 spotColor = Color.Black.copy(alpha = 0.6f)
                             )
                             // 1. Apply the haze effect to the FAB
-                            .hazeChild(state = hazeState, shape = fabShape)
+                            .hazeChild(state = hazeState, shape = fabShape, style = HazeStyle(blurRadius = 14.dp))
                             .clip(fabShape)
                             // 2. Apply the translucent background
                             .background(navBarBg)

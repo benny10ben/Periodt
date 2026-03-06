@@ -3,12 +3,10 @@ package com.ben.periodt.uiux.shared
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.ben.periodt.data.AppDatabase
-import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 class BootReceiver : BroadcastReceiver() {
 
@@ -20,57 +18,36 @@ class BootReceiver : BroadcastReceiver() {
         )
         if (intent.action !in validActions) return
 
-        val appCtx        = context.applicationContext
+        // LOCKED_BOOT fires before the user unlocks — DataStore (credential-encrypted)
+        // is inaccessible at that point and will throw. Skip it; BOOT_COMPLETED
+        // fires again after unlock and will handle the reschedule.
+        if (intent.action == "android.intent.action.LOCKED_BOOT_COMPLETED") return
+
+        val appCtx = context.applicationContext
         val pendingResult = goAsync()
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                runCatching {
-                    val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
+                val prefs = appCtx.dataStore.data.first()
 
-                    val entities = dao.getAllCyclesOnce()
-                    val cycles   = entities.map { e ->
-                        PeriodViewModel.Cycle(
-                            id         = e.id,
-                            startDate  = LocalDate.parse(e.startDate),
-                            endDate    = e.endDate.takeIf { it.isNotBlank() }
-                                ?.let { LocalDate.parse(it) },
-                            bleeding   = e.bleeding,
-                            bloodColor = e.bloodColor,
-                            painLevel  = e.painLevel
-                        )
-                    }
-
-                    val pillPacks   = dao.getAllPillPacksOnce()
-                    val isOnPill    = pillPacks.any { it.endDate == null }
-                    val rawStopDate = pillPacks
-                        .filter  { it.endDate != null }
-                        .maxByOrNull { it.endDate!! }
-                        ?.endDate
-                    val stopDate    = rawStopDate?.let { LocalDate.parse(it) }
-
-                    val postPillCycles  = if (stopDate != null)
-                        cycles.filter { !it.startDate.isBefore(stopDate) }
-                    else
-                        cycles
-
-                    val isTransitioning = !isOnPill && stopDate != null &&
-                            isStillTransitioning(postPillCycles)
-
-                    if (!isOnPill && !isTransitioning) {
-                        val validCycles = if (stopDate != null)
-                            cycles.filter { !it.startDate.isBefore(stopDate) }
-                        else
-                            cycles
-                        predictCycle(validCycles)
-                    }
-
-                }.onFailure {
-                    // DB may not be ready on very early boots — alarms still
-                    // reschedule below so the checker retries tomorrow
+                if (prefs[ReminderPrefs.IS_ENABLED] == true) {
+                    ReminderScheduler.scheduleNextReminder(appCtx,
+                        prefs[ReminderPrefs.TIME_HOUR] ?: 8,
+                        prefs[ReminderPrefs.TIME_MINUTE] ?: 0)
                 }
+                if (prefs[ReminderPrefs.FERTILITY_ENABLED] == true) {
+                    ReminderScheduler.scheduleNextFertilityReminder(appCtx,
+                        prefs[ReminderPrefs.FERTILITY_HOUR] ?: 8,
+                        prefs[ReminderPrefs.FERTILITY_MINUTE] ?: 0)
+                }
+                if (prefs[ReminderPrefs.PILL_ENABLED] == true) {
+                    ReminderScheduler.scheduleNextPillReminder(appCtx,
+                        prefs[ReminderPrefs.PILL_HOUR] ?: 8,
+                        prefs[ReminderPrefs.PILL_MINUTE] ?: 0)
+                }
+            } catch (e: Throwable) {
+                android.util.Log.e("BootReceiver", "Boot reschedule failed: ${e.message}", e)
             } finally {
-                ReminderScheduler.scheduleAllDailyChecks(appCtx)
                 pendingResult.finish()
             }
         }

@@ -71,11 +71,11 @@ fun AddCycleDialog(
     }
 
     // Yellow accent for Slider and Buttons in Dark Mode
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val surfaceFallback = if (isDark) Color.Black else Color.White
 
     // Synchronized Pastel Palette
-    val pastelGreen = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val pastelGreen = Color(0xFF6d9567).copy(alpha = 0.6f)
     val pastelOrange = Color(0xFFD89046)
     val pastelMaroon = Color(0xFF4E1A1A)
 
@@ -374,7 +374,7 @@ fun MinimalDatePickerDialog(
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
 
     // UPDATED: Yellow accent for dark mode
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val buttonText = Color.White // Forced White only
 
     Dialog(

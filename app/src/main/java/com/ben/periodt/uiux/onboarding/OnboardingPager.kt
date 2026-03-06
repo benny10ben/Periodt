@@ -453,7 +453,7 @@ fun ModeSelectionPage(onStart: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 when (page) {
-                    0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, Color(0xFF2A3825))
+                    0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, Color(0xFF6d9567).copy(alpha = 0.4f))
                     1 -> InfoCard("Smart Predictions", "We calculate your cycle based on the average of your last 3 logs. The more you log, the more accurate we get.", Icons.Rounded.AutoAwesome, Color(0xFFD89046))
                     2 -> InfoCard("Cycle Syncing", "Get phase-specific advice on nutrition, exercise, and sleep to live in harmony with your hormones.", Icons.Rounded.SelfImprovement, Color(0xFF4E1A1A))
                 }

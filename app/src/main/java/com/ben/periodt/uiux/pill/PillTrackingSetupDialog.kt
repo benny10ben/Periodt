@@ -49,10 +49,9 @@ fun PillTrackingSetupDialog(
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
 
     // Dynamic accent color
-    val accentColor = if (isDark) Color(0xFFa68e74) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val accentColor = Color(0xFFa68e74)
 
-    // Gradient colors for DatePicker
-    val pastelGreen = Color(0xFF2A3825).copy(alpha = 0.5f)
+    val pastelGreen = Color(0xFF6d9567).copy(alpha = 0.4f)
     val pastelOrange = Color(0xFFa68e74)
     val pastelMaroon = Color(0xFF4E1A1A)
 
@@ -101,12 +100,12 @@ fun PillTrackingSetupDialog(
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
                     // Explanation
-                    Text(
-                        text = "Set your current pack details to accurately predict your next withdrawal bleed.",
-                        fontFamily = BricolageGrotesque,
-                        fontSize = 14.sp,
-                        color = textSub
-                    )
+//                    Text(
+//                        text = "Set your current pack details to accurately predict your next withdrawal bleed.",
+//                        fontFamily = BricolageGrotesque,
+//                        fontSize = 14.sp,
+//                        color = textSub
+//                    )
 
                     // Start Date Card (Matching style)
                     CleanDateCard(
@@ -145,8 +144,6 @@ fun PillTrackingSetupDialog(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Save Button (Synced with Add Cycle style)
                     Button(

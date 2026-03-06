@@ -55,7 +55,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
     // The "Stars" icon color (Discovery/Learning)
     val starAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
     // Your main theme color (Pill tracking / Natural)
-    val themeAccent = if (isDark) Color(0xFFa68e74) else Color(0xFF2A3825).copy(alpha = 0.5f)
+    val themeAccent = Color(0xFFa68e74)
 
     val activeAccent = when (postPillState) {
         PostPillState.DISCOVERY, PostPillState.LEARNING -> starAccent
@@ -126,7 +126,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                         active -> "Your active pill pack is being tracked.\nWithdrawal bleed date is predicted automatically."
                         pillState == PostPillState.DISCOVERY -> "Your body is recalibrating after the pill.\nPredictions are paused until your first cycle is logged."
                         pillState == PostPillState.LEARNING  -> "Predictions are live but still refining.\nKeep logging to improve accuracy."
-                        else -> "Enable pill tracking to get accurate withdrawal bleed predictions.\nTap the button below to set up your pack."
+                        else -> "Tap the button below to set up your pack."
                     },
                     fontSize   = 15.sp,
                     fontFamily = BricolageGrotesque,
@@ -442,9 +442,19 @@ fun LifeAfterPillCard(
                             InfoRow("How to reach full accuracy", "Log at least 4 natural cycles after stopping. This gives the algorithm a solid baseline to work with.", textPrimary, textSub)
                         }
                         PostPillState.NORMAL -> {
-                            InfoRow("How pill tracking works", "The app predicts your withdrawal bleed for the day after your last active pill based on your pack settings.", textPrimary, textSub)
+                            InfoRow(
+                                "Pill Pack Tracking",
+                                "The app tracks your active pills and breaks to help you stay consistent with your specific pack settings.",
+                                textPrimary,
+                                textSub
+                            )
                             Spacer(Modifier.height(16.dp))
-                            InfoRow("After you stop", "When you stop tracking the pill, predictions pause briefly while your hormones restabilize.", textPrimary, textSub)
+                            InfoRow(
+                                "Stopping the Pill",
+                                "If you stop tracking, the app enters Discovery Mode to observe your body's natural rhythm as it restabilizes.",
+                                textPrimary,
+                                textSub
+                            )
                         }
                     }
                 }
