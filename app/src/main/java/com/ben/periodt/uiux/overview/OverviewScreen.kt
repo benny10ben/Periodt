@@ -60,6 +60,7 @@ import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
+import com.ben.periodt.uiux.shared.calculatePeriodLength
 import com.ben.periodt.uiux.shared.getConfidenceLabel
 import com.ben.periodt.uiux.shared.getCycleConfidence
 import com.ben.periodt.uiux.shared.getDisplayName
@@ -144,11 +145,7 @@ fun OverviewScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                val completed = cycles.filter { it.endDate != null }
-                val avgLength = completed.mapNotNull { c ->
-                    val s = c.startDate; val e = c.endDate
-                    if (s != null && e != null) (e.toEpochDay() - s.toEpochDay()).toInt() else null
-                }.takeIf { it.isNotEmpty() }?.average()?.toInt()
+                val avgLength = calculatePeriodLength(cycles).takeIf { cycles.any { c -> c.endDate != null } }
 
                 StatCard(
                     title = "Avg Length",

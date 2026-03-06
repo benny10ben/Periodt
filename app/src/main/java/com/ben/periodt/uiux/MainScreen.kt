@@ -131,12 +131,9 @@ fun SmoothBottomNavigation(
 fun MainScreen() {
     val context = LocalContext.current
 
-    // 1. Read the saved ThemeMode from DataStore
     val prefs by context.dataStore.data.collectAsState(initial = null)
     val savedThemeMode = prefs?.get(THEME_MODE_KEY) ?: ThemeMode.SYSTEM.name
 
-    // 2. Resolve to a concrete boolean.
-    //    isSystemInDarkTheme() is called ONLY here, once, at the root.
     val systemIsDark = isSystemInDarkTheme()
     val isDark = when (ThemeMode.valueOf(savedThemeMode)) {
         ThemeMode.LIGHT  -> false
@@ -144,7 +141,6 @@ fun MainScreen() {
         ThemeMode.SYSTEM -> systemIsDark
     }
 
-    // 3. Provide the resolved flag to every child composable
     CompositionLocalProvider(LocalAppIsDark provides isDark) {
         MainScreenContent(isDark = isDark)
     }
@@ -155,16 +151,11 @@ fun MainScreen() {
 @Composable
 private fun MainScreenContent(isDark: Boolean) {
 
-    // System bar icons
-    // Transparent bar so the background gradient shows through.
-    // darkIcons = !isDark  →  light mode gets dark (readable) icons,
-    //                         dark mode gets light (readable) icons.
     SetSystemBars(
         statusBarColor = Color.Transparent,
         darkIcons      = !isDark
     )
 
-    // Background gradient
     val bgGradient = if (isDark) {
         Brush.linearGradient(
             0.0f to Color.Black,
@@ -237,17 +228,24 @@ private fun MainScreenContent(isDark: Boolean) {
             exit     = slideOutVertically { it } + fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
+            // FAB + Navbar sit in a centered Row so the gap between them is
+            // always exactly 12.dp regardless of screen width.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 24.dp, vertical = 24.dp)
+                    .padding(bottom = 24.dp),
+                contentAlignment = Alignment.BottomCenter
             ) {
-                // FAB (left)
-                Box(modifier = Modifier.align(Alignment.CenterStart).width(60.dp).height(58.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    // FAB
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .width(60.dp)
+                            .height(58.dp)
                             .shadow(
                                 elevation    = 16.dp,
                                 shape        = fabShape,
@@ -266,24 +264,21 @@ private fun MainScreenContent(isDark: Boolean) {
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        val iconColor = Color.White
                         AnimatedContent(targetState = currentRoute, label = "FABIconTransition") { route ->
                             when (route) {
-                                Screen.Pill.route     -> CapsuleIcon(color = iconColor)
+                                Screen.Pill.route     -> CapsuleIcon(color = Color.White)
                                 Screen.Overview.route -> Icon(
                                     imageVector        = Icons.Rounded.Settings,
                                     contentDescription = "Settings",
-                                    tint               = iconColor,
+                                    tint               = Color.White,
                                     modifier           = Modifier.size(24.dp)
                                 )
-                                else -> ClickyAddIcon(tint = iconColor)
+                                else -> ClickyAddIcon(tint = Color.White)
                             }
                         }
                     }
-                }
 
-                // Navbar (right)
-                Box(modifier = Modifier.align(Alignment.BottomEnd).height(58.dp)) {
+                    // Navbar
                     SmoothBottomNavigation(
                         screens      = screens,
                         currentRoute = currentRoute,

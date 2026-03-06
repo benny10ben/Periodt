@@ -246,6 +246,33 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp)
             ) {
 
+                // Medical disclaimer
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isDark) Color(0xFFD89046).copy(alpha = 0.1f) else Color(0xFFD89046).copy(alpha = 0.08f))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.HealthAndSafety,
+                        contentDescription = null,
+                        tint = Color(0xFFD89046),
+                        modifier = Modifier.size(24.dp).padding(top = 1.dp)
+                    )
+                    Text(
+                        text = "Predictions are for informational purposes only and are not medical advice. Please consult a healthcare professional for accurate results.",
+                        fontFamily = BricolageGrotesque,
+                        fontSize = 13.sp,
+                        color = if (isDark) Color(0xFFD89046).copy(alpha = 0.9f) else Color(0xFFB8730A),
+                        lineHeight = 18.sp
+                    )
+                }
+
+                Spacer(Modifier.height(20.dp))
+
                 // 0. TOP WARNING (BATTERY)
                 if (isBatteryOptimized) {
                     BatteryWarning(
@@ -475,6 +502,18 @@ fun SettingsScreen(
                     )
                 }
 
+                Spacer(Modifier.height(24.dp))
+
+                // Dedication
+                Text(
+                    text = "Dedicated to my love ❤️",
+                    fontFamily = BricolageGrotesque,
+                    fontSize = 13.sp,
+                    color = if (isDark) Color.White else Color.Black,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                 Spacer(Modifier.height(24.dp))
             }
@@ -635,10 +674,10 @@ private fun ReminderSection(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(icon, null, tint = iconTint, modifier = Modifier.size(22.dp))
+            Icon(icon, null, tint = iconTint, modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = textPrimary)
-                Text(subtitle, fontFamily = BricolageGrotesque, fontSize = 12.sp, color = textSub)
+                Text(subtitle, fontFamily = BricolageGrotesque, fontSize = 13.sp, color = textSub)
             }
             Switch(
                 checked = isEnabled,
@@ -764,7 +803,7 @@ private fun BatteryWarning(
         Icon(Icons.Rounded.WarningAmber, null, tint = accentColor, modifier = Modifier.size(24.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text("Background Restricted", fontFamily = BricolageGrotesque, color = textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("Tap to allow unrestricted battery usage so reminders arrive on time.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 12.sp)
+            Text("Tap to allow unrestricted battery usage so reminders arrive on time.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 13.sp)
         }
     }
 }

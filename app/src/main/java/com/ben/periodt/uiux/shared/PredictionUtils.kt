@@ -78,11 +78,11 @@ internal fun predictCycle(cycles: List<PeriodViewModel.Cycle>): Prediction? {
 }
 
 // Period length
-
-private fun calculatePeriodLength(cycles: List<PeriodViewModel.Cycle>): Int {
+internal fun calculatePeriodLength(cycles: List<PeriodViewModel.Cycle>): Int {
     val periodLengths = cycles.mapNotNull { cycle ->
         cycle.endDate?.let { endDate ->
-            ChronoUnit.DAYS.between(cycle.startDate, endDate).toInt().coerceIn(1, 10)
+            // ADD + 1 HERE to include both start and end dates in the count
+            (ChronoUnit.DAYS.between(cycle.startDate, endDate).toInt() + 1).coerceIn(1, 10)
         }
     }
     return if (periodLengths.isNotEmpty()) {
