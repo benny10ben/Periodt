@@ -21,22 +21,6 @@
 
 <br />
 
-<p align="center">
-  <a href="https://x.com/benbytee">
-    <img src="https://img.shields.io/badge/X-@benbytee-000000?style=for-the-badge&logo=x&logoColor=white" alt="X" />
-  </a>
-  &nbsp;
-  <a href="https://www.instagram.com/ben.bytee">
-    <img src="https://img.shields.io/badge/Instagram-@ben.bytee-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" />
-  </a>
-  &nbsp;
-  <a href="mailto:developer.ben10@gmail.com">
-    <img src="https://img.shields.io/badge/Email-developer.ben10@gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white" alt="Email" />
-  </a>
-</p>
-
-<br />
-
 > ⚠️ **Medical disclaimer:** Predictions are for informational purposes only and are not medical advice. Please consult a healthcare professional for accurate results.
 
 ## Highlights
@@ -74,4 +58,20 @@ Issues and pull requests are welcome. Please open an issue to discuss significan
 GNU General Public License (GPL). See [LICENSE](./LICENSE) for details.
 
 ## Developer
-Built by [Ben](https://github.com/benny10ben) — [@benbytee](https://x.com/benbytee)
+Built by [Benny](https://github.com/benny10ben) — [@benbytee](https://x.com/benbytee)
+
+<br />
+
+<p align="center">
+  <a href="https://x.com/benbytee">
+    <img src="https://cdn.simpleicons.org/x/white" width="28" alt="X" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://www.instagram.com/ben.bytee">
+    <img src="https://cdn.simpleicons.org/instagram/white" width="28" alt="Instagram" />
+  </a>
+  &nbsp;&nbsp;
+  <a href="mailto:developer.ben10@gmail.com">
+    <img src="https://cdn.simpleicons.org/gmail/white" width="28" alt="Email" />
+  </a>
+</p>
