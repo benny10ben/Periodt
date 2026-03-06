@@ -6,9 +6,11 @@
   Periodt is a privacy‑first Android app that keeps all cycle data on the device and uses on‑device logic to predict upcoming periods, fertile windows, and ovulation estimates — with full pill tracking and post-pill recovery awareness.
 </p>
 <br />
+
 <p align="center">
-<img width="160" alt="Screen 1" src="assets/1.png" />
+  <img src="assets/1.png" width="100%" />
 </p>
+
 <br />
 
 > ⚠️ **Medical disclaimer:** Predictions are for informational purposes only and are not medical advice. Please consult a healthcare professional for accurate results.
@@ -26,6 +28,7 @@
 ## How it works
 
 ### Prediction algorithm
+
 Periodt uses a multi-stage on-device prediction engine:
 
 1. **Outlier filtering** — unusually long gaps (likely missed logs) are detected using the user's own median cycle length and excluded before any statistics are run.
@@ -33,7 +36,6 @@ Periodt uses a multi-stage on-device prediction engine:
 3. **Regularity scoring** — standard deviation of cycle lengths classifies the pattern as Very Regular, Regular, Somewhat Irregular, or Irregular, which directly widens or narrows the prediction window.
 4. **Personalised ovulation** — ovulation is estimated from actual logged luteal phase data where available, not a fixed 14-day assumption. The fertile window expands or contracts based on confidence.
 5. **Post-pill awareness** — after stopping the pill, predictions pause during Discovery (0–1 post-pill cycles) and are flagged as Learning (2–3 cycles) before returning to full Normal confidence.
-
 
 ## Roadmap
 - [ ] **Advanced Cycle Insights** – Statistical trends and symptom correlation analysis.
