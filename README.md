@@ -7,13 +7,7 @@
 </p>
 <br />
 <p align="center">
-<img width="160" alt="Screen 1" src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" />
-<img width="160" alt="Screen 2" src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" />
-<img width="160" alt="Screen 3" src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" />
-<img width="160" alt="Screen 4" src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" />
-<img width="160" alt="Screen 5" src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" />
-<img width="160" alt="Screen 6" src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" />
-<img width="160" alt="Screen 7" src="fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" />
+<img width="160" alt="Screen 1" src="assets/1.png" />
 </p>
 <br />
 
