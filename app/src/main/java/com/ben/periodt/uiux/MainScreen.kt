@@ -1,6 +1,7 @@
 package com.ben.periodt.uiux
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -47,6 +48,7 @@ import com.ben.periodt.uiux.pill.PillTrackerScreen
 import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
 import com.ben.periodt.uiux.shared.dataStore
 import com.ben.periodt.viewmodel.PeriodViewModel
+import com.ben.periodt.widget.CalendarWidgetProvider
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
@@ -139,6 +141,13 @@ fun MainScreen() {
         ThemeMode.LIGHT  -> false
         ThemeMode.DARK   -> true
         ThemeMode.SYSTEM -> systemIsDark
+    }
+
+    // In your root composable, after resolving isDark:
+    LaunchedEffect(isDark) {
+        context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+            .edit().putBoolean("is_dark", isDark).apply()
+        CalendarWidgetProvider.refreshAll(context)
     }
 
     CompositionLocalProvider(LocalAppIsDark provides isDark) {

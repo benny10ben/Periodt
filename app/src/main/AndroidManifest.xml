@@ -58,18 +58,18 @@
                 android:resource="@xml/widget_calendar_info" />
         </receiver>
 
-        <receiver
-            android:name=".widget.SmallCalendarWidgetProvider"
-            android:exported="true"
-            android:label="Periodt Mini">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
-                <action android:name="com.ben.periodt.widget.NAV_SMALL" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_small_info" />
-        </receiver>
+<!--        <receiver-->
+<!--            android:name=".widget.SmallCalendarWidgetProvider"-->
+<!--            android:exported="true"-->
+<!--            android:label="Periodt Mini">-->
+<!--            <intent-filter>-->
+<!--                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />-->
+<!--                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />-->
+<!--                <action android:name="com.ben.periodt.widget.NAV_SMALL" />-->
+<!--            </intent-filter>-->
+<!--            <meta-data-->
+<!--                android:name="android.appwidget.provider"-->
+<!--                android:resource="@xml/widget_small_info" />-->
+<!--        </receiver>-->
     </application>
 </manifest>
