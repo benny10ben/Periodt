@@ -238,7 +238,7 @@ private fun MainScreenContent(isDark: Boolean) {
                 .haze(state = hazeState)
                 .windowInsetsPadding(WindowInsets.statusBars)
         ) {
-            composable(Screen.Calendar.route) { CalendarScreen() }
+            composable(Screen.Calendar.route) { CalendarScreen(viewModel) }
             composable(Screen.Pill.route)     { PillTrackerScreen(viewModel) }
             composable(Screen.Overview.route) { OverviewScreen(viewModel) }
 

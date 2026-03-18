@@ -347,6 +347,8 @@ fun MinimalDatePickerDialog(
 ) {
     val isDark = LocalAppIsDark.current
     val zone = remember { ZoneId.systemDefault() }
+
+    // Default to today
     var selectedMillis by remember {
         mutableStateOf(Instant.now().atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli())
     }
@@ -358,24 +360,15 @@ fun MinimalDatePickerDialog(
         )
     }
 
-    // --- UPDATED BACKGROUND & COLORS ---
     val contentSurface = if (isDark) {
-        Brush.linearGradient(
-            0.0f to Color.Black,
-            1.0f to Color(0xFF1B1B1B)
-        )
+        Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
     } else {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3))
-        )
+        Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
     }
 
     val surfaceFallback = if (isDark) Color.Black else Color.White
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
-
-    // UPDATED: Yellow accent for dark mode
     val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val buttonText = Color.White // Forced White only
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -385,9 +378,7 @@ fun MinimalDatePickerDialog(
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = surfaceFallback),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
+            modifier = Modifier.fillMaxWidth().wrapContentHeight()
         ) {
             Column(
                 modifier = Modifier
@@ -395,24 +386,14 @@ fun MinimalDatePickerDialog(
                     .background(contentSurface)
                     .padding(horizontal = 16.dp, vertical = 24.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 20.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = title,
-                        fontFamily = BricolageGrotesque,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
-                        ),
-                        color = textPrimary,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Text(
+                    text = title,
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 22.sp),
+                    color = textPrimary,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    textAlign = TextAlign.Center
+                )
 
                 MinimalMonthPicker(
                     displayedYm = displayedYm,
@@ -421,29 +402,19 @@ fun MinimalDatePickerDialog(
                     onSelect = { ms -> selectedMillis = ms },
                     textColor = textPrimary,
                     accentColor = accentColor,
-                    weekStartsOnMonday = true
+                    // FIXED: Changed to false to match your main CalendarScreen
+                    weekStartsOnMonday = false
                 )
 
                 Spacer(Modifier.height(24.dp))
 
                 Button(
                     onClick = { onConfirm(selectedMillis) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = accentColor,
-                        contentColor = buttonText
-                    ),
-                    shape = RoundedCornerShape(50),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
+                    shape = RoundedCornerShape(50)
                 ) {
-                    Text(
-                        text = "Confirm Date",
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    Text("Confirm Date", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold)
                 }
             }
         }

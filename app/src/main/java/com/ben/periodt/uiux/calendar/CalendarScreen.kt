@@ -145,12 +145,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import com.ben.periodt.ui.theme.LocalAppIsDark
+import java.time.DayOfWeek
+import com.kizitonwose.calendar.core.daysOfWeek
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen() {
-    val context = LocalContext.current.applicationContext as Application
-    val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context))
+fun CalendarScreen(viewModel: PeriodViewModel) {
     val cycles by viewModel.cycles.collectAsState()
     val prediction by viewModel.prediction.collectAsState()
     val isDark = LocalAppIsDark.current
@@ -183,15 +184,20 @@ fun CalendarScreen() {
     val currentMonth = remember { YearMonth.now() }
     val currentDate  = remember { LocalDate.now() }
 
+    val firstDayOfWeek = remember { DayOfWeek.SUNDAY }
+
     val state = rememberCalendarState(
         startMonth        = currentMonth.minusMonths(12),
         endMonth          = currentMonth.plusMonths(12),
-        firstVisibleMonth = currentMonth
+        firstVisibleMonth = currentMonth,
+        firstDayOfWeek    = firstDayOfWeek // Pass it here
     )
+
     val weekState = rememberWeekCalendarState(
         startDate            = currentDate.minusWeeks(52),
         endDate              = currentDate.plusWeeks(52),
-        firstVisibleWeekDate = currentDate
+        firstVisibleWeekDate = currentDate,
+        firstDayOfWeek       = firstDayOfWeek // Pass it here
     )
 
     val listState  = rememberLazyListState()
@@ -261,7 +267,8 @@ fun CalendarScreen() {
                 isTransitioning = isTransitioning,
                 isLearningMode  = isLearningMode,
                 isOnPill        = isOnPill,
-                pillPacks       = pillPacks
+                pillPacks       = pillPacks,
+                firstDayOfWeek  = firstDayOfWeek
             )
         }
 
@@ -449,7 +456,6 @@ private fun LegendItem(color: Color, label: String, textColor: Color) {
         )
     }
 }
-private val ColorPeriodSolid  = Color(0xFFA5231C)
 private val ColorFertileSolid = Color(0xFF6d9567).copy(alpha = 0.6f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -462,7 +468,9 @@ fun CalendarCard(
     isTransitioning: Boolean = false,
     isLearningMode: Boolean = false,
     isOnPill: Boolean = false,
-    pillPacks: List<PeriodViewModel.PillPack> = emptyList()
+    pillPacks: List<PeriodViewModel.PillPack> = emptyList(),
+    // We default this to Sunday to force consistency across all devices
+    firstDayOfWeek: DayOfWeek = DayOfWeek.SUNDAY
 ) {
     val isDark = LocalAppIsDark.current
     val scope  = rememberCoroutineScope()
@@ -470,6 +478,11 @@ fun CalendarCard(
     val backgroundBrush    = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val onCardContent      = if (isDark) Color.White else Color.Black
     val onCardContentMuted = onCardContent.copy(alpha = 0.70f)
+
+    // Generate the labels dynamically based on the forced Sunday start
+    val daysOfWeek = remember(firstDayOfWeek) {
+        daysOfWeek(firstDayOfWeek = firstDayOfWeek)
+    }
 
     Card(
         shape    = RoundedCornerShape(24.dp),
@@ -482,7 +495,7 @@ fun CalendarCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Column {
-                // Header
+                // Header: Displays Month/Year
                 val headerText = if (isCollapsed) {
                     val currentWeek  = weekState.firstVisibleWeek
                     val dominantDate = currentWeek.days.getOrNull(3)?.date ?: currentWeek.days.first().date
@@ -502,6 +515,8 @@ fun CalendarCard(
                         modifier   = Modifier.padding(start = 4.dp)
                     )
                     Spacer(Modifier.width(12.dp))
+
+                    // Navigation: Previous Month/Week
                     Text(
                         "‹",
                         color     = onCardContentMuted,
@@ -521,6 +536,8 @@ fun CalendarCard(
                             .wrapContentSize(Alignment.Center),
                         textAlign = TextAlign.Center
                     )
+
+                    // Navigation: Next Month/Week
                     Text(
                         "›",
                         color     = onCardContentMuted,
@@ -540,7 +557,10 @@ fun CalendarCard(
                             .wrapContentSize(Alignment.Center),
                         textAlign = TextAlign.Center
                     )
+
                     Spacer(Modifier.weight(1f))
+
+                    // Today Shortcut
                     Box(
                         modifier         = Modifier
                             .size(32.dp)
@@ -559,11 +579,13 @@ fun CalendarCard(
 
                 Spacer(Modifier.height(14.dp))
 
+                // --- Day Labels Header (FIXED) ---
                 Row(Modifier.fillMaxWidth()) {
-                    listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT").forEach { label ->
+                    daysOfWeek.forEach { dayOfWeek ->
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                             Text(
-                                label,
+                                // Dynamically gets SUN, MON, etc. based on firstDayOfWeek
+                                text = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase(),
                                 color      = onCardContentMuted,
                                 fontSize   = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
