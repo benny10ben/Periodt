@@ -52,7 +52,7 @@ import com.ben.periodt.uiux.pill.PillTrackerScreen
 import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
 import com.ben.periodt.uiux.shared.dataStore
 import com.ben.periodt.viewmodel.PeriodViewModel
-import com.ben.periodt.widget.CalendarWidgetProvider
+import com.ben.periodt.widget.CalendarWidget
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.haze
@@ -156,7 +156,7 @@ fun MainScreen() {
     LaunchedEffect(isDark) {
         context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
             .edit().putBoolean("is_dark", isDark).apply()
-        CalendarWidgetProvider.refreshAll(context)
+        CalendarWidget.refreshAll(context)
     }
 
     CompositionLocalProvider(LocalAppIsDark provides isDark) {
