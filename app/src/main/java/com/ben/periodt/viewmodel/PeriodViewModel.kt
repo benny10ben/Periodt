@@ -13,7 +13,7 @@ import com.ben.periodt.uiux.shared.Prediction
 import com.ben.periodt.uiux.shared.getPostPillState
 import com.ben.periodt.uiux.shared.isStillTransitioning
 import com.ben.periodt.uiux.shared.predictCycle
-import com.ben.periodt.widget.CalendarWidgetProvider
+import com.ben.periodt.widget.CalendarWidget
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -147,7 +147,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             val packEndDate = activePack.startDate.plusDays((activePack.pillCount - 1).toLong())
             if (LocalDate.now().isAfter(packEndDate)) {
                 dao.updatePillPackEndDate(activePack.id, packEndDate.toString())
-                CalendarWidgetProvider.refreshAll(appContext)
+                CalendarWidget.refreshAll(appContext)
             }
         }
     }
@@ -163,7 +163,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     endDate   = if (isPast) packEndDate.toString() else null
                 )
             )
-            CalendarWidgetProvider.refreshAll(appContext)
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
@@ -174,14 +174,14 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             val packEndDate = activePack.startDate.plusDays((activePack.pillCount - 1).toLong())
             val finalStop   = if (today.isAfter(packEndDate)) packEndDate else today
             dao.updatePillPackEndDate(activePack.id, finalStop.toString())
-            CalendarWidgetProvider.refreshAll(appContext)
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
     fun deletePillPack(id: Int) {
         viewModelScope.launch {
             dao.deletePillPackById(id)
-            CalendarWidgetProvider.refreshAll(appContext)
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
@@ -198,7 +198,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     painLevel  = painLevel
                 )
             )
-            CalendarWidgetProvider.refreshAll(appContext)
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
@@ -214,13 +214,13 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     painLevel  = cycle.painLevel
                 )
             )
-            CalendarWidgetProvider.refreshAll(appContext)
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
     fun deleteCycle(id: Int) = viewModelScope.launch {
         dao.deleteCycleById(id)
-        CalendarWidgetProvider.refreshAll(appContext)
+        CalendarWidget.refreshAll(appContext)
     }
 
     // Export / Import
@@ -306,7 +306,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
 
                 withContext(Dispatchers.Main) {
                     onResult(true, "Import successful")
-                    CalendarWidgetProvider.refreshAll(appContext)
+                    CalendarWidget.refreshAll(appContext)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { onResult(false, "Error: ${e.localizedMessage}") }
@@ -321,7 +321,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 .getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
                 .edit().clear().apply()
             withContext(Dispatchers.Main) {
-                CalendarWidgetProvider.refreshAll(appContext)
+                CalendarWidget.refreshAll(appContext)
             }
         }
     }
