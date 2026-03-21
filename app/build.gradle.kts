@@ -14,8 +14,8 @@ android {
         applicationId = "com.ben.periodt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.1.8"
+        versionCode = 9
+        versionName = "1.1.9"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
@@ -74,11 +74,11 @@ android {
 
 dependencies {
     // --- JETPACK COMPOSE ---
-    // Update BOM to a newer version compatible with SDK 35
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.glance:glance-appwidget:1.0.0")
 
     // FIX: Replaced "libs.androidx.compose.animation" with the BOM-managed version
     // This prevents the version conflict causing the crash.

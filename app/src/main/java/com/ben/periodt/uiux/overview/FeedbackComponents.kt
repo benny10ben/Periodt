@@ -252,34 +252,48 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
     ContentDialog(title = "What's New", onDismiss = onDismiss) {
         Column(
             modifier = Modifier.padding(bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(
-                text = "Version 1.1.7",
+                text = "Version 1.1.9 (Bug fixes)",
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary,
                 fontSize = 18.sp
             )
+
+            // --- Updated Widget ---
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("💊 Pill Tracker", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Full contraceptive pill tracking added. Log your pack, track daily pills, and get new predictions timed to your pack end.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+                Text(
+                    text = "📱 New Home Widget",
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textPrimary,
+                    fontSize = 15.sp
+                )
+                Text(
+                    text = "Our home screen widget got a complete makeover! It now matches the app’s look perfectly with connected cycle strips.",
+                    fontFamily = BricolageGrotesque,
+                    color = textSub,
+                    fontSize = 14.sp
+                )
             }
+
+            // --- Calendar Alignment Fix ---
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("🌿 Discovery & Learning Mode", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("After stopping the pill, the app now enters Discovery mode — pausing predictions while your natural cycle re-establishes — then Learning mode as it builds confidence over your first few cycles.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("🧠 Smarter Algorithm", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Predictions now use trend-aware regression, outlier filtering, regularity scoring, and personalised luteal phase data for a significantly more accurate forecast.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("🔔 Notification Reminders", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Set personalised reminders for your period, fertile window, and daily pill. Choose how many days in advance and exactly what time to be notified.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("✨ Refined UI & Experience", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, color = textPrimary, fontSize = 15.sp)
-                Text("Smoother transitions, a polished appearance with light and dark mode support, and a more intuitive layout throughout.", fontFamily = BricolageGrotesque, color = textSub, fontSize = 14.sp)
+                Text(
+                    text = "🗓️ Calendar Alignment",
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textPrimary,
+                    fontSize = 15.sp
+                )
+                Text(
+                    text = "We fixed a bug where the days of the week didn't quite line up with the dates. Everything is now perfectly aligned for a clearer view of your cycle.",
+                    fontFamily = BricolageGrotesque,
+                    color = textSub,
+                    fontSize = 14.sp
+                )
             }
         }
     }

@@ -491,7 +491,7 @@ fun SettingsScreen(
                     SettingsItem(
                         icon = Icons.Rounded.Info,
                         title = "About Periodt",
-                        subtitle = "v1.1.7",
+                        subtitle = "v1.1.9",
                         tint = textPrimary,
                         onClick = { showAbout = true }
                     )
@@ -601,7 +601,7 @@ fun SettingsScreen(
         ContentDialog(title = "About Periodt", onDismiss = { showAbout = false }) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Periodt", style = MaterialTheme.typography.headlineMedium, fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, color = textPrimary)
-                Text("v1.1.7", style = MaterialTheme.typography.labelLarge, fontFamily = BricolageGrotesque, color = textSub)
+                Text("v1.1.9", style = MaterialTheme.typography.labelLarge, fontFamily = BricolageGrotesque, color = textSub)
                 Spacer(Modifier.height(16.dp))
                 Text("Designed to be simple, private, and aesthetic.", style = MaterialTheme.typography.bodyMedium, fontFamily = BricolageGrotesque, color = textSub, lineHeight = 22.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 Spacer(Modifier.height(24.dp))
