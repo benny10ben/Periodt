@@ -16,20 +16,24 @@
 
 <br />
 
-<p align="center">
-  <a href="https://play.google.com/store/apps/details?id=com.ben.periodt">
-    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
-         height="80"
-         alt="Get it on Google Play"
-         style="vertical-align: middle; margin-right: 4px;" />
-  </a>
-  <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/benny10ben/Periodt">
-    <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png"
-         height="54"
-         alt="Get it on Obtainium"
-         style="vertical-align: middle;" />
-  </a>
-</p>
+<table align="center" border="0" cellpadding="0" cellspacing="8">
+  <tr>
+    <td valign="middle">
+      <a href="https://play.google.com/store/apps/details?id=com.ben.periodt">
+        <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
+             height="80"
+             alt="Get it on Google Play" />
+      </a>
+    </td>
+    <td valign="middle">
+      <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/benny10ben/Periodt">
+        <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png"
+             height="54"
+             alt="Get it on Obtainium" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 <br />
 
