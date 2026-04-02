@@ -16,7 +16,7 @@
 
 <br />
 
-<table align="center" border="0" cellpadding="0" cellspacing="8">
+<table align="center" border="0" cellpadding="0" cellspacing="8" frame="void" rules="none">
   <tr>
     <td valign="middle">
       <a href="https://play.google.com/store/apps/details?id=com.ben.periodt">
