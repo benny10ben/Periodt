@@ -13,15 +13,14 @@
 
 <br />
 
-<p align="center">
+<div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
   <a href="https://play.google.com/store/apps/details?id=com.ben.periodt">
     <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60" alt="Get it on Google Play" />
   </a>
-  <br><br>
   <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/benny10ben/Periodt">
     <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" height="40" alt="Get it on Obtainium" />
   </a>
-</p>
+</div>
 
 <br />
 
