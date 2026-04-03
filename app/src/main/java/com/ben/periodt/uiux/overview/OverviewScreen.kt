@@ -79,6 +79,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.Spring // Add these imports
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.animation.SizeTransform // Add this import
+
 
 @Composable
 fun OverviewScreen(
@@ -244,7 +249,6 @@ fun OverviewScreen(
     }
 }
 
-// ── Combined Stats Card (Interactive) ──────────────────────────────────────────
 @Composable
 private fun CombinedStatsCard(
     totalCycles: String,
@@ -261,10 +265,16 @@ private fun CombinedStatsCard(
     val valueColor   = if (isDark) Color.White else Color(0xFF0F172A)
     val titleColor   = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
 
+    // StiffnessMediumLow is the "sweet spot"—it's soft but doesn't feel laggy
+    val gentleSpring = spring<IntSize>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMediumLow
+    )
+
     Card(
         modifier  = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(200, easing = FastOutSlowInEasing))
+            .animateContentSize(animationSpec = gentleSpring) // Resizes the card softly
             .clip(RoundedCornerShape(26.dp))
             .clickable(
                 interactionSource = interactionSource,
@@ -286,15 +296,18 @@ private fun CombinedStatsCard(
             AnimatedContent(
                 targetState = isExpanded,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
+                    // Removed the "messy" vertical sliding
+                    // Pure fadeIn/fadeOut creates a professional "dissolve"
+                    fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) togetherWith
+                            fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) using
+                            SizeTransform(clip = false) // Ensures the card growth looks seamless
                 },
                 label = "stats_expansion"
             ) { expanded ->
                 if (expanded) {
-                    // ── EXPANDED VIEW (Dividers Removed) ──
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp) // Added spacing to replace lines
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
                         ExpandedStatRow(
                             title = "Total Cycles",
@@ -303,7 +316,6 @@ private fun CombinedStatsCard(
                             valueColor = valueColor,
                             titleColor = titleColor
                         )
-
                         ExpandedStatRow(
                             title = "Average Period",
                             subtitle = "Typical bleeding duration",
@@ -311,7 +323,6 @@ private fun CombinedStatsCard(
                             valueColor = valueColor,
                             titleColor = titleColor
                         )
-
                         ExpandedStatRow(
                             title = "Average Cycle",
                             subtitle = "Start-to-start gap",
@@ -321,7 +332,6 @@ private fun CombinedStatsCard(
                         )
                     }
                 } else {
-                    // ── COLLAPSED VIEW (Dividers Retained) ──
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -334,9 +344,7 @@ private fun CombinedStatsCard(
                             titleColor = titleColor,
                             modifier = Modifier.weight(1f)
                         )
-
                         Box(modifier = Modifier.width(1.dp).height(36.dp).background(dividerColor))
-
                         StatItem(
                             title = "PERIOD",
                             value = avgPeriod,
@@ -344,9 +352,7 @@ private fun CombinedStatsCard(
                             titleColor = titleColor,
                             modifier = Modifier.weight(1f)
                         )
-
                         Box(modifier = Modifier.width(1.dp).height(36.dp).background(dividerColor))
-
                         StatItem(
                             title = "CYCLE",
                             value = avgCycle,
