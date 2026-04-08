@@ -454,6 +454,7 @@ fun DayLogDialog(
     var bleeding   by remember { mutableStateOf(existingLog?.bleeding   ?: cycle.bleeding) }
     var bloodColor by remember { mutableStateOf(existingLog?.bloodColor ?: cycle.bloodColor) }
     var painLevel  by remember { mutableIntStateOf(existingLog?.painLevel ?: cycle.painLevel) } // NEW
+    var sliderPosition by remember { mutableFloatStateOf(painLevel.toFloat()) }
 
     val formatter   = remember { DateTimeFormatter.ofPattern("MMM d") }
     val dayOfWeek   = remember { date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
@@ -609,8 +610,11 @@ fun DayLogDialog(
                             )
                         }
                         Slider(
-                            value = painLevel.toFloat(),
-                            onValueChange = { painLevel = it.toInt() },
+                            value = sliderPosition, // Use the float for the visual position
+                            onValueChange = {
+                                sliderPosition = it           // Update the smooth position
+                                painLevel = it.toInt()        // Update the actual integer for saving
+                            },
                             valueRange = 0f..10f,
                             colors = SliderDefaults.colors(
                                 thumbColor = accentColor,
@@ -1082,7 +1086,7 @@ fun DayCellEnhanced(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 3.dp)
+                    .padding(bottom = 10.dp) // Changed from 3.dp to 7.dp to move it closer to the text
                     .size(4.dp)
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.85f))
@@ -1287,6 +1291,9 @@ fun EditCycleDialog(
         )
     }
 
+    val dailyLogRotation by animateFloatAsState(if (showDailyLog) 180f else 0f, label = "dailyLogRotation")
+
+
     val today = LocalDate.now()
     val cycleDays = remember(startDate, endDate) {
         val end = endDate ?: if (startDate.isBefore(today)) today else startDate
@@ -1457,8 +1464,14 @@ fun EditCycleDialog(
                                         fontFamily = BricolageGrotesque, fontSize = 12.sp, color = if (dailyOverrides.isEmpty()) pillTextColor.copy(alpha = 0.5f) else accentColor
                                     )
                                 }
-                                Text(if (showDailyLog) "▲" else "▼", color = pillTextColor.copy(alpha = 0.5f), fontSize = 12.sp, fontFamily = BricolageGrotesque)
-                            }
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = pillTextColor.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer { rotationZ = dailyLogRotation }
+                                )                            }
 
                             if (showDailyLog) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
