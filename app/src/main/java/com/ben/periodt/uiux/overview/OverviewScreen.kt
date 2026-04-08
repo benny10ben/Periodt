@@ -923,9 +923,9 @@ fun RecentTrendsBanner(
     if (trends == null || cycleCount == 0) return
 
     val isDark = LocalAppIsDark.current
-    val textPrimary = if (isDark) Color.White else Color(0xFF1b1b1b)
+    val textPrimary = if (isDark) Color.White else Color.White
     // High opacity text color for readability against the image
-    val textSub = if (isDark) Color.White else Color(0xFF1b1b1b)
+    val textSub = if (isDark) Color.White else Color.White
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
@@ -951,9 +951,9 @@ fun RecentTrendsBanner(
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
-                                if (isDark) Color.Black.copy(alpha = 0.90f) else Color.White.copy(alpha = 1f),
-                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.80f),
-                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.40f)
+                                if (isDark) Color.Black.copy(alpha = 0.90f) else Color.Black.copy(alpha = 1f),
+                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.80f),
+                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.40f)
 
                             )
                         )
