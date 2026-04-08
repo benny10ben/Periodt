@@ -83,6 +83,10 @@ import androidx.compose.animation.core.Spring // Add these imports
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.SizeTransform // Add this import
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material3.Icon
 
 
 @Composable
@@ -124,6 +128,46 @@ fun OverviewScreen(
     val avgPeriodLength = calculatePeriodLength(cycles).takeIf { cycles.any { c -> c.endDate != null } }
     val avgCycleLength  = calculateAvgCycleLength(cycles)
 
+    val dailyLogs by viewModel.dailyLogs.collectAsState()
+
+    // 1. ---> ADD THIS NEW BLOCK RIGHT HERE <---
+    val recentTrends = remember(cycles, dailyLogs) {
+        val recentCycles = cycles.sortedBy { it.startDate }.takeLast(6)
+        if (recentCycles.isEmpty()) return@remember null
+
+        var totalPain = 0
+        var totalDays = 0
+        val bleedingCounts = mutableMapOf<String, Int>()
+        val colorCounts = mutableMapOf<String, Int>()
+
+        recentCycles.forEach { cycle ->
+            val end = cycle.endDate ?: cycle.startDate.plusDays(4) // fallback
+            var day = cycle.startDate
+            while (!day.isAfter(end)) {
+                val key = "${cycle.id}|$day"
+                val b = dailyLogs[key]?.bleeding ?: cycle.bleeding
+                val c = dailyLogs[key]?.bloodColor ?: cycle.bloodColor
+                val p = dailyLogs[key]?.painLevel ?: cycle.painLevel
+
+                bleedingCounts[b] = (bleedingCounts[b] ?: 0) + 1
+                colorCounts[c] = (colorCounts[c] ?: 0) + 1
+                totalPain += p
+                totalDays++
+
+                day = day.plusDays(1)
+            }
+        }
+
+        if (totalDays == 0) return@remember null
+
+        val avgPain = kotlin.math.round(totalPain.toFloat() / totalDays).toInt()
+        val typicalBleeding = bleedingCounts.maxByOrNull { it.value }?.key ?: "Medium"
+        val typicalColor = colorCounts.maxByOrNull { it.value }?.key ?: "Bright Red"
+
+        Triple(typicalBleeding, typicalColor, avgPain)
+    }
+    val recentCyclesCount = minOf(cycles.size, 6)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -137,6 +181,14 @@ fun OverviewScreen(
                 .padding(bottom = 90.dp)
                 .padding(top = 16.dp)
         ) {
+
+            // ---> ADD THIS NEW BANNER CALL HERE <---
+            if (!isOnPill && !isDiscoveryMode && !isLearningMode) {
+                RecentTrendsBanner(
+                    trends = recentTrends,
+                    cycleCount = recentCyclesCount
+                )
+            }
 
             // ── UNIFIED STATS CARD ──────────────────────────────────────────────
             CombinedStatsCard(
@@ -196,9 +248,12 @@ fun OverviewScreen(
 
             // ── CHARTS ──────────────────────────────────────────────────────────
             MinimalChartCard("Bleeding intensity", surface, textCol) {
+                val (bleedingPoints, bleedingDates) = remember(cycles, dailyLogs) {
+                    bleedingSeriesDailyVM(cycles, dailyLogs)
+                }
                 ScrollableLineChart(
-                    points     = bleedingSeriesVM(cycles),
-                    dates      = getDateLabels(cycles),
+                    points     = bleedingPoints,
+                    dates      = bleedingDates,
                     lineColor  = bleedingChartColor,
                     yLabels    = listOf("S", "L", "M", "H"),
                     yMax       = 3f,
@@ -214,9 +269,13 @@ fun OverviewScreen(
             Spacer(Modifier.height(14.dp))
 
             MinimalChartCard("Pain level", surface, textCol) {
+                // Get both points and dates for the daily pain series
+                val (painPoints, painDates) = remember(cycles, dailyLogs) {
+                    painSeriesDailyVM(cycles, dailyLogs)
+                }
                 ScrollableLineChart(
-                    points     = painSeriesVM(cycles),
-                    dates      = getDateLabels(cycles),
+                    points     = painPoints,
+                    dates      = painDates, // Now uses daily labels
                     lineColor  = painChartColor,
                     yLabels    = (0..10 step 2).map { "$it" },
                     yMax       = 10f,
@@ -233,7 +292,7 @@ fun OverviewScreen(
 
             MinimalChartCard("Blood color", surface, textCol) {
                 BloodColorPieChart(
-                    data       = bloodColorDistributionVM(cycles),
+                    data = remember(cycles, dailyLogs) { bloodColorDistributionVM(cycles, dailyLogs) },
                     surface    = surface,
                     labelColor = subCol,
                     modifier   = Modifier
@@ -765,24 +824,84 @@ private fun getDateLabels(cycles: List<PeriodViewModel.Cycle>): List<String> {
     return cyclesSorted(cycles).mapNotNull { it.startDate?.format(formatter) }
 }
 
-private fun bleedingSeriesVM(cycles: List<PeriodViewModel.Cycle>): List<Pair<Float, Float>> {
-    val map    = mapOf("none" to 0f, "light" to 1f, "medium" to 2f, "heavy" to 3f)
-    val sorted = cyclesSorted(cycles)
-    return sorted.mapIndexedNotNull { index, c ->
-        c.startDate?.let { index.toFloat() to (map[c.bleeding.lowercase()] ?: 0f) }
+private fun bleedingSeriesDailyVM(
+    cycles: List<PeriodViewModel.Cycle>,
+    dailyLogs: Map<String, PeriodViewModel.DailyLog>
+): Pair<List<Pair<Float, Float>>, List<String>> {
+    val map       = mapOf("spotting" to 0.5f, "light" to 1f, "medium" to 2f, "heavy" to 3f)
+    val formatter = DateTimeFormatter.ofPattern("MMM d")
+    val points    = mutableListOf<Pair<Float, Float>>()
+    val dates     = mutableListOf<String>()
+
+    val sorted = cycles.sortedBy { it.startDate }
+    var index  = 0
+
+    sorted.forEach { cycle ->
+        val start = cycle.startDate
+        val end   = cycle.endDate ?: start.plusDays(4)
+        var day   = start
+        while (!day.isAfter(end)) {
+            val key      = "${cycle.id}|$day"
+            val bleeding = dailyLogs[key]?.bleeding ?: cycle.bleeding
+            val yVal     = map[bleeding.lowercase()] ?: 0f
+            points.add(index.toFloat() to yVal)
+            dates.add(day.format(formatter))
+            day = day.plusDays(1)
+            index++
+        }
     }
+    return points to dates
 }
 
-private fun painSeriesVM(cycles: List<PeriodViewModel.Cycle>): List<Pair<Float, Float>> {
-    val sorted = cyclesSorted(cycles)
-    return sorted.mapIndexedNotNull { index, c ->
-        c.startDate?.let { index.toFloat() to c.painLevel.toFloat() }
+private fun painSeriesDailyVM(
+    cycles: List<PeriodViewModel.Cycle>,
+    dailyLogs: Map<String, PeriodViewModel.DailyLog>
+): Pair<List<Pair<Float, Float>>, List<String>> {
+    val formatter = DateTimeFormatter.ofPattern("MMM d")
+    val points    = mutableListOf<Pair<Float, Float>>()
+    val dates     = mutableListOf<String>()
+
+    // Sort by start date to ensure chronological order in the chart
+    val sorted = cycles.sortedBy { it.startDate }
+    var index  = 0
+
+    sorted.forEach { cycle ->
+        val start = cycle.startDate
+        val end   = cycle.endDate ?: start.plusDays(4) // Assume 5 days if ongoing
+        var day   = start
+        while (!day.isAfter(end)) {
+            val key   = "${cycle.id}|$day"
+            // Use daily override if it exists, otherwise fall back to cycle default
+            val pain = dailyLogs[key]?.painLevel ?: cycle.painLevel
+
+            points.add(index.toFloat() to pain.toFloat())
+            dates.add(day.format(formatter))
+            day = day.plusDays(1)
+            index++
+        }
     }
+    return points to dates
 }
 
-private fun bloodColorDistributionVM(cycles: List<PeriodViewModel.Cycle>): List<Pair<String, Float>> {
-    val counts = cycles.groupingBy { it.bloodColor.lowercase() }.eachCount()
-    val total  = counts.values.sum()
+private fun bloodColorDistributionVM(
+    cycles: List<PeriodViewModel.Cycle>,
+    dailyLogs: Map<String, PeriodViewModel.DailyLog>
+): List<Pair<String, Float>> {
+    val counts = mutableMapOf<String, Int>()
+
+    cycles.forEach { cycle ->
+        val start = cycle.startDate
+        val end   = cycle.endDate ?: start.plusDays(4)
+        var day   = start
+        while (!day.isAfter(end)) {
+            val key   = "${cycle.id}|$day"
+            val color = (dailyLogs[key]?.bloodColor ?: cycle.bloodColor).lowercase()
+            counts[color] = (counts[color] ?: 0) + 1
+            day = day.plusDays(1)
+        }
+    }
+
+    val total = counts.values.sum()
     if (total == 0) return emptyList()
     return counts.entries.sortedByDescending { it.value }
         .map { it.key to (it.value.toFloat() / total.toFloat()) }
@@ -794,4 +913,85 @@ private fun calculateAvgCycleLength(cycles: List<PeriodViewModel.Cycle>): Int? {
         ChronoUnit.DAYS.between(a.startDate, b.startDate).toInt()
     }
     return if (lengths.isNotEmpty()) lengths.average().toInt() else null
+}
+
+@Composable
+fun RecentTrendsBanner(
+    trends: Triple<String, String, Int>?,
+    cycleCount: Int
+) {
+    if (trends == null || cycleCount == 0) return
+
+    val isDark = LocalAppIsDark.current
+    val textPrimary = if (isDark) Color.White else Color(0xFF1b1b1b)
+    // High opacity text color for readability against the image
+    val textSub = if (isDark) Color.White else Color(0xFF1b1b1b)
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+        shape = RoundedCornerShape(26.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+
+            // 1. THE IMAGE BACKGROUND
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = com.ben.periodt.R.drawable.recent),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
+            )
+
+            // 2. HORIZONTAL GRADIENT OVERLAY (Left to Right)
+            // Starts more opaque on the left (where the text is) and fades out towards the right.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                if (isDark) Color.Black.copy(alpha = 0.90f) else Color.White.copy(alpha = 1f),
+                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.80f),
+                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.40f)
+
+                            )
+                        )
+                    )
+            )
+
+            // 3. THE TEXT CONTENT
+            Column(modifier = Modifier.padding(24.dp).fillMaxWidth(0.85f)) {
+                Text(
+                    text = "Recent Trends",
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = textPrimary
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
+                    append("Over your last $cycleCount cycle${if(cycleCount > 1) "s" else ""}, your typical flow is ")
+                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
+                    append(trends.first.lowercase())
+                    append(" (${trends.second.lowercase()})")
+                    pop()
+                    append(", with an average pain level of ")
+                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
+                    append("${trends.third}/10")
+                    pop()
+                    append(".")
+                }
+
+                Text(
+                    text = annotatedSummary,
+                    fontFamily = BricolageGrotesque,
+                    fontSize = 14.sp,
+                    color = textSub,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
 }
