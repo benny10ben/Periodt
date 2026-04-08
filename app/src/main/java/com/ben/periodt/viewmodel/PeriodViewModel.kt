@@ -30,7 +30,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
     private val dao        = AppDatabase.getDatabase(application).periodCycleDao()
     private val appContext = application.applicationContext
 
-    // Data streams
+    // ── Data streams ─────────────────────────────────────────────────────────
 
     val cycles: StateFlow<List<Cycle>> = dao.getAllCycles()
         .map { list -> list.map { it.toDomain() } }
@@ -49,7 +49,22 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    // Derived reactive states
+    val dailyLogs: StateFlow<Map<String, DailyLog>> = dao.getAllDailyLogs()
+        .map { list ->
+            list.associate { entity ->
+                "${entity.cycleId}|${entity.date}" to DailyLog(
+                    id         = entity.id,
+                    cycleId    = entity.cycleId,
+                    date       = LocalDate.parse(entity.date),
+                    bleeding   = entity.bleeding,
+                    bloodColor = entity.bloodColor,
+                    painLevel  = entity.painLevel // NEW
+                )
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    // ── Derived reactive states ───────────────────────────────────────────────
 
     val isOnPill: StateFlow<Boolean> = pillPacks.map { packs ->
         packs.any { it.endDate == null }
@@ -67,8 +82,6 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         packs.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.endDate
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    // The full three-state post-pill status. Use this in UI components
-    // that need to distinguish between discovery, learning, and normal.
     val postPillState: StateFlow<PostPillState> = combine(cycles, isOnPill, pillStopDate) { cycleList, onPill, stopDate ->
         if (onPill || stopDate == null) PostPillState.NORMAL
         else {
@@ -78,14 +91,10 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
     }.stateIn(viewModelScope, SharingStarted.Eagerly, PostPillState.NORMAL)
 
     val pillWindowStartDate: StateFlow<LocalDate?> = pillPacks.map { packs ->
-        // Active pack start OR most recently stopped pack start
         packs.firstOrNull { it.endDate == null }?.startDate
             ?: packs.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.startDate
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-
-    // Kept for backward compatibility with CalendarScreen, DayCellEnhanced,
-    // PredictionBanner, and the broadcast receivers. True only in DISCOVERY.
     val isTransitioning: StateFlow<Boolean> = postPillState.map { state ->
         state == PostPillState.DISCOVERY
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -102,26 +111,20 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
 
         when {
             onPill && activeStart != null -> {
-                // FIXED: Added a 2-day offset for a more realistic withdrawal prediction
                 val withdrawalStart = activeStart.plusDays(activeCount.toLong() + 2)
-
                 Prediction(
                     minPeriodStart        = withdrawalStart.minusDays(1),
                     maxPeriodStart        = withdrawalStart.plusDays(1),
                     mostLikelyPeriodStart = withdrawalStart,
-                    periodLength          = 4, // Withdrawal bleeds are typically shorter
-                    ovulationDay          = withdrawalStart, // Placeholder
-                    ovulationConfidence   = 1.0f, // High confidence due to chemical timing
+                    periodLength          = 4,
+                    ovulationDay          = withdrawalStart,
+                    ovulationConfidence   = 1.0f,
                     fertileWindow         = LocalDate.MIN..LocalDate.MIN,
                     cycleLength           = activeCount + 7,
                     cycleRegularity       = com.ben.periodt.uiux.shared.CycleRegularity.VERY_REGULAR
-
                 )
             }
-            // DISCOVERY — no prediction
             transitioning -> null
-
-            // LEARNING and NORMAL
             else -> {
                 val validCycles = if (stopDate != null)
                     cycleList.filter { !it.startDate.isBefore(stopDate) }
@@ -137,7 +140,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         checkAndAutoStopPillPack()
     }
 
-    // Pill logic
+    // ── Pill logic ────────────────────────────────────────────────────────────
 
     fun refreshState() = checkAndAutoStopPillPack()
 
@@ -185,9 +188,16 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // CRUD
+    // ── Cycle CRUD ────────────────────────────────────────────────────────────
 
-    fun addCycle(start: LocalDate, end: LocalDate?, bleeding: String, bloodColor: String, painLevel: Int) {
+    fun addCycleWithDailyLogs(
+        start: LocalDate,
+        end: LocalDate?,
+        bleeding: String,
+        bloodColor: String,
+        painLevel: Int,
+        overrides: Map<LocalDate, Triple<String, String, Int>> // CHANGED TO TRIPLE
+    ) {
         viewModelScope.launch {
             dao.insertCycle(
                 PeriodCycleEntity(
@@ -198,11 +208,30 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     painLevel  = painLevel
                 )
             )
+            if (overrides.isNotEmpty()) {
+                val inserted = dao.getAllCyclesOnce().firstOrNull { it.startDate == start.toString() }
+                inserted?.let { entity ->
+                    overrides.forEach { (date, triple) ->
+                        dao.insertDailyLog(
+                            DailyCycleLogEntity(
+                                cycleId    = entity.id,
+                                date       = date.toString(),
+                                bleeding   = triple.first,
+                                bloodColor = triple.second,
+                                painLevel  = triple.third // NEW
+                            )
+                        )
+                    }
+                }
+            }
             CalendarWidget.refreshAll(appContext)
         }
     }
 
-    fun updateCycle(cycle: Cycle) {
+    fun updateCycleWithDailyLogs(
+        cycle: Cycle,
+        overrides: Map<LocalDate, Triple<String, String, Int>> // CHANGED TO TRIPLE
+    ) {
         viewModelScope.launch {
             dao.updateCycle(
                 PeriodCycleEntity(
@@ -214,6 +243,18 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     painLevel  = cycle.painLevel
                 )
             )
+            dao.deleteDailyLogsForCycle(cycle.id)
+            overrides.forEach { (date, triple) ->
+                dao.insertDailyLog(
+                    DailyCycleLogEntity(
+                        cycleId    = cycle.id,
+                        date       = date.toString(),
+                        bleeding   = triple.first,
+                        bloodColor = triple.second,
+                        painLevel  = triple.third // NEW
+                    )
+                )
+            }
             CalendarWidget.refreshAll(appContext)
         }
     }
@@ -223,7 +264,52 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         CalendarWidget.refreshAll(appContext)
     }
 
-    // Export / Import
+    // ── Daily log CRUD ────────────────────────────────────────────────────────
+
+    fun upsertDailyLog(cycleId: Int, date: LocalDate, bleeding: String, bloodColor: String, painLevel: Int) {
+        viewModelScope.launch {
+            val dateStr  = date.toString()
+            val existing = dao.getDailyLogForDate(cycleId, dateStr)
+            if (existing != null) {
+                dao.updateDailyLog(
+                    existing.copy(bleeding = bleeding, bloodColor = bloodColor, painLevel = painLevel)
+                )
+            } else {
+                dao.insertDailyLog(
+                    DailyCycleLogEntity(
+                        cycleId    = cycleId,
+                        date       = dateStr,
+                        bleeding   = bleeding,
+                        bloodColor = bloodColor,
+                        painLevel  = painLevel // NEW
+                    )
+                )
+            }
+        }
+    }
+
+    fun deleteDailyLog(cycleId: Int, date: LocalDate) {
+        viewModelScope.launch {
+            dao.deleteDailyLog(cycleId, date.toString())
+        }
+    }
+
+    fun effectiveBleeding(cycle: Cycle, date: LocalDate): String {
+        val key = "${cycle.id}|$date"
+        return dailyLogs.value[key]?.bleeding ?: cycle.bleeding
+    }
+
+    fun effectiveBloodColor(cycle: Cycle, date: LocalDate): String {
+        val key = "${cycle.id}|$date"
+        return dailyLogs.value[key]?.bloodColor ?: cycle.bloodColor
+    }
+
+    fun effectivePainLevel(cycle: Cycle, date: LocalDate): Int {
+        val key = "${cycle.id}|$date"
+        return dailyLogs.value[key]?.painLevel ?: cycle.painLevel
+    }
+
+    // ── Export / Import ───────────────────────────────────────────────────────
 
     fun performExport(uri: Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -232,7 +318,8 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     version     = BackupData.CURRENT_VERSION,
                     timestamp   = System.currentTimeMillis(),
                     cycles      = dao.getAllCyclesOnce().map { it.toDto() },
-                    pillHistory = dao.getAllPillPacksOnce().map { it.toDto() }
+                    pillHistory = dao.getAllPillPacksOnce().map { it.toDto() },
+                    dailyLogs   = dao.getAllDailyLogsOnce().map { it.toDto() }
                 )
                 val json = Gson().toJson(backup)
                 appContext.contentResolver.openOutputStream(uri)?.use { os ->
@@ -295,6 +382,35 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
 
+                if (!backup.dailyLogs.isNullOrEmpty()) {
+                    val allCycles      = dao.getAllCyclesOnce()
+                    val startDateToId  = allCycles.associate { it.startDate to it.id }
+
+                    backup.dailyLogs.forEach { dto ->
+                        val matchingCycleStart = backup.cycles.find { cycleDto ->
+                            val cycleStart = LocalDate.parse(cycleDto.startDate)
+                            val cycleEnd   = cycleDto.endDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
+                            val logDate    = LocalDate.parse(dto.date)
+                            logDate >= cycleStart && (cycleEnd == null || logDate <= cycleEnd)
+                        }?.startDate ?: return@forEach
+
+                        val realCycleId = startDateToId[matchingCycleStart] ?: return@forEach
+
+                        val alreadyExists = dao.getDailyLogForDate(realCycleId, dto.date) != null
+                        if (!alreadyExists) {
+                            dao.insertDailyLog(
+                                DailyCycleLogEntity(
+                                    cycleId    = realCycleId,
+                                    date       = dto.date,
+                                    bleeding   = dto.bleeding,
+                                    bloodColor = dto.bloodColor,
+                                    painLevel  = dto.painLevel // NEW
+                                )
+                            )
+                        }
+                    }
+                }
+
                 val activePack = dao.getAllPillPacksOnce().firstOrNull { it.endDate == null }
                 if (activePack != null) {
                     val packEndDate = LocalDate.parse(activePack.startDate)
@@ -326,7 +442,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // Domain models
+    // ── Domain models ─────────────────────────────────────────────────────────
 
     data class Cycle(
         val id: Int,
@@ -342,6 +458,15 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         val startDate: LocalDate,
         val pillCount: Int,
         val endDate: LocalDate?
+    )
+
+    data class DailyLog(
+        val id: Int,
+        val cycleId: Int,
+        val date: LocalDate,
+        val bleeding: String,
+        val bloodColor: String,
+        val painLevel: Int // NEW
     )
 
     class Factory(private val app: Application) : ViewModelProvider.Factory {
