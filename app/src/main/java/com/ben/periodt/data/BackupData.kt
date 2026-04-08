@@ -33,7 +33,8 @@ data class BackupData(
     @SerializedName("version")     val version: Int = CURRENT_VERSION,
     @SerializedName("timestamp")   val timestamp: Long = System.currentTimeMillis(),
     @SerializedName("cycles")      val cycles: List<BackupCycleDto>,
-    @SerializedName("pillHistory") val pillHistory: List<PillPackDto>? = null
+    @SerializedName("pillHistory") val pillHistory: List<PillPackDto>? = null,
+    @SerializedName("dailyLogs")   val dailyLogs: List<DailyLogDto>? = null  // null = v1-v3 backup
 ) {
     companion object {
         /**
@@ -41,8 +42,9 @@ data class BackupData(
          * 1 → Initial release
          * 2 → Added painLevel to cycles
          * 3 → Moved pill state from SharedPreferences to DB (pillHistory)
+         * 4 → Added per-day bleeding/color/pain overrides (dailyLogs)
          */
-        const val CURRENT_VERSION = 3
+        const val CURRENT_VERSION = 4
     }
 }
 
@@ -66,4 +68,29 @@ fun BackupCycleDto.toEntity() = PeriodCycleEntity(
     bleeding   = bleeding,
     bloodColor = bloodColor,
     painLevel  = painLevel
+)
+
+@Keep
+data class DailyLogDto(
+    @SerializedName("cycleId")    val cycleId: Int,
+    @SerializedName("date")       val date: String,
+    @SerializedName("bleeding")   val bleeding: String,
+    @SerializedName("bloodColor") val bloodColor: String,
+    @SerializedName("painLevel")  val painLevel: Int = 5 // NEW
+)
+
+fun DailyCycleLogEntity.toDto() = DailyLogDto(
+    cycleId    = cycleId,
+    date       = date,
+    bleeding   = bleeding,
+    bloodColor = bloodColor,
+    painLevel  = painLevel // NEW
+)
+
+fun DailyLogDto.toEntity() = DailyCycleLogEntity(
+    cycleId    = cycleId,
+    date       = date,
+    bleeding   = bleeding,
+    bloodColor = bloodColor,
+    painLevel  = painLevel // NEW
 )

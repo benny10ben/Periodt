@@ -48,10 +48,39 @@ interface PeriodCycleDao {
     @Query("SELECT * FROM pill_packs ORDER BY startDate ASC")
     suspend fun getAllPillPacksOnce(): List<PillPackEntity>
 
+    // --- DAILY CYCLE LOGS ---
+    @Query("SELECT * FROM daily_cycle_logs WHERE cycleId = :cycleId ORDER BY date ASC")
+    fun getDailyLogsForCycle(cycleId: Int): Flow<List<DailyCycleLogEntity>>
+
+    @Query("SELECT * FROM daily_cycle_logs ORDER BY date ASC")
+    suspend fun getAllDailyLogsOnce(): List<DailyCycleLogEntity>
+
+    @Query("SELECT * FROM daily_cycle_logs WHERE cycleId = :cycleId AND date = :date LIMIT 1")
+    suspend fun getDailyLogForDate(cycleId: Int, date: String): DailyCycleLogEntity?
+
+    @Insert
+    suspend fun insertDailyLog(entity: DailyCycleLogEntity)
+
+    @Update
+    suspend fun updateDailyLog(entity: DailyCycleLogEntity)
+
+    @Query("DELETE FROM daily_cycle_logs WHERE cycleId = :cycleId AND date = :date")
+    suspend fun deleteDailyLog(cycleId: Int, date: String)
+
+    @Query("DELETE FROM daily_cycle_logs WHERE cycleId = :cycleId")
+    suspend fun deleteDailyLogsForCycle(cycleId: Int)
+
     // Global Wipe
     @Transaction
     suspend fun deleteAll() {
         deleteAllCycles()
         deleteAllPillPacks()
+        deleteAllDailyLogs()  // add this line
     }
+
+    @Query("DELETE FROM daily_cycle_logs")
+    suspend fun deleteAllDailyLogs()
+
+    @Query("SELECT * FROM daily_cycle_logs ORDER BY date ASC")
+    fun getAllDailyLogs(): Flow<List<DailyCycleLogEntity>>
 }

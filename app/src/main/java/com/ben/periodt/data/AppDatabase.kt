@@ -11,8 +11,8 @@ import com.ben.periodt.security.DbKeyManager
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
-    entities = [PeriodCycleEntity::class, PillPackEntity::class], // Added PillPackEntity
-    version = 3, // Bumped to 3
+    entities = [PeriodCycleEntity::class, PillPackEntity::class, DailyCycleLogEntity::class],
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,7 +27,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // NEW MIGRATION: 2 -> 3
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -38,6 +37,23 @@ abstract class AppDatabase : RoomDatabase() {
                         endDate TEXT
                     )
                 """.trimIndent())
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+            CREATE TABLE IF NOT EXISTS daily_cycle_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                cycleId INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                bleeding TEXT NOT NULL,
+                bloodColor TEXT NOT NULL,
+                painLevel INTEGER NOT NULL DEFAULT 5,
+                FOREIGN KEY (cycleId) REFERENCES period_cycles(id) ON DELETE CASCADE
+            )
+        """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_daily_cycle_logs_cycleId ON daily_cycle_logs(cycleId)")
             }
         }
 
@@ -55,7 +71,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
             return Room.databaseBuilder(ctx, AppDatabase::class.java, "period_db")
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // Added MIGRATION_2_3
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
         }
     }
