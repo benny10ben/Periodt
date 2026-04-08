@@ -348,8 +348,8 @@ private fun MainScreenContent(isDark: Boolean) {
         if (showAddCycleDialog) {
             AddCycleDialog(
                 onDismiss = { showAddCycleDialog = false },
-                onSave    = { start, end, bleed, color, pain ->
-                    viewModel.addCycle(start, end, bleed, color, pain)
+                onSave    = { start, end, bleeding, bloodColor, pain, overrides ->
+                    viewModel.addCycleWithDailyLogs(start, end, bleeding, bloodColor, pain, overrides)
                     showAddCycleDialog = false
                 }
             )

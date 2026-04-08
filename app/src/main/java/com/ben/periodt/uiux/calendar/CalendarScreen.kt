@@ -144,9 +144,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import java.time.DayOfWeek
 import com.kizitonwose.calendar.core.daysOfWeek
+import kotlin.collections.remove
+import kotlin.compareTo
+import kotlin.text.format
+import kotlin.text.toFloat
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -160,6 +165,8 @@ fun CalendarScreen(viewModel: PeriodViewModel) {
     val pillStartDate by viewModel.pillPackStartDate.collectAsState()
     val pillStopDate by viewModel.pillStopDate.collectAsState()
     val pillPacks by viewModel.pillPacks.collectAsState()
+    val dailyLogs by viewModel.dailyLogs.collectAsState()
+    var dayLogTarget by remember { mutableStateOf<Pair<PeriodViewModel.Cycle, LocalDate>?>(null) }
 
     var showFullHistory by remember { mutableStateOf(false) }
 
@@ -268,7 +275,11 @@ fun CalendarScreen(viewModel: PeriodViewModel) {
                 isLearningMode  = isLearningMode,
                 isOnPill        = isOnPill,
                 pillPacks       = pillPacks,
-                firstDayOfWeek  = firstDayOfWeek
+                firstDayOfWeek  = firstDayOfWeek,
+                dailyLogs       = dailyLogs,                          // NEW
+                onDayTapped     = { cycle, date ->                    // NEW
+                    dayLogTarget = Pair(cycle, date)
+                }
             )
         }
 
@@ -315,22 +326,23 @@ fun CalendarScreen(viewModel: PeriodViewModel) {
             items(displayedCycles, key = { it.id }) { cycle ->
                 SwipeToDeleteCard(onDelete = { viewModel.deleteCycle(cycle.id) }) { isSwiping ->
                     EntryRow(
-                        monthLabel  = cycle.startDate.month
+                        monthLabel     = cycle.startDate.month
                             .getDisplayName(TextStyle.FULL, Locale.getDefault())
                             .lowercase().replaceFirstChar { it.uppercase() },
-                        dayNumber   = cycle.startDate.dayOfMonth.toString(),
-                        startDate   = cycle.startDate.toString(),
-                        endDate     = cycle.endDate?.toString() ?: "",
-                        bleeding    = cycle.bleeding,
-                        bloodColor  = cycle.bloodColor,
-                        crampsPain  = cycle.painLevel,
-                        surface     = entrySurface,
-                        soft        = Color.Transparent,
-                        text        = entryText,
-                        sub         = entryText.copy(alpha = 0.6f),
-                        accent      = entryText,
-                        isSwiping   = isSwiping,
-                        onEditClick = { cycleToEdit = cycle }
+                        dayNumber      = cycle.startDate.dayOfMonth.toString(),
+                        startDate      = cycle.startDate.toString(),
+                        endDate        = cycle.endDate?.toString() ?: "",
+                        bleeding       = cycle.bleeding,
+                        bloodColor     = cycle.bloodColor,
+                        crampsPain     = cycle.painLevel,
+                        surface        = entrySurface,
+                        soft           = Color.Transparent,
+                        text           = entryText,
+                        sub            = entryText.copy(alpha = 0.6f),
+                        accent         = entryText,
+                        isSwiping      = isSwiping,
+                        customDayCount = dailyLogs.count { (key, _) -> key.startsWith("${cycle.id}|") }, // NEW
+                        onEditClick    = { cycleToEdit = cycle }
                     )
                 }
             }
@@ -369,12 +381,280 @@ fun CalendarScreen(viewModel: PeriodViewModel) {
             }
         }
 
-        if (cycleToEdit != null) {
+        cycleToEdit?.let { cycle ->
             EditCycleDialog(
-                cycle     = cycleToEdit!!,
-                onDismiss = { cycleToEdit = null },
-                onSave    = { viewModel.updateCycle(it); cycleToEdit = null }
+                cycle             = cycle,
+                existingDailyLogs = dailyLogs.values.filter { it.cycleId == cycle.id },
+                onDismiss         = { cycleToEdit = null },
+                // Catch BOTH the updated cycle and the user's edited daily overrides
+                onSave            = { updated, overrides ->
+                    // Pass them directly to the viewmodel
+                    viewModel.updateCycleWithDailyLogs(updated, overrides)
+                    cycleToEdit = null
+                }
             )
+        }
+
+        // NEW: Daily log override dialog
+        dayLogTarget?.let { (cycle, date) ->
+            val existingLog = dailyLogs["${cycle.id}|$date"]
+            DayLogDialog(
+                date          = date,
+                cycle         = cycle,
+                existingLog   = existingLog,
+                onDismiss     = { dayLogTarget = null },
+                // ADDED PAINLEVEL HERE:
+                onSave        = { bleeding, bloodColor, painLevel ->
+                    viewModel.upsertDailyLog(cycle.id, date, bleeding, bloodColor, painLevel)
+                    dayLogTarget = null
+                },
+                onClear       = {
+                    viewModel.deleteDailyLog(cycle.id, date)
+                    dayLogTarget = null
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun DayLogDialog(
+    date: LocalDate,
+    cycle: PeriodViewModel.Cycle,
+    existingLog: PeriodViewModel.DailyLog?,
+    onDismiss: () -> Unit,
+    // UPGRADED SIGNATURE TO INCLUDE PAIN
+    onSave: (bleeding: String, bloodColor: String, painLevel: Int) -> Unit,
+    onClear: () -> Unit
+) {
+    val isDark = LocalAppIsDark.current
+
+    val contentSurface = if (isDark) {
+        Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
+    } else {
+        Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
+    }
+
+    val accentColor     = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val surfaceFallback = if (isDark) Color.Black else Color.White
+    val pillBackground  = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+    val pillTextColor   = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textPrimary     = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSub         = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+
+    val pastelGreen  = Color(0xFF6d9567).copy(alpha = 0.6f)
+    val pastelOrange = Color(0xFFD89046)
+    val pastelMaroon = Color(0xFF4E1A1A)
+
+    val bleedingOptions = listOf("Heavy", "Medium", "Light", "Spotting")
+    val colorOptions    = listOf("Bright Red", "Dark Red", "Brown")
+
+    // Pre-fill from existing daily override, otherwise fall back to cycle default
+    var bleeding   by remember { mutableStateOf(existingLog?.bleeding   ?: cycle.bleeding) }
+    var bloodColor by remember { mutableStateOf(existingLog?.bloodColor ?: cycle.bloodColor) }
+    var painLevel  by remember { mutableIntStateOf(existingLog?.painLevel ?: cycle.painLevel) } // NEW
+
+    val formatter   = remember { DateTimeFormatter.ofPattern("MMM d") }
+    val dayOfWeek   = remember { date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
+    val isOverridden = existingLog != null
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties       = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier  = Modifier.fillMaxWidth(0.92f).padding(vertical = 24.dp),
+            shape     = RoundedCornerShape(28.dp),
+            colors    = CardDefaults.cardColors(containerColor = surfaceFallback),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().background(contentSurface)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text       = "$dayOfWeek, ${date.format(formatter)}",
+                            fontFamily = BricolageGrotesque,
+                            style      = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color      = textPrimary
+                        )
+                        if (isOverridden) {
+                            Text(
+                                text       = "Custom log active",
+                                fontFamily = BricolageGrotesque,
+                                fontSize   = 12.sp,
+                                color      = accentColor
+                            )
+                        } else {
+                            Text(
+                                text       = "Using cycle default",
+                                fontFamily = BricolageGrotesque,
+                                fontSize   = 12.sp,
+                                color      = textSub
+                            )
+                        }
+                    }
+                    Box(
+                        modifier         = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(textSub.copy(alpha = 0.1f))
+                            .clickable(onClick = onDismiss),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Column(
+                    modifier            = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Flow Intensity
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text       = "Flow Intensity",
+                            fontFamily = BricolageGrotesque,
+                            style      = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = textPrimary
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement   = Arrangement.spacedBy(8.dp)
+                        ) {
+                            bleedingOptions.forEach { option ->
+                                val isSelected     = bleeding.equals(option, ignoreCase = true)
+                                val activePillColor = when (option) {
+                                    "Heavy"    -> pastelMaroon
+                                    "Medium"   -> pastelOrange
+                                    else       -> pastelGreen
+                                }
+                                EntryStylePill(
+                                    text         = option,
+                                    isSelected   = isSelected,
+                                    activeBg     = activePillColor,
+                                    activeText   = Color.White,
+                                    inactiveText = textSub,
+                                    surface      = surfaceFallback,
+                                    onClick      = { bleeding = option }
+                                )
+                            }
+                        }
+                    }
+
+                    // Blood Color
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text       = "Blood Color",
+                            fontFamily = BricolageGrotesque,
+                            style      = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = textPrimary
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement   = Arrangement.spacedBy(8.dp)
+                        ) {
+                            colorOptions.forEach { option ->
+                                val isSelected      = bloodColor.equals(option, ignoreCase = true)
+                                val activePillColor = when (option) {
+                                    "Bright Red" -> pastelGreen
+                                    "Dark Red"   -> Color(0xFF4E1A1A)
+                                    "Brown"      -> pastelOrange
+                                    else         -> accentColor
+                                }
+                                EntryStylePill(
+                                    text         = option,
+                                    isSelected   = isSelected,
+                                    activeBg     = activePillColor,
+                                    activeText   = Color.White,
+                                    inactiveText = textSub,
+                                    surface      = surfaceFallback,
+                                    onClick      = { bloodColor = option }
+                                )
+                            }
+                        }
+                    }
+
+                    // --- NEW: Pain Level Slider ---
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Cramps & Pain",
+                                fontFamily = BricolageGrotesque,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textPrimary
+                            )
+                            Text(
+                                text = "$painLevel / 10",
+                                fontFamily = BricolageGrotesque,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor
+                            )
+                        }
+                        Slider(
+                            value = painLevel.toFloat(),
+                            onValueChange = { painLevel = it.toInt() },
+                            valueRange = 0f..10f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = accentColor,
+                                activeTrackColor = accentColor,
+                                inactiveTrackColor = pillBackground
+                            )
+                        )
+                    }
+
+                    // Save button
+                    Button(
+                        // PASSED PAINLEVEL BACK
+                        onClick  = { onSave(bleeding, bloodColor, painLevel) },
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape    = CircleShape,
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = accentColor,
+                            contentColor   = Color.White
+                        )
+                    ) {
+                        Text(
+                            text       = "Save Day Log",
+                            fontFamily = BricolageGrotesque,
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 16.sp
+                        )
+                    }
+
+                    // Clear override button — only shown when an override exists
+                    if (isOverridden) {
+                        TextButton(
+                            onClick  = onClear,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text       = "Reset to cycle default",
+                                fontFamily = BricolageGrotesque,
+                                color      = textSub,
+                                fontSize   = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -469,9 +749,10 @@ fun CalendarCard(
     isLearningMode: Boolean = false,
     isOnPill: Boolean = false,
     pillPacks: List<PeriodViewModel.PillPack> = emptyList(),
-    // We default this to Sunday to force consistency across all devices
-    firstDayOfWeek: DayOfWeek = DayOfWeek.SUNDAY
-) {
+    firstDayOfWeek: DayOfWeek = DayOfWeek.SUNDAY,
+    dailyLogs: Map<String, PeriodViewModel.DailyLog> = emptyMap(),       // NEW
+    onDayTapped: (PeriodViewModel.Cycle, LocalDate) -> Unit = { _, _ -> } // NEW
+){
     val isDark = LocalAppIsDark.current
     val scope  = rememberCoroutineScope()
 
@@ -599,6 +880,7 @@ fun CalendarCard(
 
                 AnimatedContent(targetState = isCollapsed, label = "CalendarType") { collapsed ->
                     if (collapsed) {
+                        // WeekCalendar block
                         WeekCalendar(state = weekState, dayContent = { weekDay ->
                             DayCellEnhanced(
                                 date            = weekDay.date,
@@ -608,10 +890,13 @@ fun CalendarCard(
                                 isTransitioning = isTransitioning,
                                 isLearningMode  = isLearningMode,
                                 isOnPill        = isOnPill,
-                                pillPacks       = pillPacks
+                                pillPacks       = pillPacks,
+                                dailyLogs       = dailyLogs,
+                                onDayTapped     = onDayTapped
                             )
                         })
                     } else {
+                        // HorizontalCalendar block
                         HorizontalCalendar(state = state, dayContent = { calendarDay ->
                             DayCellEnhanced(
                                 date            = calendarDay.date,
@@ -621,7 +906,9 @@ fun CalendarCard(
                                 isTransitioning = isTransitioning,
                                 isLearningMode  = isLearningMode,
                                 isOnPill        = isOnPill,
-                                pillPacks       = pillPacks
+                                pillPacks       = pillPacks,
+                                dailyLogs       = dailyLogs,
+                                onDayTapped     = onDayTapped
                             )
                         })
                     }
@@ -656,7 +943,9 @@ fun DayCellEnhanced(
     isTransitioning: Boolean = false,
     isLearningMode: Boolean = false,
     isOnPill: Boolean = false,
-    pillPacks: List<PeriodViewModel.PillPack> = emptyList()
+    pillPacks: List<PeriodViewModel.PillPack> = emptyList(),
+    dailyLogs: Map<String, PeriodViewModel.DailyLog> = emptyMap(),        // NEW
+    onDayTapped: (PeriodViewModel.Cycle, LocalDate) -> Unit = { _, _ -> } // NEW
 ) {
     val isDark = LocalAppIsDark.current
     val isToday = date == LocalDate.now()
@@ -705,6 +994,18 @@ fun DayCellEnhanced(
     }
 
     val currentPhase = checkPhase(date)
+
+    // NEW: find which cycle owns this day (if any) for the tap handler
+    val owningCycle = if (currentPhase == 1) {
+        cycles.firstOrNull { c ->
+            val end = c.endDate ?: c.startDate.plusDays(6)
+            !date.isBefore(c.startDate) && !date.isAfter(end)
+        }
+    } else null
+
+    // NEW: check if this day has an override so we can show the dot indicator
+    val hasOverride = owningCycle != null && dailyLogs.containsKey("${owningCycle.id}|$date")
+
     val prevPhase    = checkPhase(date.minusDays(1))
     val nextPhase    = checkPhase(date.plusDays(1))
 
@@ -743,7 +1044,16 @@ fun DayCellEnhanced(
     }
 
     Box(
-        modifier         = Modifier.aspectRatio(1f),
+        modifier = Modifier
+            .aspectRatio(1f)
+            .then(
+                if (owningCycle != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication        = null
+                    ) { onDayTapped(owningCycle, date) }
+                } else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
         // Strip background
@@ -766,6 +1076,18 @@ fun DayCellEnhanced(
         }
 
         DayText(date, isCurrentMonth, isHighlighted = isHighlighted)
+
+        // NEW: small dot to indicate a daily override exists
+        if (hasOverride) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 3.dp)
+                    .size(4.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.85f))
+            )
+        }
 
         if (isToday) {
             Canvas(modifier = Modifier.fillMaxSize().padding(2.dp)) {
@@ -935,7 +1257,8 @@ fun SwipeToDeleteCard(
 fun EditCycleDialog(
     cycle: PeriodViewModel.Cycle,
     onDismiss: () -> Unit,
-    onSave: (PeriodViewModel.Cycle) -> Unit
+    onSave: (PeriodViewModel.Cycle, Map<LocalDate, Triple<String, String, Int>>) -> Unit,
+    existingDailyLogs: List<PeriodViewModel.DailyLog> = emptyList()
 ) {
     // --- STATE MANAGEMENT ---
     var showStartPicker by remember { mutableStateOf(false) }
@@ -952,34 +1275,63 @@ fun EditCycleDialog(
     val bleedingOptions = listOf("Heavy", "Medium", "Light", "Spotting")
     val colorOptions = listOf("Bright Red", "Dark Red", "Brown")
 
-    // --- THEME & COLORS ---
-    val isDark = LocalAppIsDark.current
+    // --- DAILY LOG STATE ---
+    var showDailyLog by remember { mutableStateOf(false) }
+    var selectedDayForLog by remember { mutableStateOf<LocalDate?>(null) }
 
-    // Dark Mode background: Pure Black to Deep Gray
-    val contentSurface = if (isDark) {
-        Brush.linearGradient(
-            0.0f to Color.Black,
-            1.0f to Color(0xFF1B1B1B)
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3))
+    var dailyOverrides by remember {
+        mutableStateOf<Map<LocalDate, Triple<String, String, Int>>>(
+            existingDailyLogs.associate { log ->
+                log.date to Triple(log.bleeding, log.bloodColor, log.painLevel)
+            }
         )
     }
 
-    // Yellow accent for Slider and Buttons in Dark Mode
+    val today = LocalDate.now()
+    val cycleDays = remember(startDate, endDate) {
+        val end = endDate ?: if (startDate.isBefore(today)) today else startDate
+        generateSequence(startDate) { it.plusDays(1) }
+            .takeWhile { !it.isAfter(end) }
+            .toList()
+    }
+
+    val flowWeights = remember { mapOf("Spotting" to 1, "Light" to 2, "Medium" to 3, "Heavy" to 4) }
+    val reverseFlowWeights = remember { mapOf(1 to "Spotting", 2 to "Light", 3 to "Medium", 4 to "Heavy") }
+
+    val derivedBleeding = remember(dailyOverrides, bleeding, cycleDays) {
+        if (dailyOverrides.isEmpty() || cycleDays.isEmpty()) return@remember bleeding
+        val maxWeight = cycleDays.maxOfOrNull { day ->
+            val dailyFlow = dailyOverrides[day]?.first ?: bleeding
+            flowWeights[dailyFlow] ?: 0
+        } ?: 0
+        reverseFlowWeights[maxWeight] ?: bleeding
+    }
+
+    val derivedColor = remember(dailyOverrides, bloodColor, cycleDays) {
+        if (dailyOverrides.isEmpty() || cycleDays.isEmpty()) return@remember bloodColor
+        val allColors = cycleDays.map { day -> dailyOverrides[day]?.second ?: bloodColor }
+        allColors.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: bloodColor
+    }
+
+    val derivedPain = remember(dailyOverrides, painLevel, cycleDays) {
+        if (dailyOverrides.isEmpty() || cycleDays.isEmpty()) return@remember painLevel
+        val totalPain = cycleDays.sumOf { day -> dailyOverrides[day]?.third ?: painLevel }
+        kotlin.math.round(totalPain.toFloat() / cycleDays.size).toInt()
+    }
+
+    // --- THEME & COLORS (RESTORED) ---
+    val isDark = LocalAppIsDark.current
+    val contentSurface = if (isDark) Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
+    else Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
     val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val surfaceFallback = if (isDark) Color.Black else Color.White
-
     val pastelGreen = Color(0xFF6d9567).copy(alpha = 0.6f)
     val pastelOrange = Color(0xFFD89046)
     val pastelMaroon = Color(0xFF4E1A1A)
-
     val pillBackground = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
     val pillTextColor = if (isDark) Color.White else Color(0xFF1B1B1B)
-
     val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1B1B1B)
 
     val formatter = remember { DateTimeFormatter.ofPattern("MMM dd") }
 
@@ -988,23 +1340,15 @@ fun EditCycleDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .padding(vertical = 24.dp) ,
+            modifier = Modifier.fillMaxWidth(0.92f).padding(vertical = 24.dp),
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = surfaceFallback),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(contentSurface)
-            ) {
+            Column(modifier = Modifier.fillMaxWidth().background(contentSurface)) {
                 // Header
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1015,190 +1359,192 @@ fun EditCycleDialog(
                         color = textPrimary
                     )
                     Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(textSub.copy(alpha = 0.1f))
-                            .clickable(onClick = onDismiss),
+                        modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            tint = textPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
                     }
                 }
 
                 Column(
-                    modifier = Modifier
-                        .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
                     // Date Selectors
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CleanDateCard(
-                            label = "Start Date",
-                            date = startDate.format(formatter),
-                            icon = Icons.Rounded.CalendarToday,
-                            bg = pillBackground,
-                            textColor = pillTextColor,
-                            onClick = { showStartPicker = true },
-                            modifier = Modifier.weight(1f)
-                        )
-                        CleanDateCard(
-                            label = "End Date",
-                            date = endDate?.format(formatter) ?: "Ongoing",
-                            icon = if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable,
-                            bg = pillBackground,
-                            textColor = pillTextColor,
-                            onClick = { showEndPicker = true },
-                            modifier = Modifier.weight(1f)
-                        )
+                        CleanDateCard("Start Date", startDate.format(formatter), Icons.Rounded.CalendarToday, pillBackground, pillTextColor, { showStartPicker = true }, Modifier.weight(1f))
+                        CleanDateCard("End Date", endDate?.format(formatter) ?: "Ongoing", if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable, pillBackground, pillTextColor, { showEndPicker = true }, Modifier.weight(1f))
                     }
 
-                    // Flow Intensity
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = "Flow Intensity",
-                            fontFamily = BricolageGrotesque,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = textPrimary
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            bleedingOptions.forEach { option ->
-                                val isSelected = bleeding.equals(option, ignoreCase = true)
-                                val activePillColor = when(option) {
-                                    "Heavy" -> pastelMaroon
-                                    "Medium" -> pastelOrange
-                                    else -> pastelGreen
-                                }
+                    // --- SUMMARY OR PICKERS ---
+                    if (dailyOverrides.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Summary", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = textPrimary)
 
-                                EntryStylePill(
-                                    text = option,
-                                    isSelected = isSelected,
-                                    activeBg = activePillColor,
-                                    activeText = if (isDark) Color.White else Color.White,
-                                    inactiveText = textSub,
-                                    surface = surfaceFallback,
-                                    onClick = { bleeding = option }
-                                )
+                            val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
+                                append("Based on your daily logs, this cycle has a peak flow of ")
+                                pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                                append(derivedBleeding.lowercase())
+                                append(" (${derivedColor.lowercase()})")
+                                pop()
+                                append(", with an average pain level of ")
+                                pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                                append("$derivedPain/10")
+                                pop()
+                                append(".")
+                            }
+
+                            Text(
+                                text = annotatedSummary,
+                                fontFamily = BricolageGrotesque,
+                                fontSize = 14.sp,
+                                color = textSub,
+                                lineHeight = 20.sp
+                            )
+                        }
+                    } else {
+                        // Flow Intensity
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Flow Intensity", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = textPrimary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                bleedingOptions.forEach { option ->
+                                    val isSelected = bleeding.equals(option, ignoreCase = true)
+                                    val activeBg = when(option) { "Heavy" -> pastelMaroon; "Medium" -> pastelOrange; else -> pastelGreen }
+                                    EntryStylePill(option, isSelected, activeBg, Color.White, textSub, surfaceFallback) { bleeding = option }
+                                }
+                            }
+                        }
+
+                        // Blood Color
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Blood Color", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = textPrimary)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                colorOptions.forEach { option ->
+                                    val isSelected = bloodColor.equals(option, ignoreCase = true)
+                                    val activeBg = when(option) { "Bright Red" -> pastelGreen; "Dark Red" -> Color(0xFF4E1A1A); "Brown" -> pastelOrange; else -> accentColor }
+                                    EntryStylePill(option, isSelected, activeBg, Color.White, textSub, surfaceFallback) { bloodColor = option }
+                                }
+                            }
+                        }
+
+                        // Pain Level Slider
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Cramps & Pain", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = textPrimary)
+                                Text("${sliderPosition.toInt()} / 10", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = accentColor)
+                            }
+                            Slider(
+                                value = sliderPosition,
+                                onValueChange = { sliderPosition = it; painLevel = it.toInt() },
+                                valueRange = 0f..10f,
+                                colors = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor, inactiveTrackColor = pillBackground)
+                            )
+                        }
+                    }
+
+                    // --- DAILY LOG SECTION ---
+                    if (cycleDays.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pillBackground).clickable { showDailyLog = !showDailyLog }.padding(16.dp, 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Log by day", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = pillTextColor)
+                                    Text(
+                                        if (dailyOverrides.isEmpty()) "Optional • uses cycle default" else "${dailyOverrides.size} day${if (dailyOverrides.size > 1) "s" else ""} customized",
+                                        fontFamily = BricolageGrotesque, fontSize = 12.sp, color = if (dailyOverrides.isEmpty()) pillTextColor.copy(alpha = 0.5f) else accentColor
+                                    )
+                                }
+                                Text(if (showDailyLog) "▲" else "▼", color = pillTextColor.copy(alpha = 0.5f), fontSize = 12.sp, fontFamily = BricolageGrotesque)
+                            }
+
+                            if (showDailyLog) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    cycleDays.forEach { day ->
+                                        val override    = dailyOverrides[day]
+                                        val dayBleeding = override?.first  ?: bleeding
+                                        val dayColor    = override?.second ?: bloodColor
+                                        val dayPain     = override?.third  ?: painLevel
+                                        val dayLabel    = day.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+                                        val isCustom    = override != null
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(if (isCustom) accentColor.copy(alpha = 0.12f) else pillBackground)
+                                                .clickable { selectedDayForLog = day }
+                                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = dayLabel,
+                                                    fontFamily = BricolageGrotesque,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 14.sp,
+                                                    color = if (isCustom) textPrimary else textPrimary.copy(alpha = 0.8f)
+                                                )
+                                                Spacer(Modifier.height(2.dp))
+                                                Text(
+                                                    text = "$dayBleeding • $dayColor • Pain: $dayPain/10",
+                                                    fontFamily = BricolageGrotesque,
+                                                    fontSize = 12.sp,
+                                                    color = textSub.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Edit",
+                                                tint = if (isCustom) accentColor else textSub.copy(alpha = 0.3f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
 
-// Blood Color
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = "Blood Color",
-                            fontFamily = BricolageGrotesque,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = textPrimary
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            colorOptions.forEach { option ->
-                                val isSelected = bloodColor.equals(option, ignoreCase = true)
-
-                                // Assigning specific colors based on the blood color option
-                                val activePillColor = when(option) {
-                                    "Bright Red" -> pastelGreen // Using your existing light red/pink
-                                    "Dark Red"   -> Color(0xFF4E1A1A) // Deep Maroon for contrast
-                                    "Brown"      -> pastelOrange // Using your existing orange/brown
-                                    else         -> accentColor
-                                }
-
-                                EntryStylePill(
-                                    text = option,
-                                    isSelected = isSelected,
-                                    activeBg = activePillColor,
-                                    activeText = Color.White,
-                                    inactiveText = textSub,
-                                    surface = surfaceFallback,
-                                    onClick = { bloodColor = option }
-                                )
-                            }
-                        }
-                    }
-
-                    // Pain Level Slider
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Cramps & Pain",
-                                fontFamily = BricolageGrotesque,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = textPrimary
-                            )
-                            Text(
-                                text = "${sliderPosition.toInt()} / 10",
-                                fontFamily = BricolageGrotesque,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = accentColor
-                            )
-                        }
-                        Slider(
-                            value = sliderPosition,
-                            onValueChange = {
-                                sliderPosition = it
-                                painLevel = it.toInt()
-                            },
-                            valueRange = 0f..10f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = accentColor,
-                                activeTrackColor = accentColor,
-                                inactiveTrackColor = pillBackground
-                            )
-                        )
-                    }
-
-                    // Action Button
                     Button(
-                        onClick = {
-                            onSave(cycle.copy(
-                                startDate = startDate,
-                                endDate = endDate,
-                                bleeding = bleeding,
-                                bloodColor = bloodColor,
-                                painLevel = painLevel
-                            ))
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(bottom = 8.dp),
+                        onClick = { onSave(cycle.copy(startDate = startDate, endDate = endDate, bleeding = derivedBleeding, bloodColor = derivedColor, painLevel = derivedPain), dailyOverrides) },
+                        modifier = Modifier.fillMaxWidth().height(56.dp).padding(bottom = 8.dp),
                         shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = accentColor,
-                            contentColor = Color.White // FORCED WHITE ONLY
-                        ),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                     ) {
-                        Text(
-                            text = "Update Entry",
-                            fontFamily = BricolageGrotesque,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Update Entry", fontFamily = BricolageGrotesque, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
         }
+    }
+
+    // --- NESTED DAY LOG DIALOG ---
+    selectedDayForLog?.let { day ->
+        val override = dailyOverrides[day]
+        val existingLog = override?.let {
+            PeriodViewModel.DailyLog(id = 0, cycleId = cycle.id, date = day, bleeding = it.first, bloodColor = it.second, painLevel = it.third)
+        }
+        val tempCycle = cycle.copy(startDate = startDate, endDate = endDate, bleeding = bleeding, bloodColor = bloodColor, painLevel = painLevel)
+
+        DayLogDialog(
+            date = day,
+            cycle = tempCycle,
+            existingLog = existingLog,
+            onDismiss = { selectedDayForLog = null },
+            onSave = { newBleeding, newColor, newPain ->
+                dailyOverrides = dailyOverrides.toMutableMap().apply { put(day, Triple(newBleeding, newColor, newPain)) }
+                selectedDayForLog = null
+            },
+            onClear = {
+                dailyOverrides = dailyOverrides.toMutableMap().apply { remove(day) }
+                selectedDayForLog = null
+            }
+        )
     }
 
     // --- DATE PICKERS ---
@@ -1233,6 +1579,7 @@ fun EditCycleDialog(
         )
     }
 }
+
 
 @Composable
 fun EntryStylePill(
@@ -1322,6 +1669,7 @@ fun EntryRow(
     sub: Color,
     accent: Color,
     isSwiping: Boolean = false,
+    customDayCount: Int = 0,
     onEditClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1349,13 +1697,15 @@ fun EntryRow(
     val endDt = remember(endDate) { runCatching { if (endDate.isNotBlank()) java.time.LocalDate.parse(endDate) else null }.getOrNull() }
     val today = LocalDate.now()
 
-    var statusText = "Status unknown"
-    if (startDt != null) {
-        statusText = if (endDt == null) {
-            "Day ${ChronoUnit.DAYS.between(startDt, today) + 1} • Ongoing"
-        } else {
-            "${ChronoUnit.DAYS.between(startDt, endDt) + 1} Days • Completed"
-        }
+    // Base Status only (Cleaned up as requested)
+    val statusText = remember(startDt, endDt) {
+        if (startDt != null) {
+            if (endDt == null) {
+                "Day ${ChronoUnit.DAYS.between(startDt, today) + 1} • Ongoing"
+            } else {
+                "${ChronoUnit.DAYS.between(startDt, endDt) + 1} Days • Completed"
+            }
+        } else "Status unknown"
     }
 
     Card(
@@ -1403,11 +1753,13 @@ fun EntryRow(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
                             InfoBox("Duration", "${shortPretty(startDate)} - ${if(endDate.isNotBlank()) shortPretty(endDate) else "Ongoing"}", pillBackground, pillTextColor)
-                            InfoBox("Pain", "$crampsPain/10", pillBackground, pillTextColor)
+
+                            // Keep smart labels so users know if custom data is influencing the pill
+                            InfoBox(if (customDayCount > 0) "Avg Pain" else "Pain", "$crampsPain/10", pillBackground, pillTextColor)
                         }
                         Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(10.dp)) {
-                            InfoBox("Flow", capitalizedBleeding, pillBackground, pillTextColor)
-                            InfoBox("Color", bloodColor, pillBackground, pillTextColor)
+                            InfoBox(if (customDayCount > 0) "Peak Flow" else "Flow", capitalizedBleeding, pillBackground, pillTextColor)
+                            InfoBox(if (customDayCount > 0) "Main Color" else "Color", bloodColor, pillBackground, pillTextColor)
                         }
                     }
 
@@ -1428,7 +1780,6 @@ fun EntryRow(
         }
     }
 }
-
 
 @Composable
 fun RowScope.InfoBox(
