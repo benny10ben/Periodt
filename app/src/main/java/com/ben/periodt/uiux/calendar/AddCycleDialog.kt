@@ -35,6 +35,10 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.ceil
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.ui.graphics.graphicsLayer
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddCycleDialog(
@@ -60,6 +64,7 @@ fun AddCycleDialog(
     var showDailyLog by remember { mutableStateOf(false) }
     var selectedDayForLog by remember { mutableStateOf<LocalDate?>(null) }
     var dailyOverrides by remember { mutableStateOf<Map<LocalDate, Triple<String, String, Int>>>(emptyMap()) }
+    val dailyLogRotation by animateFloatAsState(if (showDailyLog) 180f else 0f, label = "dailyLogRotation")
 
     val today = LocalDate.now()
     val cycleDays = remember(startDate, endDate) {
@@ -211,8 +216,14 @@ fun AddCycleDialog(
                                         fontFamily = BricolageGrotesque, fontSize = 12.sp, color = if (dailyOverrides.isEmpty()) pillTextColor.copy(alpha = 0.5f) else accentColor
                                     )
                                 }
-                                Text(if (showDailyLog) "▲" else "▼", color = pillTextColor.copy(alpha = 0.5f), fontSize = 12.sp, fontFamily = BricolageGrotesque)
-                            }
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = pillTextColor.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer { rotationZ = dailyLogRotation }
+                                )                            }
 
                             if (showDailyLog) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
