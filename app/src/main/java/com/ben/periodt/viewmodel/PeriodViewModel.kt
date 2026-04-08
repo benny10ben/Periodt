@@ -485,3 +485,5 @@ private fun PeriodCycleEntity.toDomain() = PeriodViewModel.Cycle(
     bloodColor = bloodColor,
     painLevel  = painLevel
 )
+
+// Triggering GitHub Actions test
