@@ -22,6 +22,8 @@ import androidx.core.content.ContextCompat
 import com.ben.periodt.ui.theme.PeriodTTheme
 import com.ben.periodt.uiux.MainScreen
 import com.ben.periodt.uiux.onboarding.OnboardingNavigator
+import androidx.activity.enableEdgeToEdge
+import androidx.annotation.RequiresApi
 
 class MainActivity : ComponentActivity() {
 
@@ -50,10 +52,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     override fun onCreate(savedInstanceState: Bundle?) {
         ensureReminderChannel(applicationContext)
         super.onCreate(savedInstanceState)
         System.loadLibrary("sqlcipher")
+
+        enableEdgeToEdge()
 
         setContent {
             PeriodTTheme {
