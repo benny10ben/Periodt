@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.*
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
@@ -17,7 +18,8 @@ import androidx.glance.action.clickable
 import androidx.glance.appwidget.*
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
-import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.*
@@ -32,17 +34,38 @@ import com.ben.periodt.R
 import com.ben.periodt.data.AppDatabase
 import com.ben.periodt.data.PeriodCycleEntity
 import com.ben.periodt.data.PillPackEntity
+import com.ben.periodt.data.ProfileEntity
+import com.ben.periodt.uiux.overview.THEME_MODE_KEY
+import com.ben.periodt.uiux.overview.ThemeMode
 import com.ben.periodt.viewmodel.PeriodViewModel
 import com.ben.periodt.uiux.shared.CycleRegularity
 import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.Prediction
+import com.ben.periodt.uiux.shared.dataStore
 import com.ben.periodt.uiux.shared.getPostPillState
 import com.ben.periodt.uiux.shared.predictCycle
+import com.google.gson.Gson
+import kotlinx.coroutines.flow.firstOrNull
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 val MonthOffsetKey = intPreferencesKey("calendar_month_offset")
+val ProfileIdKey = intPreferencesKey("widget_profile_id")
+val ThemeModeWidgetKey = stringPreferencesKey("widget_theme_mode")
+
+val ProfilesJsonKey = stringPreferencesKey("widget_profiles_json")
+val CyclesJsonKey = stringPreferencesKey("widget_cycles_json")
+val PillsJsonKey = stringPreferencesKey("widget_pills_json")
+
+@SuppressLint("RestrictedApi")
+private fun themeColorProvider(light: Color, dark: Color, mode: ThemeMode): ColorProvider {
+    return when (mode) {
+        ThemeMode.LIGHT -> ColorProvider(light, light)
+        ThemeMode.DARK -> ColorProvider(dark, dark)
+        ThemeMode.SYSTEM -> ColorProvider(day = light, night = dark)
+    }
+}
 
 @SuppressLint("RestrictedApi")
 private fun colorProvider(color: Color): ColorProvider = ColorProvider(color)
@@ -65,62 +88,171 @@ class CalendarWidgetReceiver : GlanceAppWidgetReceiver() {
 class CalendarWidget : GlanceAppWidget() {
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
-    // --- ADDED REFRESH LOGIC HERE ---
     companion object {
         suspend fun refreshAll(context: Context) {
             val manager = GlanceAppWidgetManager(context)
             val ids = manager.getGlanceIds(CalendarWidget::class.java)
-            val widget = CalendarWidget()
+            val gson = Gson()
+
+            // 1. Fetch fresh Data from DB
+            val dao = AppDatabase.getDatabase(context).periodCycleDao()
+            val freshProfiles = dao.getAllProfilesOnce()
+            val freshCycles = dao.getAllCyclesOnce()
+            val freshPills = dao.getAllPillPacksOnce()
+
+            // 2. Fetch fresh Theme from DataStore
+            val themePrefs = context.dataStore.data.firstOrNull()
+            val themeModeStr = themePrefs?.get(THEME_MODE_KEY) ?: ThemeMode.SYSTEM.name
+
+            // 3. Write EVERYTHING into the widget's internal reactive state
             ids.forEach { id ->
-                widget.update(context, id)
+                updateAppWidgetState(context, id) { prefs ->
+                    prefs[ThemeModeWidgetKey] = themeModeStr
+                    prefs[ProfilesJsonKey] = gson.toJson(freshProfiles)
+                    prefs[CyclesJsonKey] = gson.toJson(freshCycles)
+                    prefs[PillsJsonKey] = gson.toJson(freshPills)
+                }
             }
+
+            CalendarWidget().updateAll(context)
         }
     }
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // Initial fallback fetch (used only when the widget is placed for the very first time)
         val dao = AppDatabase.getDatabase(context).periodCycleDao()
-        val cyclesEntities = dao.getAllCyclesOnce()
-        val pills = dao.getAllPillPacksOnce()
-        val domainCycles = cyclesEntities.map { it.toDomain() }
-
-        val activePack = pills.firstOrNull { it.endDate == null }
-        val stopDateStr = pills.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.endDate
-        val stopDate = stopDateStr?.let { LocalDate.parse(it) }
-
-        val isTransitioning = if (activePack != null || stopDate == null) false else {
-            val postPillCycles = domainCycles.filter { !it.startDate.isBefore(stopDate) }
-            getPostPillState(postPillCycles) == PostPillState.DISCOVERY
-        }
-
-        val prediction: Prediction? = when {
-            activePack != null -> {
-                val activeStart = LocalDate.parse(activePack.startDate)
-                val withdrawalStart = activeStart.plusDays(activePack.pillCount.toLong() + 2)
-                Prediction(
-                    minPeriodStart = withdrawalStart.minusDays(1),
-                    maxPeriodStart = withdrawalStart.plusDays(1),
-                    mostLikelyPeriodStart = withdrawalStart,
-                    periodLength = 4,
-                    ovulationDay = withdrawalStart,
-                    ovulationConfidence = 1.0f,
-                    fertileWindow = LocalDate.MIN..LocalDate.MIN,
-                    cycleLength = activePack.pillCount + 7,
-                    cycleRegularity = CycleRegularity.VERY_REGULAR
-                )
-            }
-            isTransitioning -> null
-            else -> {
-                val validCycles = if (stopDate != null) domainCycles.filter { !it.startDate.isBefore(stopDate) } else domainCycles
-                predictCycle(validCycles)
-            }
-        }
+        val initialProfiles = dao.getAllProfilesOnce()
+        val initialCycles = dao.getAllCyclesOnce()
+        val initialPills = dao.getAllPillPacksOnce()
 
         provideContent {
             val prefs = currentState<Preferences>()
-            val monthOffset = prefs[MonthOffsetKey] ?: 0
-            val displayMonth = YearMonth.now().plusMonths(monthOffset.toLong())
+            val gson = Gson()
 
-            CalendarWidgetContent(context, displayMonth, cyclesEntities, pills, prediction)
+            // ✨ Read reactive Theme
+            val themeModeStr = prefs[ThemeModeWidgetKey] ?: ThemeMode.SYSTEM.name
+            val themeMode = try { ThemeMode.valueOf(themeModeStr) } catch (e: Exception) { ThemeMode.SYSTEM }
+
+            // ✨ Read reactive Data (with fallback to initial fetch)
+            val profilesStr = prefs[ProfilesJsonKey]
+            val activeProfiles = if (profilesStr != null) gson.fromJson(profilesStr, Array<ProfileEntity>::class.java).toList() else initialProfiles
+
+            val cyclesStr = prefs[CyclesJsonKey]
+            val activeCycles = if (cyclesStr != null) gson.fromJson(cyclesStr, Array<PeriodCycleEntity>::class.java).toList() else initialCycles
+
+            val pillsStr = prefs[PillsJsonKey]
+            val activePills = if (pillsStr != null) gson.fromJson(pillsStr, Array<PillPackEntity>::class.java).toList() else initialPills
+
+            val profileId = prefs[ProfileIdKey]
+
+            if (profileId == null) {
+                ProfileSelectionContent(activeProfiles, themeMode)
+            } else {
+                val cyclesEntities = activeCycles.filter { it.profileId == profileId }
+                val pills = activePills.filter { it.profileId == profileId }
+                val domainCycles = cyclesEntities.map { it.toDomain() }
+
+                val activePack = pills.firstOrNull { it.endDate == null }
+                val stopDateStr = pills.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.endDate
+                val stopDate = stopDateStr?.let { LocalDate.parse(it) }
+
+                val isTransitioning = if (activePack != null || stopDate == null) false else {
+                    val postPillCycles = domainCycles.filter { !it.startDate.isBefore(stopDate) }
+                    getPostPillState(postPillCycles) == PostPillState.DISCOVERY
+                }
+
+                val prediction: Prediction? = when {
+                    activePack != null -> {
+                        val activeStart = LocalDate.parse(activePack.startDate)
+                        val withdrawalStart = activeStart.plusDays(activePack.pillCount.toLong() + 2)
+                        Prediction(
+                            minPeriodStart = withdrawalStart.minusDays(1),
+                            maxPeriodStart = withdrawalStart.plusDays(1),
+                            mostLikelyPeriodStart = withdrawalStart,
+                            periodLength = 4,
+                            ovulationDay = withdrawalStart,
+                            ovulationConfidence = 1.0f,
+                            fertileWindow = LocalDate.MIN..LocalDate.MIN,
+                            cycleLength = activePack.pillCount + 7,
+                            cycleRegularity = CycleRegularity.VERY_REGULAR
+                        )
+                    }
+                    isTransitioning -> null
+                    else -> {
+                        val validCycles = if (stopDate != null) domainCycles.filter { !it.startDate.isBefore(stopDate) } else domainCycles
+                        predictCycle(validCycles)
+                    }
+                }
+
+                val monthOffset = prefs[MonthOffsetKey] ?: 0
+                val displayMonth = YearMonth.now().plusMonths(monthOffset.toLong())
+
+                CalendarWidgetContent(context, displayMonth, cyclesEntities, pills, prediction, themeMode)
+            }
+        }
+    }
+
+    @Composable
+    private fun ProfileSelectionContent(profiles: List<ProfileEntity>, themeMode: ThemeMode) {
+        val textPrimaryProvider = themeColorProvider(Color(0xFF0F172A), Color(0xFFFFFFFF), themeMode)
+        val rowBgProvider = themeColorProvider(Color(0xFFF1F5F9), Color(0xFF252525), themeMode)
+        val widgetBackground = themeColorProvider(Color.White, Color.Black, themeMode)
+
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .appWidgetBackground()
+                .background(widgetBackground)
+                .cornerRadius(24.dp)
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "Select Profile",
+                style = TextStyle(color = textPrimaryProvider, fontSize = 20.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier.padding(bottom = 16.dp).fillMaxWidth()
+            )
+
+            LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                items(profiles) { profile ->
+                    Column(modifier = GlanceModifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                        Row(
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .background(rowBgProvider)
+                                .cornerRadius(16.dp)
+                                .clickable(actionRunCallback<SelectProfileAction>(actionParametersOf(SelectProfileAction.ProfileIdParam to profile.id)))
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val avatarRes = when(profile.avatarColor) {
+                                "avatar_1" -> R.drawable.avatar_1
+                                "avatar_2" -> R.drawable.avatar_2
+                                "avatar_3" -> R.drawable.avatar_3
+                                "avatar_4" -> R.drawable.avatar_4
+                                "avatar_5" -> R.drawable.avatar_5
+                                "avatar_6" -> R.drawable.avatar_6
+                                "avatar_7" -> R.drawable.avatar_7
+                                "avatar_8" -> R.drawable.avatar_8
+                                else -> 0
+                            }
+
+                            if (avatarRes != 0) {
+                                Image(
+                                    provider = ImageProvider(avatarRes),
+                                    contentDescription = null,
+                                    modifier = GlanceModifier.size(32.dp).cornerRadius(100.dp)
+                                )
+                                Spacer(GlanceModifier.width(12.dp))
+                            }
+
+                            Text(
+                                text = profile.name,
+                                style = TextStyle(color = textPrimaryProvider, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -130,16 +262,18 @@ class CalendarWidget : GlanceAppWidget() {
         displayMonth: YearMonth,
         cycles: List<PeriodCycleEntity>,
         pills: List<PillPackEntity>,
-        prediction: Prediction?
+        prediction: Prediction?,
+        themeMode: ThemeMode
     ) {
-        val textPrimaryProvider = ColorProvider(day = Color(0xFF0F172A), night = Color(0xFFFFFFFF))
-        val textMutedProvider = ColorProvider(day = Color(0xFF64748B), night = Color(0xFFFFFFFF).copy(alpha = 0.6f))
+        val textPrimaryProvider = themeColorProvider(Color(0xFF0F172A), Color(0xFFFFFFFF), themeMode)
+        val textMutedProvider = themeColorProvider(Color(0xFF64748B), Color(0xFFFFFFFF).copy(alpha = 0.6f), themeMode)
+        val widgetBackground = themeColorProvider(Color.White, Color.Black, themeMode)
 
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .appWidgetBackground()
-                .background(ImageProvider(R.drawable.bg_widget_card))
+                .background(widgetBackground)
                 .cornerRadius(24.dp)
                 .padding(horizontal = 16.dp, vertical = 16.dp)
                 .clickable(actionStartActivity(ComponentName(context, "com.ben.periodt.MainActivity")))
@@ -196,6 +330,7 @@ class CalendarWidget : GlanceAppWidget() {
                                 cycles = cycles,
                                 pills = pills,
                                 prediction = prediction,
+                                themeMode = themeMode,
                                 textPrimaryProvider = textPrimaryProvider
                             )
                             cursor = cursor.plusDays(1)
@@ -216,6 +351,7 @@ private fun DayCellGlance(
     cycles: List<PeriodCycleEntity>,
     pills: List<PillPackEntity>,
     prediction: Prediction?,
+    themeMode: ThemeMode,
     textPrimaryProvider: ColorProvider
 ) {
     val phase = getPhase(date, cycles, pills, prediction)
@@ -226,10 +362,10 @@ private fun DayCellGlance(
     val isCurrentMonth = date.month == displayMonth.month
     val isToday = date == LocalDate.now()
 
-    val loggedColor = ColorProvider(day = Color(0xFFCA7B77), night = Color(0xFF6E1F1C))
-    val upcomingColor = ColorProvider(day = Color(0xFFA5231C), night = Color(0xFFA5231C))
-    val fertileColor = ColorProvider(day = Color(0xFFA6BFA2), night = Color(0xFF4C6549))
-    val pillColor = ColorProvider(day = Color(0xFFa68e74), night = Color(0xFFa68e74))
+    val loggedColor = themeColorProvider(Color(0xFFCA7B77), Color(0xFF6E1F1C), themeMode)
+    val upcomingColor = themeColorProvider(Color(0xFFA5231C), Color(0xFFA5231C), themeMode)
+    val fertileColor = themeColorProvider(Color(0xFFA6BFA2), Color(0xFF4C6549), themeMode)
+    val pillColor = themeColorProvider(Color(0xFFa68e74), Color(0xFFa68e74), themeMode)
 
     val bgColorProvider = when (phase) {
         1 -> loggedColor
@@ -256,8 +392,8 @@ private fun DayCellGlance(
 
         val finalTextColorProvider = when {
             phase != 0 -> colorProvider(Color.White)
-            isCurrentMonth -> if (isToday) colorProvider(Color(0xFFD89046)) else textPrimaryProvider
-            else -> colorProvider(Color.Gray.copy(alpha = 0.5f))
+            isCurrentMonth -> if (isToday) themeColorProvider(Color(0xFFD89046), Color(0xFFD89046), themeMode) else textPrimaryProvider
+            else -> themeColorProvider(Color.Gray.copy(alpha = 0.5f), Color.Gray.copy(alpha = 0.5f), themeMode)
         }
 
         Text(
@@ -296,4 +432,18 @@ class UpdateMonthAction : ActionCallback {
         CalendarWidget().update(context, glanceId)
     }
     companion object { val IncrementKey = ActionParameters.Key<Int>("increment") }
+}
+
+class SelectProfileAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val profileId = parameters[ProfileIdParam] ?: return
+        updateAppWidgetState(context, glanceId) { prefs ->
+            prefs[ProfileIdKey] = profileId
+        }
+        CalendarWidget().update(context, glanceId)
+    }
+
+    companion object {
+        val ProfileIdParam = ActionParameters.Key<Int>("profile_id")
+    }
 }
