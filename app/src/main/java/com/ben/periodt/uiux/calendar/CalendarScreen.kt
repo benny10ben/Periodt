@@ -425,9 +425,9 @@ fun DayLogDialog(
 ) {
     val isDark = LocalAppIsDark.current
 
-    val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color.White
     val accentColor     = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val surfaceFallback = if (isDark) Color.Black else Color.White
+    val surfaceFallback = if (isDark) Color.Black else Color.Black.copy(alpha = 0.05f)
     val pillBackground  = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
     val textPrimary     = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub         = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
@@ -1081,9 +1081,9 @@ fun EditCycleDialog(
     }
 
     val isDark = LocalAppIsDark.current
-    val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color.White
     val accentColor     = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val surfaceFallback = if (isDark) Color.Black else Color.White
+    val surfaceFallback = if (isDark) Color.Black else Color.Black.copy(alpha = 0.05f)
     val pastelGreen     = Color(0xFF6d9567).copy(alpha = 0.6f)
     val pastelOrange    = Color(0xFFD89046)
     val pastelMaroon    = Color(0xFF4E1A1A)
