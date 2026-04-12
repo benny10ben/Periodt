@@ -1,10 +1,17 @@
 package com.ben.periodt.uiux.overview
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material3.*
@@ -12,15 +19,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 
+private val SIZE_SM = 13.sp
+private val SIZE_MD = 14.sp
+private val SIZE_LG = 15.sp
+// ─────────────────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SuccessFeedbackDialog(
     title: String,
@@ -29,101 +41,94 @@ fun SuccessFeedbackDialog(
     onDismiss: () -> Unit
 ) {
     val isDark = LocalAppIsDark.current
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
 
-    // 1. UPDATED GRADIENT SURFACE
-    val contentSurface = if (isDark) {
-        Brush.linearGradient(
-            0.0f to Color.Black,
-            1.0f to Color(0xFF1B1B1B)
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3))
-        )
-    }
-
-    // 2. UPDATED ACCENT COLOR
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-
-
-    val surfaceFallback = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val textMain = if (isDark) Color.White else Color(0xFF1B1B1B)
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = surfaceFallback),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = containerColor,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        scrimColor = Color.Black.copy(alpha = 0.32f),
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = textSub.copy(alpha = 0.2f)) }
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness    = Spring.StiffnessMediumLow
+                    )
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Box(modifier = Modifier.background(contentSurface)) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF4CAF50).copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = null,
-                            tint = Color(0xFF4CAF50),
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4CAF50).copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(40.dp)
+                )
+            }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = title,
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = textPrimary,
+                textAlign = TextAlign.Center
+            )
 
-                    Text(
-                        text = title,
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = textMain
-                    )
+            Text(
+                text = message,
+                fontFamily = BricolageGrotesque,
+                fontSize = SIZE_MD,
+                color = textSub,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp
+            )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                    Text(
-                        text = message,
-                        fontFamily = BricolageGrotesque,
-                        fontSize = 15.sp,
-                        color = textSub,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 22.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = accentColor, // Use specified accentColor
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = buttonText,
-                            fontFamily = BricolageGrotesque,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+            ) {
+                Text(
+                    buttonText,
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = SIZE_LG
+                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DestructiveConfirmationDialog(
     title: String,
@@ -132,169 +137,243 @@ fun DestructiveConfirmationDialog(
     onDismiss: () -> Unit
 ) {
     val isDark = LocalAppIsDark.current
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val dangerColor    = Color(0xFFEF5350)
 
-    // 1. UPDATED GRADIENT SURFACE
-    val contentSurface = if (isDark) {
-        Brush.linearGradient(
-            0.0f to Color.Black,
-            1.0f to Color(0xFF1B1B1B)
-        )
-    } else {
-        Brush.linearGradient(
-            colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3))
-        )
-    }
-
-    val surfaceFallback = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val textMain = if (isDark) Color.White else Color(0xFF1B1B1B)
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
-    val dangerColor = Color(0xFFEF5350)
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(26.dp),
-            colors = CardDefaults.cardColors(containerColor = surfaceFallback),
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = containerColor,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        scrimColor = Color.Black.copy(alpha = 0.32f),
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = textSub.copy(alpha = 0.2f)) }
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness    = Spring.StiffnessMediumLow
+                    )
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Box(modifier = Modifier.background(contentSurface)) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(dangerColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteForever,
+                    contentDescription = null,
+                    tint = dangerColor,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
+
+            Text(
+                text = title,
+                fontFamily = BricolageGrotesque,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = textPrimary,
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = message,
+                fontFamily = BricolageGrotesque,
+                fontSize = SIZE_MD,
+                color = textSub,
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = CircleShape
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(dangerColor.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.DeleteForever,
-                            contentDescription = null,
-                            tint = dangerColor,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
                     Text(
-                        text = title,
+                        "Cancel",
+                        fontFamily = BricolageGrotesque,
+                        color = textSub,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = SIZE_LG
+                    )
+                }
+
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = dangerColor,
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+                ) {
+                    Text(
+                        "Delete",
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = textMain,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontSize = SIZE_LG
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = message,
-                        fontFamily = BricolageGrotesque,
-                        fontSize = 15.sp,
-                        color = textSub,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        lineHeight = 22.sp
-                    )
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(50),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, textSub.copy(alpha = 0.3f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = textMain)
-                        ) {
-                            Text(
-                                text = "Cancel",
-                                fontFamily = BricolageGrotesque,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Button(
-                            onClick = onConfirm,
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(50),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = dangerColor,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text(
-                                text = "Delete",
-                                fontFamily = BricolageGrotesque,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WhatsNewDialog(onDismiss: () -> Unit) {
     val isDark = LocalAppIsDark.current
-    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
 
-    ContentDialog(title = "What's New", onDismiss = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = containerColor,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        scrimColor = Color.Black.copy(alpha = 0.32f),
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = textSub.copy(alpha = 0.2f)) }
+    ) {
         Column(
-            modifier = Modifier.padding(bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+                .verticalScroll(rememberScrollState())
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness    = Spring.StiffnessMediumLow
+                    )
+                ),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "What's New",
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = textPrimary
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(textSub.copy(alpha = 0.1f))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
+                }
+            }
+
             Text(
-                text = "Version 1.1.9 (Bug fixes)",
+                text = "Version 1.1.9",
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary,
-                fontSize = 18.sp
+                fontSize = SIZE_LG
             )
 
-            // --- Updated Widget ---
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "📱 New Home Widget",
-                    fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textPrimary,
-                    fontSize = 15.sp
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                WhatsNewItem(
+                    icon = "📱",
+                    title = "New Home Widget",
+                    description = "Our home screen widget got a complete makeover! It now matches the app's look perfectly with connected cycle strips.",
+                    textPrimary = textPrimary,
+                    textSub = textSub
                 )
-                Text(
-                    text = "Our home screen widget got a complete makeover! It now matches the app’s look perfectly with connected cycle strips.",
-                    fontFamily = BricolageGrotesque,
-                    color = textSub,
-                    fontSize = 14.sp
+                WhatsNewItem(
+                    icon = "🗓️",
+                    title = "Calendar Alignment",
+                    description = "We fixed a bug where the days of the week didn't quite line up with the dates. Everything is now perfectly aligned.",
+                    textPrimary = textPrimary,
+                    textSub = textSub
                 )
             }
 
-            // --- Calendar Alignment Fix ---
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+            ) {
                 Text(
-                    text = "🗓️ Calendar Alignment",
+                    "Got it",
                     fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.SemiBold,
-                    color = textPrimary,
-                    fontSize = 15.sp
-                )
-                Text(
-                    text = "We fixed a bug where the days of the week didn't quite line up with the dates. Everything is now perfectly aligned for a clearer view of your cycle.",
-                    fontFamily = BricolageGrotesque,
-                    color = textSub,
-                    fontSize = 14.sp
+                    fontWeight = FontWeight.Bold,
+                    fontSize = SIZE_LG
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun WhatsNewItem(
+    icon: String,
+    title: String,
+    description: String,
+    textPrimary: Color,
+    textSub: Color
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(icon, fontSize = SIZE_LG)
+            Text(
+                text = title,
+                fontFamily = BricolageGrotesque,
+                fontWeight = FontWeight.SemiBold,
+                color = textPrimary,
+                fontSize = SIZE_LG
+            )
+        }
+        Text(
+            text = description,
+            fontFamily = BricolageGrotesque,
+            color = textSub,
+            fontSize = SIZE_MD,
+            lineHeight = 20.sp
+        )
     }
 }

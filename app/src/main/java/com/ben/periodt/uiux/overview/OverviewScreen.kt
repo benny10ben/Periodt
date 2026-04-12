@@ -79,31 +79,34 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.core.Spring // Add these imports
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.animation.SizeTransform // Add this import
+import androidx.compose.animation.SizeTransform
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material3.Icon
 
+private val SIZE_XXS = 11.sp
+private val SIZE_XS  = 12.sp
+private val SIZE_SM  = 13.sp
+private val SIZE_MD  = 14.sp
+private val SIZE_LG  = 15.sp
+private val SIZE_XL  = 20.sp
 
 @Composable
-fun OverviewScreen(
-    viewModel: PeriodViewModel,
-) {
-    val cycles       by viewModel.cycles.collectAsState()
+fun OverviewScreen(viewModel: PeriodViewModel) {
+    val cycles        by viewModel.cycles.collectAsState()
     val rawPrediction by viewModel.prediction.collectAsState()
-    val prediction   = rawPrediction
+    val prediction    = rawPrediction
 
-    val isOnPill     by viewModel.isOnPill.collectAsState()
+    val isOnPill      by viewModel.isOnPill.collectAsState()
     val postPillState by viewModel.postPillState.collectAsState()
-    val pillStopDate by viewModel.pillStopDate.collectAsState()
+    val pillStopDate  by viewModel.pillStopDate.collectAsState()
 
     val postPillCycles = remember(cycles, pillStopDate) {
-        if (pillStopDate != null) cycles.filter { !it.startDate.isBefore(pillStopDate) }
-        else emptyList()
+        if (pillStopDate != null) cycles.filter { !it.startDate.isBefore(pillStopDate) } else emptyList()
     }
     val discoveryCycle  = (postPillCycles.size + 1).coerceIn(1, 4)
     val isDiscoveryMode = postPillState == PostPillState.DISCOVERY
@@ -120,7 +123,7 @@ fun OverviewScreen(
 
     val surface = if (isDark) Color(0xFF141820) else Color(0xFFF5F7F9)
     val textCol = if (isDark) Color(0xFFF5F7FA) else Color(0xFF0F172A)
-    val subCol  = if (isDark) Color(0xFFBFC6D1) else Color(0xFF64748B)
+    val subCol  = if (isDark) Color(0xFFBFC6D1) else Color(0xFF1b1b1b)
 
     val bleedingChartColor = Color(0xFFD89046)
     val painChartColor     = Color(0xFF6d9567).copy(alpha = 0.4f)
@@ -130,49 +133,38 @@ fun OverviewScreen(
 
     val dailyLogs by viewModel.dailyLogs.collectAsState()
 
-    // 1. ---> ADD THIS NEW BLOCK RIGHT HERE <---
     val recentTrends = remember(cycles, dailyLogs) {
         val recentCycles = cycles.sortedBy { it.startDate }.takeLast(6)
         if (recentCycles.isEmpty()) return@remember null
 
-        var totalPain = 0
-        var totalDays = 0
+        var totalPain = 0; var totalDays = 0
         val bleedingCounts = mutableMapOf<String, Int>()
-        val colorCounts = mutableMapOf<String, Int>()
+        val colorCounts    = mutableMapOf<String, Int>()
 
         recentCycles.forEach { cycle ->
-            val end = cycle.endDate ?: cycle.startDate.plusDays(4) // fallback
+            val end = cycle.endDate ?: cycle.startDate.plusDays(4)
             var day = cycle.startDate
             while (!day.isAfter(end)) {
                 val key = "${cycle.id}|$day"
-                val b = dailyLogs[key]?.bleeding ?: cycle.bleeding
-                val c = dailyLogs[key]?.bloodColor ?: cycle.bloodColor
-                val p = dailyLogs[key]?.painLevel ?: cycle.painLevel
-
+                val b   = dailyLogs[key]?.bleeding   ?: cycle.bleeding
+                val c   = dailyLogs[key]?.bloodColor ?: cycle.bloodColor
+                val p   = dailyLogs[key]?.painLevel  ?: cycle.painLevel
                 bleedingCounts[b] = (bleedingCounts[b] ?: 0) + 1
-                colorCounts[c] = (colorCounts[c] ?: 0) + 1
-                totalPain += p
-                totalDays++
-
+                colorCounts[c]    = (colorCounts[c]    ?: 0) + 1
+                totalPain += p; totalDays++
                 day = day.plusDays(1)
             }
         }
-
         if (totalDays == 0) return@remember null
-
-        val avgPain = kotlin.math.round(totalPain.toFloat() / totalDays).toInt()
-        val typicalBleeding = bleedingCounts.maxByOrNull { it.value }?.key ?: "Medium"
-        val typicalColor = colorCounts.maxByOrNull { it.value }?.key ?: "Bright Red"
-
-        Triple(typicalBleeding, typicalColor, avgPain)
+        Triple(
+            bleedingCounts.maxByOrNull { it.value }?.key ?: "Medium",
+            colorCounts.maxByOrNull    { it.value }?.key ?: "Bright Red",
+            kotlin.math.round(totalPain.toFloat() / totalDays).toInt()
+        )
     }
     val recentCyclesCount = minOf(cycles.size, 6)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Transparent)
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Transparent)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -181,25 +173,18 @@ fun OverviewScreen(
                 .padding(bottom = 90.dp)
                 .padding(top = 16.dp)
         ) {
-
-            // ---> ADD THIS NEW BANNER CALL HERE <---
             if (!isOnPill && !isDiscoveryMode && !isLearningMode) {
-                RecentTrendsBanner(
-                    trends = recentTrends,
-                    cycleCount = recentCyclesCount
-                )
+                RecentTrendsBanner(trends = recentTrends, cycleCount = recentCyclesCount)
             }
 
-            // ── UNIFIED STATS CARD ──────────────────────────────────────────────
             CombinedStatsCard(
                 totalCycles = "${cycles.size}",
                 avgPeriod   = avgPeriodLength?.let { "$it d" } ?: "-",
-                avgCycle    = avgCycleLength?.let { "$it d" } ?: "-"
+                avgCycle    = avgCycleLength?.let  { "$it d" } ?: "-"
             )
 
             Spacer(Modifier.height(14.dp))
 
-            // ── PREDICTION BANNER ───────────────────────────────────────────────
             if (prediction != null || isDiscoveryMode) {
                 UpcomingBannerEnhanced(
                     title           = if (isOnPill) "Withdrawal bleed" else "Upcoming period",
@@ -208,8 +193,8 @@ fun OverviewScreen(
                     badge           = if (isOnPill) "Pill Pack" else "",
                     confidence      = prediction?.let { getCycleConfidence(it.cycleRegularity) } ?: 0f,
                     confidenceLabel = prediction?.cycleRegularity?.getDisplayName() ?: "",
-                    gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient      = onGradient, onGradientMuted = onGradientMuted,
+                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient = onGradient, onGradientMuted = onGradientMuted,
                     mostLikelyDate  = prediction?.mostLikelyPeriodStart,
                     isDiscoveryMode = isDiscoveryMode,
                     isLearningMode  = isLearningMode,
@@ -218,18 +203,14 @@ fun OverviewScreen(
                 )
             } else {
                 UpcomingBannerEnhanced(
-                    title           = "Upcoming period",
-                    windowText      = "Not enough data",
-                    mostLikely      = "Track more cycles for predictions",
-                    badge           = "",
-                    confidence      = 0f,
-                    confidenceLabel = "No data",
-                    gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient      = onGradient, onGradientMuted = onGradientMuted
+                    title = "Upcoming period", windowText = "Not enough data",
+                    mostLikely = "Track more cycles for predictions", badge = "",
+                    confidence = 0f, confidenceLabel = "No data",
+                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient = onGradient, onGradientMuted = onGradientMuted
                 )
             }
 
-            // ── FERTILE WINDOW ──────────────────────────────────────────────────
             if (prediction != null && !isOnPill && !isDiscoveryMode && !isLearningMode) {
                 Spacer(Modifier.height(14.dp))
                 UpcomingBannerEnhanced(
@@ -239,52 +220,36 @@ fun OverviewScreen(
                     badge           = "Confidence ${(prediction.ovulationConfidence * 100).toInt()}%",
                     confidence      = prediction.ovulationConfidence,
                     confidenceLabel = getConfidenceLabel(prediction.ovulationConfidence),
-                    gradTop         = gradTop, gradMid = gradMid, gradBottom = gradBottom,
-                    onGradient      = onGradient, onGradientMuted = onGradientMuted
+                    gradTop = gradTop, gradMid = gradMid, gradBottom = gradBottom,
+                    onGradient = onGradient, onGradientMuted = onGradientMuted
                 )
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // ── CHARTS ──────────────────────────────────────────────────────────
             MinimalChartCard("Bleeding intensity", surface, textCol) {
-                val (bleedingPoints, bleedingDates) = remember(cycles, dailyLogs) {
-                    bleedingSeriesDailyVM(cycles, dailyLogs)
-                }
+                val (bleedingPoints, bleedingDates) = remember(cycles, dailyLogs) { bleedingSeriesDailyVM(cycles, dailyLogs) }
                 ScrollableLineChart(
-                    points     = bleedingPoints,
-                    dates      = bleedingDates,
-                    lineColor  = bleedingChartColor,
-                    yLabels    = listOf("S", "L", "M", "H"),
-                    yMax       = 3f,
-                    showArea   = true,
+                    points = bleedingPoints, dates = bleedingDates, lineColor = bleedingChartColor,
+                    yLabels = listOf("S", "L", "M", "H"), yMax = 3f, showArea = true,
                     gridColor  = if (isDark) Color(0xFF2A2F36) else Color(0xFFEAEAEA),
                     axisColor  = if (isDark) Color(0xFF343A43) else Color(0xFFE0E0E0),
-                    labelColor = subCol,
-                    surface    = surface,
-                    modifier   = Modifier.fillMaxWidth().height(220.dp)
+                    labelColor = subCol, surface = surface,
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
                 )
             }
 
             Spacer(Modifier.height(14.dp))
 
             MinimalChartCard("Pain level", surface, textCol) {
-                // Get both points and dates for the daily pain series
-                val (painPoints, painDates) = remember(cycles, dailyLogs) {
-                    painSeriesDailyVM(cycles, dailyLogs)
-                }
+                val (painPoints, painDates) = remember(cycles, dailyLogs) { painSeriesDailyVM(cycles, dailyLogs) }
                 ScrollableLineChart(
-                    points     = painPoints,
-                    dates      = painDates, // Now uses daily labels
-                    lineColor  = painChartColor,
-                    yLabels    = (0..10 step 2).map { "$it" },
-                    yMax       = 10f,
-                    showArea   = true,
+                    points = painPoints, dates = painDates, lineColor = painChartColor,
+                    yLabels = (0..10 step 2).map { "$it" }, yMax = 10f, showArea = true,
                     gridColor  = if (isDark) Color(0xFF2A2F36) else Color(0xFFEAEAEA),
                     axisColor  = if (isDark) Color(0xFF343A43) else Color(0xFFE0E0E0),
-                    labelColor = subCol,
-                    surface    = surface,
-                    modifier   = Modifier.fillMaxWidth().height(220.dp)
+                    labelColor = subCol, surface = surface,
+                    modifier = Modifier.fillMaxWidth().height(220.dp)
                 )
             }
 
@@ -292,13 +257,10 @@ fun OverviewScreen(
 
             MinimalChartCard("Blood color", surface, textCol) {
                 BloodColorPieChart(
-                    data = remember(cycles, dailyLogs) { bloodColorDistributionVM(cycles, dailyLogs) },
+                    data       = remember(cycles, dailyLogs) { bloodColorDistributionVM(cycles, dailyLogs) },
                     surface    = surface,
                     labelColor = subCol,
-                    modifier   = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .padding(horizontal = 8.dp)
+                    modifier   = Modifier.fillMaxWidth().wrapContentHeight().padding(horizontal = 8.dp)
                 )
             }
 
@@ -322,103 +284,53 @@ private fun CombinedStatsCard(
     val surfaceColor = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val dividerColor = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.08f)
     val valueColor   = if (isDark) Color.White else Color(0xFF0F172A)
-    val titleColor   = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val titleColor   = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
 
-    // StiffnessMediumLow is the "sweet spot"—it's soft but doesn't feel laggy
-    val gentleSpring = spring<IntSize>(
-        dampingRatio = Spring.DampingRatioNoBouncy,
-        stiffness = Spring.StiffnessMediumLow
-    )
+    val gentleSpring = spring<IntSize>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
 
     Card(
         modifier  = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = gentleSpring) // Resizes the card softly
+            .animateContentSize(animationSpec = gentleSpring)
             .clip(RoundedCornerShape(26.dp))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
-                isExpanded = !isExpanded
-            },
+            .clickable(interactionSource = interactionSource, indication = null) { isExpanded = !isExpanded },
         colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape     = RoundedCornerShape(26.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(surfaceColor)
-                .padding(vertical = 24.dp, horizontal = 16.dp),
+            modifier         = Modifier.fillMaxWidth().background(surfaceColor).padding(vertical = 24.dp, horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
-                targetState = isExpanded,
+                targetState  = isExpanded,
                 transitionSpec = {
-                    // Removed the "messy" vertical sliding
-                    // Pure fadeIn/fadeOut creates a professional "dissolve"
                     fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) togetherWith
                             fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) using
-                            SizeTransform(clip = false) // Ensures the card growth looks seamless
+                            SizeTransform(clip = false)
                 },
                 label = "stats_expansion"
             ) { expanded ->
                 if (expanded) {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        modifier            = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp)
                     ) {
-                        ExpandedStatRow(
-                            title = "Total Cycles",
-                            subtitle = "Complete logged history",
-                            value = totalCycles,
-                            valueColor = valueColor,
-                            titleColor = titleColor
-                        )
-                        ExpandedStatRow(
-                            title = "Average Period",
-                            subtitle = "Typical bleeding duration",
-                            value = avgPeriod,
-                            valueColor = valueColor,
-                            titleColor = titleColor
-                        )
-                        ExpandedStatRow(
-                            title = "Average Cycle",
-                            subtitle = "Start-to-start gap",
-                            value = avgCycle,
-                            valueColor = valueColor,
-                            titleColor = titleColor
-                        )
+                        ExpandedStatRow("Total Cycles",   "Complete logged history",   totalCycles, valueColor, titleColor)
+                        ExpandedStatRow("Average Period", "Typical bleeding duration", avgPeriod,   valueColor, titleColor)
+                        ExpandedStatRow("Average Cycle",  "Start-to-start gap",        avgCycle,    valueColor, titleColor)
                     }
                 } else {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                        modifier              = Modifier.fillMaxWidth(),
+                        verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatItem(
-                            title = "CYCLES",
-                            value = totalCycles,
-                            valueColor = valueColor,
-                            titleColor = titleColor,
-                            modifier = Modifier.weight(1f)
-                        )
+                        StatItem("CYCLES", totalCycles, valueColor, titleColor, Modifier.weight(1f))
                         Box(modifier = Modifier.width(1.dp).height(36.dp).background(dividerColor))
-                        StatItem(
-                            title = "PERIOD",
-                            value = avgPeriod,
-                            valueColor = valueColor,
-                            titleColor = titleColor,
-                            modifier = Modifier.weight(1f)
-                        )
+                        StatItem("PERIOD", avgPeriod,   valueColor, titleColor, Modifier.weight(1f))
                         Box(modifier = Modifier.width(1.dp).height(36.dp).background(dividerColor))
-                        StatItem(
-                            title = "CYCLE",
-                            value = avgCycle,
-                            valueColor = valueColor,
-                            titleColor = titleColor,
-                            modifier = Modifier.weight(1f)
-                        )
+                        StatItem("CYCLE",  avgCycle,    valueColor, titleColor, Modifier.weight(1f))
                     }
                 }
             }
@@ -426,87 +338,75 @@ private fun CombinedStatsCard(
     }
 }
 
-// ── Expanded Row Component ──
 @Composable
 private fun ExpandedStatRow(
-    title: String,
-    subtitle: String,
-    value: String,
-    valueColor: Color,
-    titleColor: Color
+    title: String, subtitle: String, value: String,
+    valueColor: Color, titleColor: Color
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment     = Alignment.CenterVertically
     ) {
         Column {
             Text(
-                text = title,
-                color = valueColor,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                fontFamily = BricolageGrotesque
+                text       = title,
+                color      = valueColor,
+                fontFamily = BricolageGrotesque,
+                fontWeight = FontWeight.SemiBold,
+                fontSize   = SIZE_LG
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = subtitle,
-                color = titleColor,
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = BricolageGrotesque
+                text       = subtitle,
+                color      = titleColor,
+                fontFamily = BricolageGrotesque,
+                fontSize   = SIZE_SM
             )
         }
         Text(
-            text = value,
-            color = valueColor,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-            fontFamily = BricolageGrotesque
-        )
+            text       = value,
+            color      = valueColor,
+            fontFamily = BricolageGrotesque,
+            fontSize   = SIZE_XL,
+            fontWeight = FontWeight.Bold,
+            )
     }
 }
 
-// ── Collapsed Item Component ──
 @Composable
 private fun StatItem(
-    title: String,
-    value: String,
-    valueColor: Color,
-    titleColor: Color,
+    title: String, value: String,
+    valueColor: Color, titleColor: Color,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text       = value,
             fontFamily = BricolageGrotesque,
-            style      = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            fontSize   = SIZE_XL,
+            fontWeight = FontWeight.Bold,
             color      = valueColor,
             maxLines   = 1,
-            textAlign  = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign  = TextAlign.Center
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text       = title,
-            fontFamily = BricolageGrotesque,
-            style      = MaterialTheme.typography.labelSmall.copy(
-                fontWeight    = FontWeight.Medium,
-                letterSpacing = 1.sp
-            ),
-            color      = titleColor,
-            maxLines   = 1,
-            textAlign  = androidx.compose.ui.text.style.TextAlign.Center
+            text          = title,
+            fontFamily    = BricolageGrotesque,
+            fontSize      = SIZE_XXS,
+            fontWeight    = FontWeight.Medium,
+            letterSpacing = 1.sp,
+            color         = titleColor,
+            maxLines      = 1,
+            textAlign     = TextAlign.Center
         )
     }
 }
 
-
-// ── Minimal Chart Card ─────────────────────────────────────────────────────────
 @Composable
 private fun MinimalChartCard(
-    title: String,
-    surface: Color,
-    titleColor: Color,
+    title: String, surface: Color, titleColor: Color,
     content: @Composable () -> Unit
 ) {
     val isDark      = LocalAppIsDark.current
@@ -523,7 +423,8 @@ private fun MinimalChartCard(
             Text(
                 text       = title,
                 fontFamily = BricolageGrotesque,
-                style      = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                fontWeight = FontWeight.SemiBold,
+                fontSize   = SIZE_XL,
                 color      = titleColor
             )
             Spacer(Modifier.height(24.dp))
@@ -532,18 +433,21 @@ private fun MinimalChartCard(
     }
 }
 
-// ── Blood Color Pie Chart ──────────────────────────────────────────────────────
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BloodColorPieChart(
     data: List<Pair<String, Float>>,
-    surface: Color,
-    labelColor: Color,
+    surface: Color, labelColor: Color,
     modifier: Modifier = Modifier
 ) {
     if (data.isEmpty()) {
         Box(Modifier.height(150.dp), contentAlignment = Alignment.Center) {
-            Text("No data", fontFamily = BricolageGrotesque, color = labelColor.copy(0.5f))
+            Text(
+                "No data",
+                fontFamily = BricolageGrotesque,
+                fontSize   = SIZE_MD,
+                color      = labelColor.copy(0.5f)
+            )
         }
         return
     }
@@ -561,34 +465,23 @@ private fun BloodColorPieChart(
     val total       = data.sumOf { it.second.toDouble() }.toFloat().coerceAtLeast(0.0001f)
     val legendItems = data.map { (label, value) ->
         val cleanLabel = label.lowercase().trim()
-        val pct        = (value / total) * 100f
-        Triple(label.replaceFirstChar { it.uppercase() }, pct, colorMap[cleanLabel] ?: Color.Gray)
+        Triple(label.replaceFirstChar { it.uppercase() }, (value / total) * 100f, colorMap[cleanLabel] ?: Color.Gray)
     }
 
     Column(modifier = modifier) {
-        Box(
-            modifier         = Modifier.fillMaxWidth().height(200.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
                 val ringWidth  = 40.dp.toPx()
                 val diameter   = minOf(size.width, size.height) - ringWidth
                 val radius     = diameter / 2f
                 val stroke     = Stroke(width = ringWidth, cap = StrokeCap.Round)
                 var startAngle = -90f
-
                 legendItems.forEach { (_, pct, color) ->
                     val sweep = (pct / 100f * 360f) - 4f
                     if (sweep > 0) {
-                        drawArc(
-                            color      = color,
-                            startAngle = startAngle,
-                            sweepAngle = sweep,
-                            useCenter  = false,
-                            topLeft    = Offset(center.x - radius, center.y - radius),
-                            size       = Size(radius * 2, radius * 2),
-                            style      = stroke
-                        )
+                        drawArc(color = color, startAngle = startAngle, sweepAngle = sweep, useCenter = false,
+                            topLeft = Offset(center.x - radius, center.y - radius),
+                            size = Size(radius * 2, radius * 2), style = stroke)
                     }
                     startAngle += (sweep + 4f)
                 }
@@ -605,7 +498,7 @@ private fun BloodColorPieChart(
             legendItems.forEach { (name, pct, color) ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier          = Modifier
+                    modifier = Modifier
                         .padding(4.dp)
                         .clip(RoundedCornerShape(50))
                         .background(if (isDark) color.copy(0.15f) else Color.Black.copy(0.05f))
@@ -616,7 +509,7 @@ private fun BloodColorPieChart(
                     Text(
                         text       = "$name ${pct.toInt()}%",
                         fontFamily = BricolageGrotesque,
-                        fontSize   = 12.sp,
+                        fontSize   = SIZE_XS,
                         fontWeight = FontWeight.Bold,
                         color      = if (isDark) color else Color(0xFF1B1B1B)
                     )
@@ -626,12 +519,9 @@ private fun BloodColorPieChart(
     }
 }
 
-// ── Y-Axis Labels ──────────────────────────────────────────────────────────────
 @Composable
 private fun YAxisLabels(
-    yLabels: List<String>,
-    labelColor: Color,
-    axisColor: Color,
+    yLabels: List<String>, labelColor: Color, axisColor: Color,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -640,12 +530,11 @@ private fun YAxisLabels(
         val topPadding    = 20.dp.toPx()
         val chartHeight   = size.height - bottomPadding - topPadding
         val chartBottom   = size.height - bottomPadding
-
         yLabels.forEachIndexed { index, label ->
             val y     = chartBottom - (index.toFloat() / (yLabels.size - 1)) * chartHeight
             val paint = android.graphics.Paint().apply {
                 color     = labelColor.toArgb()
-                textSize  = with(density) { 10.sp.toPx() }
+                textSize  = with(density) { SIZE_XXS.toPx() }
                 textAlign = android.graphics.Paint.Align.RIGHT
                 typeface  = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
             }
@@ -656,20 +545,12 @@ private fun YAxisLabels(
     }
 }
 
-// ── Scrollable Line Chart ──────────────────────────────────────────────────────
 @Composable
 fun ScrollableLineChart(
-    points: List<Pair<Float, Float>>,
-    dates: List<String>,
-    lineColor: Color,
-    yLabels: List<String>,
-    yMax: Float,
-    showArea: Boolean,
-    gridColor: Color,
-    axisColor: Color,
-    labelColor: Color,
-    surface: Color,
-    modifier: Modifier = Modifier
+    points: List<Pair<Float, Float>>, dates: List<String>,
+    lineColor: Color, yLabels: List<String>, yMax: Float,
+    showArea: Boolean, gridColor: Color, axisColor: Color,
+    labelColor: Color, surface: Color, modifier: Modifier = Modifier
 ) {
     val hScroll = rememberScrollState()
     val scope   = rememberCoroutineScope()
@@ -679,7 +560,7 @@ fun ScrollableLineChart(
             Text(
                 text       = "No data yet",
                 fontFamily = BricolageGrotesque,
-                style      = MaterialTheme.typography.bodyMedium,
+                fontSize   = SIZE_MD,
                 color      = labelColor.copy(alpha = 0.5f)
             )
         }
@@ -687,9 +568,7 @@ fun ScrollableLineChart(
     }
 
     LaunchedEffect(points.size) {
-        scope.launch {
-            hScroll.animateScrollTo(hScroll.maxValue, animationSpec = tween(600, easing = FastOutSlowInEasing))
-        }
+        scope.launch { hScroll.animateScrollTo(hScroll.maxValue, animationSpec = tween(600, easing = FastOutSlowInEasing)) }
     }
 
     Row(modifier = modifier.height(220.dp)) {
@@ -703,11 +582,8 @@ fun ScrollableLineChart(
             val dynamicWidth = (points.size * 70.dp).coerceAtLeast(this.maxWidth)
             Box(modifier = Modifier.fillMaxSize().horizontalScroll(hScroll)) {
                 LineChartContent(
-                    points     = points,
-                    dates      = dates,
-                    lineColor  = lineColor,
-                    yMax       = yMax,
-                    showArea   = showArea,
+                    points = points, dates = dates, lineColor = lineColor,
+                    yMax = yMax, showArea = showArea,
                     gridColor  = gridColor.copy(alpha = 0.05f),
                     axisColor  = axisColor.copy(alpha = 0.1f),
                     labelColor = labelColor.copy(alpha = 0.7f),
@@ -719,22 +595,14 @@ fun ScrollableLineChart(
     }
 }
 
-// ── Line Chart Content ─────────────────────────────────────────────────────────
 @Composable
 private fun LineChartContent(
-    points: List<Pair<Float, Float>>,
-    dates: List<String>,
-    lineColor: Color,
-    yMax: Float,
-    showArea: Boolean,
-    gridColor: Color,
-    axisColor: Color,
-    labelColor: Color,
-    surface: Color,
-    modifier: Modifier = Modifier
+    points: List<Pair<Float, Float>>, dates: List<String>,
+    lineColor: Color, yMax: Float, showArea: Boolean,
+    gridColor: Color, axisColor: Color, labelColor: Color,
+    surface: Color, modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
-
     Canvas(modifier) {
         val horizontalPadding = 32.dp.toPx()
         val bottomPadding     = 40.dp.toPx()
@@ -755,19 +623,16 @@ private fun LineChartContent(
             val y = chartBottom - (i.toFloat() / ySteps) * chartHeight
             drawContext.canvas.nativeCanvas.drawLine(chartLeft, y, chartRight, y, gridPaint)
         }
-
         drawLine(color = axisColor, start = Offset(chartLeft, chartBottom), end = Offset(chartRight, chartBottom), strokeWidth = 1.5.dp.toPx())
 
         val denom    = (points.size - 1).coerceAtLeast(1).toFloat()
         val linePath = Path()
         val areaPath = Path()
-        var prevXPos = 0f
-        var prevYPos = 0f
+        var prevXPos = 0f; var prevYPos = 0f
 
         points.forEachIndexed { index, (x, y) ->
             val xPos = chartLeft + (x / denom) * chartWidth
             val yPos = chartBottom - (y / yMax) * chartHeight
-
             if (index == 0) {
                 linePath.moveTo(xPos, yPos)
                 if (showArea) { areaPath.moveTo(xPos, chartBottom); areaPath.lineTo(xPos, yPos) }
@@ -776,13 +641,12 @@ private fun LineChartContent(
                 linePath.cubicTo(cpX, prevYPos, cpX, yPos, xPos, yPos)
                 if (showArea) areaPath.cubicTo(cpX, prevYPos, cpX, yPos, xPos, yPos)
             }
-            prevXPos = xPos
-            prevYPos = yPos
+            prevXPos = xPos; prevYPos = yPos
 
             if (index < dates.size) {
                 val paint = android.graphics.Paint().apply {
                     color     = labelColor.toArgb()
-                    textSize  = with(density) { 10.sp.toPx() }
+                    textSize  = with(density) { SIZE_XXS.toPx() }
                     textAlign = android.graphics.Paint.Align.CENTER
                     typeface  = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
                 }
@@ -792,8 +656,7 @@ private fun LineChartContent(
 
         if (showArea && points.isNotEmpty()) {
             val lastX = chartLeft + (points.last().first / denom) * chartWidth
-            areaPath.lineTo(lastX, chartBottom)
-            areaPath.close()
+            areaPath.lineTo(lastX, chartBottom); areaPath.close()
             drawPath(
                 path  = areaPath,
                 brush = Brush.verticalGradient(
@@ -802,9 +665,7 @@ private fun LineChartContent(
                 )
             )
         }
-
         drawPath(path = linePath, color = lineColor, style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-
         points.forEach { (x, y) ->
             val xPos = chartLeft + (x / denom) * chartWidth
             val yPos = chartBottom - (y / yMax) * chartHeight
@@ -815,15 +676,7 @@ private fun LineChartContent(
     }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
-private fun cyclesSorted(cycles: List<PeriodViewModel.Cycle>): List<PeriodViewModel.Cycle> =
-    cycles.sortedWith(compareBy(nullsLast()) { it.startDate })
-
-private fun getDateLabels(cycles: List<PeriodViewModel.Cycle>): List<String> {
-    val formatter = DateTimeFormatter.ofPattern("MMM dd")
-    return cyclesSorted(cycles).mapNotNull { it.startDate?.format(formatter) }
-}
-
+// ── Helpers ────────────────────────────────────────────────────────────────────
 private fun bleedingSeriesDailyVM(
     cycles: List<PeriodViewModel.Cycle>,
     dailyLogs: Map<String, PeriodViewModel.DailyLog>
@@ -832,22 +685,13 @@ private fun bleedingSeriesDailyVM(
     val formatter = DateTimeFormatter.ofPattern("MMM d")
     val points    = mutableListOf<Pair<Float, Float>>()
     val dates     = mutableListOf<String>()
-
-    val sorted = cycles.sortedBy { it.startDate }
-    var index  = 0
-
-    sorted.forEach { cycle ->
-        val start = cycle.startDate
-        val end   = cycle.endDate ?: start.plusDays(4)
-        var day   = start
+    var index     = 0
+    cycles.sortedBy { it.startDate }.forEach { cycle ->
+        val end = cycle.endDate ?: cycle.startDate.plusDays(4); var day = cycle.startDate
         while (!day.isAfter(end)) {
-            val key      = "${cycle.id}|$day"
-            val bleeding = dailyLogs[key]?.bleeding ?: cycle.bleeding
-            val yVal     = map[bleeding.lowercase()] ?: 0f
-            points.add(index.toFloat() to yVal)
-            dates.add(day.format(formatter))
-            day = day.plusDays(1)
-            index++
+            val key = "${cycle.id}|$day"
+            points.add(index.toFloat() to (map[(dailyLogs[key]?.bleeding ?: cycle.bleeding).lowercase()] ?: 0f))
+            dates.add(day.format(formatter)); day = day.plusDays(1); index++
         }
     }
     return points to dates
@@ -860,24 +704,13 @@ private fun painSeriesDailyVM(
     val formatter = DateTimeFormatter.ofPattern("MMM d")
     val points    = mutableListOf<Pair<Float, Float>>()
     val dates     = mutableListOf<String>()
-
-    // Sort by start date to ensure chronological order in the chart
-    val sorted = cycles.sortedBy { it.startDate }
-    var index  = 0
-
-    sorted.forEach { cycle ->
-        val start = cycle.startDate
-        val end   = cycle.endDate ?: start.plusDays(4) // Assume 5 days if ongoing
-        var day   = start
+    var index     = 0
+    cycles.sortedBy { it.startDate }.forEach { cycle ->
+        val end = cycle.endDate ?: cycle.startDate.plusDays(4); var day = cycle.startDate
         while (!day.isAfter(end)) {
-            val key   = "${cycle.id}|$day"
-            // Use daily override if it exists, otherwise fall back to cycle default
-            val pain = dailyLogs[key]?.painLevel ?: cycle.painLevel
-
-            points.add(index.toFloat() to pain.toFloat())
-            dates.add(day.format(formatter))
-            day = day.plusDays(1)
-            index++
+            val key = "${cycle.id}|$day"
+            points.add(index.toFloat() to (dailyLogs[key]?.painLevel ?: cycle.painLevel).toFloat())
+            dates.add(day.format(formatter)); day = day.plusDays(1); index++
         }
     }
     return points to dates
@@ -888,94 +721,71 @@ private fun bloodColorDistributionVM(
     dailyLogs: Map<String, PeriodViewModel.DailyLog>
 ): List<Pair<String, Float>> {
     val counts = mutableMapOf<String, Int>()
-
     cycles.forEach { cycle ->
-        val start = cycle.startDate
-        val end   = cycle.endDate ?: start.plusDays(4)
-        var day   = start
+        val end = cycle.endDate ?: cycle.startDate.plusDays(4); var day = cycle.startDate
         while (!day.isAfter(end)) {
-            val key   = "${cycle.id}|$day"
+            val key = "${cycle.id}|$day"
             val color = (dailyLogs[key]?.bloodColor ?: cycle.bloodColor).lowercase()
-            counts[color] = (counts[color] ?: 0) + 1
-            day = day.plusDays(1)
+            counts[color] = (counts[color] ?: 0) + 1; day = day.plusDays(1)
         }
     }
-
     val total = counts.values.sum()
     if (total == 0) return emptyList()
-    return counts.entries.sortedByDescending { it.value }
-        .map { it.key to (it.value.toFloat() / total.toFloat()) }
+    return counts.entries.sortedByDescending { it.value }.map { it.key to (it.value.toFloat() / total) }
 }
 
 private fun calculateAvgCycleLength(cycles: List<PeriodViewModel.Cycle>): Int? {
-    val sorted  = cycles.sortedBy { it.startDate }
-    val lengths = sorted.zipWithNext { a, b ->
+    val lengths = cycles.sortedBy { it.startDate }.zipWithNext { a, b ->
         ChronoUnit.DAYS.between(a.startDate, b.startDate).toInt()
     }
     return if (lengths.isNotEmpty()) lengths.average().toInt() else null
 }
 
 @Composable
-fun RecentTrendsBanner(
-    trends: Triple<String, String, Int>?,
-    cycleCount: Int
-) {
+fun RecentTrendsBanner(trends: Triple<String, String, Int>?, cycleCount: Int) {
     if (trends == null || cycleCount == 0) return
 
-    val isDark = LocalAppIsDark.current
-    val textPrimary = if (isDark) Color.White else Color.White
-    // High opacity text color for readability against the image
-    val textSub = if (isDark) Color.White else Color.White
+    val isDark      = LocalAppIsDark.current
+    val textPrimary = Color.White
+    val textSub     = Color.White
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-        shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        modifier  = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+        shape     = RoundedCornerShape(26.dp),
+        colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-
-            // 1. THE IMAGE BACKGROUND
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.ben.periodt.R.drawable.recent),
+                painter      = androidx.compose.ui.res.painterResource(id = com.ben.periodt.R.drawable.recent),
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
+                modifier     = Modifier.matchParentSize()
             )
-
-            // 2. HORIZONTAL GRADIENT OVERLAY (Left to Right)
-            // Starts more opaque on the left (where the text is) and fades out towards the right.
             Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                if (isDark) Color.Black.copy(alpha = 0.90f) else Color.Black.copy(alpha = 1f),
-                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.80f),
-                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.40f)
-
-                            )
+                modifier = Modifier.matchParentSize().background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            if (isDark) Color.Black.copy(alpha = 0.90f) else Color.Black.copy(alpha = 1f),
+                            if (isDark) Color.Black.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.80f),
+                            if (isDark) Color.Black.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.40f)
                         )
                     )
+                )
             )
-
-            // 3. THE TEXT CONTENT
             Column(modifier = Modifier.padding(24.dp).fillMaxWidth(0.85f)) {
                 Text(
-                    text = "Recent Trends",
+                    text       = "Recent Trends",
                     fontFamily = BricolageGrotesque,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = textPrimary
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize   = SIZE_XL,
+                    color      = textPrimary
                 )
-
                 Spacer(Modifier.height(12.dp))
-
                 val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
-                    append("Over your last $cycleCount cycle${if(cycleCount > 1) "s" else ""}, your typical flow is ")
+                    append("Over your last $cycleCount cycle${if (cycleCount > 1) "s" else ""}, your typical flow is ")
                     pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
-                    append(trends.first.lowercase())
-                    append(" (${trends.second.lowercase()})")
+                    append("${trends.first.lowercase()} (${trends.second.lowercase()})")
                     pop()
                     append(", with an average pain level of ")
                     pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
@@ -983,12 +793,11 @@ fun RecentTrendsBanner(
                     pop()
                     append(".")
                 }
-
                 Text(
-                    text = annotatedSummary,
+                    text       = annotatedSummary,
                     fontFamily = BricolageGrotesque,
-                    fontSize = 14.sp,
-                    color = textSub,
+                    fontSize   = SIZE_MD,
+                    color      = textSub,
                     lineHeight = 20.sp
                 )
             }
