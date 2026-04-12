@@ -9,12 +9,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import com.ben.periodt.ui.theme.LocalAppIsDark
 
 @Composable
 private fun AppBackgroundGradient(): Brush {
-    // Your exact gradient logic
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     return if (isDark) {
         Brush.linearGradient(
             0.0f to Color(0xFF1b1b1b),

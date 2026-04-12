@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,12 +28,11 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
-import com.ben.periodt.ui.theme.LocalAppIsDark
 
 // --- HIGH PERFORMANCE CANVAS BACKGROUND ---
 @Composable
 fun AnimatedIconBackground() {
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     val iconColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1B1B1B).copy(alpha = 0.6f)
 
     // --- 1. ICON TO TEXT MAPPING ---
@@ -81,7 +81,7 @@ fun AnimatedIconBackground() {
     val density = LocalDensity.current
     val iconSize = with(density) { 24.dp.toPx() }
     val spacing = with(density) { 70.dp.toPx() }
-    val rowHeight = with(density) { 80.dp.toPx() } // Increased slightly to fit text below
+    val rowHeight = with(density) { 80.dp.toPx() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val totalItemWidth = iconSize + spacing
@@ -122,10 +122,9 @@ fun AnimatedIconBackground() {
 
                                     drawText(
                                         textLayoutResult = measuredText,
-                                        // Center text horizontally relative to icon
                                         topLeft = Offset(
                                             x = (iconSize / 2) - (measuredText.size.width / 2),
-                                            y = iconSize + 4.dp.toPx() // 4dp gap below icon
+                                            y = iconSize + 4.dp.toPx()
                                         )
                                     )
                                 }
@@ -142,7 +141,7 @@ fun AnimatedIconBackground() {
 
 @Composable
 fun OnboardingButton(text: String, onClick: () -> Unit) {
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     val btnColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val txtColor = if (isDark) Color(0xFF1B1B1B) else Color.White
 
@@ -150,7 +149,7 @@ fun OnboardingButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(btnColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -170,7 +169,6 @@ fun PageIndicator(current: Int, total: Int, activeColor: Color) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(total) { index ->
             val isSelected = index == current
-            // Animate width for a "worm" indicator effect
             val width by animateDpAsState(if (isSelected) 24.dp else 8.dp, label = "dotWidth")
 
             Box(
@@ -178,7 +176,6 @@ fun PageIndicator(current: Int, total: Int, activeColor: Color) {
                     .height(8.dp)
                     .width(width)
                     .clip(CircleShape)
-                    // All indicators follow activeColor; inactive ones are faded
                     .background(if (isSelected) activeColor else activeColor.copy(alpha = 0.2f))
             )
         }

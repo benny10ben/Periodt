@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -51,7 +52,7 @@ fun OnboardingPager(
     onBack: () -> Unit,
     onAllow: () -> Unit
 ) {
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     SetSystemBars(statusBarColor = Color.Transparent, darkIcons = !isDark)
 
     OnboardingRoot {
@@ -101,7 +102,7 @@ fun OnboardingPager(
 // --- PAGE 1: WELCOME ---
 @Composable
 fun WelcomePage(onGetStarted: () -> Unit) {
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     val titleColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val logoBoxColor = if (isDark) Color.Black else Color.White
     val logoBorder = if (isDark) Color(0xFF333333) else Color(0xFFE2E8F0)
@@ -141,22 +142,25 @@ fun WelcomePage(onGetStarted: () -> Unit) {
         }
 
         if (showLanguageDialog) {
-            ContentDialog(
-                title = "Choose Language",
-                onDismiss = { showLanguageDialog = false }
-            ) {
-                Column {
-                    LanguageItem("English (US)", "🇺🇸", true, titleColor) {
-                        showLanguageDialog = false
-                    }
-                    listOf(
-                        "日本語" to "🇯🇵",
-                        "한국어" to "🇰🇷",
-                        "Español" to "🇪🇸",
-                        "Français" to "🇫🇷",
-                        "Deutsch" to "🇩🇪"
-                    ).forEach { (lang, flag) ->
-                        LanguageItem(lang, flag, false, titleColor) {}
+            // Force the dialog to read the system theme
+            CompositionLocalProvider(LocalAppIsDark provides isSystemInDarkTheme()) {
+                ContentDialog(
+                    title = "Choose Language",
+                    onDismiss = { showLanguageDialog = false }
+                ) {
+                    Column {
+                        LanguageItem("English (US)", "🇺🇸", true, titleColor) {
+                            showLanguageDialog = false
+                        }
+                        listOf(
+                            "日本語" to "🇯🇵",
+                            "한국어" to "🇰🇷",
+                            "Español" to "🇪🇸",
+                            "Français" to "🇫🇷",
+                            "Deutsch" to "🇩🇪"
+                        ).forEach { (lang, flag) ->
+                            LanguageItem(lang, flag, false, titleColor) {}
+                        }
                     }
                 }
             }
@@ -261,7 +265,7 @@ fun LanguageItem(
 // --- PAGE 2: FEATURES ---
 @Composable
 fun FeaturesPage(onNext: () -> Unit) {
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val subTextColor = textColor.copy(alpha = 0.6f)
 
@@ -293,7 +297,7 @@ fun FeaturesPage(onNext: () -> Unit) {
                     )
                 }
         ) {
-            AnimatedIconBackground() // ← always visible, no isTransitioning check
+            AnimatedIconBackground()
         }
 
         Column(
@@ -352,21 +356,24 @@ fun FeaturesPage(onNext: () -> Unit) {
     }
 
     if (showTermsDialog) {
-        ContentDialog(
-            title = "Terms & Conditions",
-            onDismiss = { showTermsDialog = false }
-        ) {
-            Text(
-                text = "By using Periodt., you agree that your data is stored locally on this device. " +
-                        "We do not collect, sell, or share your personal health information.\n\n" +
-                        "1. Data Privacy: Your history remains yours.\n" +
-                        "2. Usage: This app provides insights, not medical advice.\n" +
-                        "3. Backups: You are responsible for exporting your data backups.",
-                fontFamily = BricolageGrotesque,
-                color = subTextColor,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
-            )
+        // Force the dialog to read the system theme instead of the app's uninitialized default
+        CompositionLocalProvider(LocalAppIsDark provides isSystemInDarkTheme()) {
+            ContentDialog(
+                title = "Terms & Conditions",
+                onDismiss = { showTermsDialog = false }
+            ) {
+                Text(
+                    text = "By using Periodt., you agree that your data is stored locally on this device. " +
+                            "We do not collect, sell, or share your personal health information.\n\n" +
+                            "1. Data Privacy: Your history remains yours.\n" +
+                            "2. Usage: This app provides insights, not medical advice.\n" +
+                            "3. Backups: You are responsible for exporting your data backups.",
+                    fontFamily = BricolageGrotesque,
+                    color = subTextColor,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
         }
     }
 }
@@ -375,7 +382,7 @@ fun FeaturesPage(onNext: () -> Unit) {
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun ModeSelectionPage(onStart: () -> Unit) {
-    val isDark = LocalAppIsDark.current
+    val isDark = isSystemInDarkTheme()
     val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val subTextColor = textColor.copy(alpha = 0.7f)
 
@@ -444,7 +451,6 @@ fun ModeSelectionPage(onStart: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth() // <--- Ensures consistent width for accurate peeking
                     .fillMaxHeight(0.9f)
-                    // Removed aspectRatio(0.75f) to prevent clipping on small screens
                     .graphicsLayer {
                         scaleX = scale
                         scaleY = scale
@@ -486,9 +492,8 @@ fun InfoCard(title: String, subtitle: String, icon: ImageVector, backgroundColor
             .fillMaxSize()
             .clip(RoundedCornerShape(32.dp))
             .background(backgroundColor)
-            .padding(24.dp) // Slightly reduced padding to give text more room
+            .padding(24.dp)
     ) {
-        // Changed align to fillMaxSize so the weight(1f) spacer works properly
         Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
@@ -500,7 +505,6 @@ fun InfoCard(title: String, subtitle: String, icon: ImageVector, backgroundColor
                 Icon(icon, null, tint = Color.White, modifier = Modifier.size(28.dp))
             }
 
-            // This spacer now perfectly pushes the text to the bottom without overlapping
             Spacer(Modifier.weight(1f))
 
             Text(

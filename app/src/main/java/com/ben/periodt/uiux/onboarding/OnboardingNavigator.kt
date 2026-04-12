@@ -1,4 +1,3 @@
-// uiux/onboarding/OnboardingNavigator.kt
 package com.ben.periodt.uiux.onboarding
 
 import androidx.compose.runtime.*
