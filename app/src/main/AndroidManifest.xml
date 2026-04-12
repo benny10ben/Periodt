@@ -23,7 +23,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.PeriodT">
+            android:theme="@style/Theme.PeriodT"
+            android:windowSoftInputMode="adjustNothing">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -44,7 +45,7 @@
 
         <receiver
             android:name=".widget.CalendarWidgetReceiver"
-            android:exported="true">   <!-- ← was false, widgets must be exported -->
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

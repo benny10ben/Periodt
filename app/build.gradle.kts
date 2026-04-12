@@ -14,8 +14,8 @@ android {
         applicationId = "com.ben.periodt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.1.9"
+        versionCode = 10
+        versionName = "1.2.0"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
@@ -81,16 +81,11 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.0.0")
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
-
-    // FIX: Replaced "libs.androidx.compose.animation" with the BOM-managed version
-    // This prevents the version conflict causing the crash.
     implementation("androidx.compose.animation:animation")
     implementation(libs.androidx.compose.foundation)
 
     debugImplementation("androidx.compose.ui:ui-tooling")
-    // Update Navigation to match SDK 35 requirements
     implementation("androidx.navigation:navigation-compose:2.8.3")
-    // Update Material Icons
     implementation("androidx.compose.material:material-icons-extended")
 
     // --- LIFECYCLE (Updated for SDK 35) ---
@@ -113,7 +108,7 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
-    implementation("dev.chrisbanes.haze:haze:0.5.4") // check for the latest version
+    implementation("dev.chrisbanes.haze:haze:0.5.4")
 
     // --- TESTING ---
     testImplementation("junit:junit:4.13.2")
