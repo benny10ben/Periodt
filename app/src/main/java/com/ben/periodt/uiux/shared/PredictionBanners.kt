@@ -20,10 +20,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+
+private val SIZE_XXS = 11.sp
+private val SIZE_SM  = 13.sp
+private val SIZE_MD  = 14.sp
+private val SIZE_LG  = 15.sp
+
+private val SIZE_XL  = 20.sp
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun UpcomingBannerEnhanced(
@@ -47,16 +57,9 @@ fun UpcomingBannerEnhanced(
     val isDark = LocalAppIsDark.current
 
     // --- COLOR LOGIC ---
-
-    // 1. The "Stars" icon color (Purple/Navy)
     val starIconColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
-
-    // 2. Main theme color (Orange/Green) for Natural Cycles
     val themeAccent = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-
-    // 3. Theme Accent 2 (Requested color for Withdrawal/Pill mode)
     val themeAccent2 = Color(0xFFa68e74)
-    // Select the primary accent for pills, badges, and labels based on the state
     val activeAccent = if (isOnPill) themeAccent2 else themeAccent
 
     val displayTitle = when {
@@ -66,7 +69,6 @@ fun UpcomingBannerEnhanced(
         else            -> title
     }
 
-    // This badge is used for the top right corner in special modes
     val displayBadge = when {
         isDiscoveryMode -> "Paused"
         isLearningMode  -> "Learning"
@@ -82,7 +84,7 @@ fun UpcomingBannerEnhanced(
 
     val surfaceColor   = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSecondary  = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val textSecondary  = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val badgeAlpha     = if (isDark) 0.15f else 0.1f
 
     Card(
@@ -131,12 +133,12 @@ fun UpcomingBannerEnhanced(
                             text       = displayTitle,
                             fontFamily = BricolageGrotesque,
                             color      = textPrimary,
-                            style      = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            fontSize   = SIZE_XL,
+                            fontWeight = FontWeight.SemiBold,
                             modifier   = Modifier.weight(1f)
                         )
                     }
 
-                    // Top right corner logic restored: Special modes get a badge, otherwise dots
                     if (isDiscoveryMode || isLearningMode || isOnPill) {
                         Box(
                             modifier = Modifier
@@ -149,7 +151,7 @@ fun UpcomingBannerEnhanced(
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.SemiBold,
                                 color      = activeAccent,
-                                style      = MaterialTheme.typography.labelSmall
+                                fontSize   = SIZE_XXS // 11.sp
                             )
                         }
                     } else {
@@ -163,7 +165,8 @@ fun UpcomingBannerEnhanced(
                         text       = displayTitle,
                         fontFamily = BricolageGrotesque,
                         color      = textPrimary,
-                        style      = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+                        fontSize   = SIZE_XL,
+                        fontWeight = FontWeight.SemiBold
                     )
                 } else {
                     Text(
@@ -171,7 +174,7 @@ fun UpcomingBannerEnhanced(
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Normal,
                         color      = textSecondary,
-                        style      = MaterialTheme.typography.labelSmall,
+                        fontSize   = SIZE_XXS, // 11.sp
                         modifier   = Modifier.fillMaxWidth().wrapContentWidth(Alignment.End)
                     )
                 }
@@ -183,7 +186,7 @@ fun UpcomingBannerEnhanced(
                     fontFamily = BricolageGrotesque,
                     fontWeight = FontWeight.Normal,
                     color      = textPrimary.copy(alpha = 0.9f),
-                    style      = MaterialTheme.typography.bodyMedium
+                    fontSize   = SIZE_MD // 14.sp
                 )
 
                 Spacer(Modifier.height(4.dp))
@@ -197,10 +200,9 @@ fun UpcomingBannerEnhanced(
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Normal,
                         color      = textSecondary,
-                        style      = MaterialTheme.typography.bodyMedium
+                        fontSize   = SIZE_SM // 13.sp
                     )
 
-                    // Inline confidence pill beside the mostLikely/ovulation date
                     if (!isDiscoveryMode && !isLearningMode && !isOnPill && badge.isNotEmpty()) {
                         Box(
                             modifier = Modifier
@@ -213,14 +215,13 @@ fun UpcomingBannerEnhanced(
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.Bold,
                                 color      = Color.White,
-                                style      = MaterialTheme.typography.labelSmall
+                                fontSize   = SIZE_XXS // 11.sp
                             )
                         }
                     }
                 }
             }
 
-            // Bottom-end "Days Left" badge
             if (!isDiscoveryMode && !daysLeftLabel.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
@@ -234,13 +235,14 @@ fun UpcomingBannerEnhanced(
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Bold,
                         color      = Color.White,
-                        style      = MaterialTheme.typography.labelSmall
+                        fontSize   = SIZE_XXS // 11.sp
                     )
                 }
             }
         }
     }
 }
+
 @Composable
 fun ConfidenceDots(
     confidence: Float,
