@@ -20,8 +20,8 @@ import androidx.room.PrimaryKey
 data class DailyCycleLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val cycleId: Int,
-    val date: String,       // ISO format: "2025-04-03"
+    val date: String,
     val bleeding: String,
     val bloodColor: String,
-    val painLevel: Int = 5  // NEW
+    val painLevel: Int = 5
 )
