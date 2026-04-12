@@ -8,9 +8,12 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,11 +21,14 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -47,6 +53,7 @@ import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 private val SIZE_SM = 13.sp
 private val SIZE_MD = 14.sp
@@ -143,9 +150,9 @@ fun RemindersDialog(
 
     // Colors
     val isDark = LocalAppIsDark.current
-    val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
-    val innerPillBg     = if (isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.04f)
-    val surfaceFallback = if (isDark) Color(0xFF2C2C2C) else Color.White
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val innerPillBg     = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+    val surfaceFallback = if (isDark) Color.Black else Color.Black.copy(alpha = 0.05f)
     val textPrimary     = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub         = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val accentColor     = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
@@ -153,6 +160,12 @@ fun RemindersDialog(
     val pillAccent      = Color(0xFFa68e74)
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var enableAnimations by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(400)
+        enableAnimations = true
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -167,11 +180,17 @@ fun RemindersDialog(
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp)
                 .verticalScroll(rememberScrollState())
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
+                .then(
+                    if (enableAnimations) {
+                        Modifier.animateContentSize(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness    = Spring.StiffnessMediumLow
+                            )
+                        )
+                    } else {
+                        Modifier
+                    }
                 ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -402,7 +421,9 @@ private fun ReminderTimePicker(
     textPrimary: Color, context: Context,
     onTimePicked: (LocalTime) -> Unit
 ) {
-    // Inline Time Picker
+    var showDialog by remember { mutableStateOf(false) }
+    val isDark = LocalAppIsDark.current
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -419,12 +440,7 @@ private fun ReminderTimePicker(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(pillBg)
-                .clickable {
-                    android.app.TimePickerDialog(
-                        context, { _, h, m -> onTimePicked(LocalTime.of(h, m)) },
-                        time.hour, time.minute, false
-                    ).show()
-                }
+                .clickable { showDialog = true }
                 .padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
             Text(
@@ -435,6 +451,19 @@ private fun ReminderTimePicker(
                 fontSize = SIZE_MD
             )
         }
+    }
+
+    if (showDialog) {
+        PeriodtWheelTimeSheet(
+            initialTime = time,
+            isDark = isDark,
+            accentColor = accentColor,
+            onDismiss = { showDialog = false },
+            onConfirm = { newTime ->
+                onTimePicked(newTime)
+                showDialog = false
+            }
+        )
     }
 }
 
@@ -475,5 +504,222 @@ private fun BatteryWarning(
                 fontSize = SIZE_SM
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PeriodtWheelTimeSheet(
+    initialTime: LocalTime,
+    isDark: Boolean,
+    accentColor: Color,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalTime) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val rowBg          = if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f)
+
+    var isAm by remember { mutableStateOf(initialTime.hour < 12) }
+    var hour by remember { mutableStateOf(if (initialTime.hour % 12 == 0) 12 else initialTime.hour % 12) }
+    var minute by remember { mutableStateOf(initialTime.minute) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = containerColor,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = textSub.copy(alpha = 0.2f)) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Select Time",
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = textPrimary
+                )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(textSub.copy(alpha = 0.1f))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(0.85f),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // AM/PM Picker
+                WheelPicker(
+                    items = listOf("AM", "PM"),
+                    selectedIndex = if (isAm) 0 else 1,
+                    onItemSelected = { isAm = (it == 0) },
+                    textPrimary = textPrimary,
+                    textSub = textSub,
+                    selectedSize = 22f,
+                    unselectedSize = 16f
+                )
+
+                // Hour Picker
+                WheelPicker(
+                    items = (1..12).map { it.toString().padStart(2, '0') },
+                    selectedIndex = hour - 1,
+                    onItemSelected = { hour = it + 1 },
+                    textPrimary = textPrimary,
+                    textSub = textSub
+                )
+
+                Text(":", fontFamily = BricolageGrotesque, fontSize = 28.sp, color = textPrimary, fontWeight = FontWeight.Bold)
+
+                // Minute Picker
+                WheelPicker(
+                    items = (0..59).map { it.toString().padStart(2, '0') },
+                    selectedIndex = minute,
+                    onItemSelected = { minute = it },
+                    textPrimary = textPrimary,
+                    textSub = textSub
+                )
+            }
+
+            Button(
+                onClick = {
+                    val finalHour = when {
+                        isAm && hour == 12 -> 0
+                        !isAm && hour < 12 -> hour + 12
+                        else -> hour
+                    }
+                    onConfirm(LocalTime.of(finalHour, minute))
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentColor,
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+            ) {
+                Text(
+                    "Save Time",
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = SIZE_LG
+                )
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun WheelPicker(
+    items: List<String>,
+    selectedIndex: Int,
+    onItemSelected: (Int) -> Unit,
+    textPrimary: Color,
+    textSub: Color,
+    selectedSize: Float = 28f,
+    unselectedSize: Float = 20f
+) {
+    val itemHeight = 50.dp
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
+    val snapBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(lazyListState = listState)
+
+    val coroutineScope = rememberCoroutineScope()
+
+    val centerIndex by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            if (visibleItemsInfo.isEmpty()) return@derivedStateOf -1
+
+            val viewportCenter = layoutInfo.viewportEndOffset / 2
+            val closestItem = visibleItemsInfo.minByOrNull {
+                kotlin.math.abs((it.offset + (it.size / 2)) - viewportCenter)
+            }
+            (closestItem?.index ?: 1) - 1
+        }
+    }
+
+    LaunchedEffect(centerIndex, listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress && centerIndex in items.indices) {
+            onItemSelected(centerIndex)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        flingBehavior = snapBehavior,
+        modifier = Modifier.height(itemHeight * 3).width(64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        item { Spacer(modifier = Modifier.height(itemHeight)) }
+
+        items(items.size) { index ->
+            val isSelected = centerIndex == index
+
+            val animatedFontSize by animateFloatAsState(
+                targetValue = if (isSelected) selectedSize else unselectedSize,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "fontSizeAnim"
+            )
+
+            val animatedColor by animateColorAsState(
+                targetValue = if (isSelected) textPrimary else textSub.copy(alpha = 0.3f),
+                animationSpec = tween(150),
+                label = "colorAnim"
+            )
+
+            Box(
+                modifier = Modifier
+                    .height(itemHeight)
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(index)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = items[index],
+                    fontFamily = BricolageGrotesque,
+                    fontSize = animatedFontSize.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = animatedColor
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(itemHeight)) }
     }
 }
