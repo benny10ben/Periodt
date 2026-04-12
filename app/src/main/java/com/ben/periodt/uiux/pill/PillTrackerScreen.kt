@@ -36,6 +36,12 @@ import com.ben.periodt.viewmodel.PeriodViewModel
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
+private val SIZE_XXS = 11.sp
+private val SIZE_SM  = 13.sp
+private val SIZE_MD  = 14.sp
+private val SIZE_LG  = 15.sp
+private val SIZE_XL  = 20.sp
+
 @Composable
 fun PillTrackerScreen(viewModel: PeriodViewModel) {
     val isOnPill      by viewModel.isOnPill.collectAsState()
@@ -47,13 +53,11 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
     val isDark = LocalAppIsDark.current
 
     val textPrimary    = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val cardBg         = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
     val pillBackground = if (isDark) Color(0xFFE8EBED).copy(alpha = 0.1f) else Color(0xFFE8EBED).copy(alpha = 0.4f)
 
-    // The "Stars" icon color (Discovery/Learning)
-    val starAccent = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
-    // Your main theme color (Pill tracking / Natural)
+    val starAccent  = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
     val themeAccent = Color(0xFFa68e74)
 
     val activeAccent = when (postPillState) {
@@ -61,9 +65,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
         else -> themeAccent
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.refreshState()
-    }
+    LaunchedEffect(Unit) { viewModel.refreshState() }
 
     Column(
         modifier = Modifier
@@ -75,27 +77,18 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
     ) {
         Spacer(Modifier.height(32.dp))
 
-        AnimatedContent(
-            targetState = Pair(isOnPill, postPillState),
-            label       = "HeaderState"
-        ) { (active, pillState) ->
-            val isStarMode = pillState == PostPillState.DISCOVERY || pillState == PostPillState.LEARNING && !active
-
+        AnimatedContent(targetState = Pair(isOnPill, postPillState), label = "HeaderState") { (active, pillState) ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
-                    modifier         = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        // REMOVED: Background is now Transparent if in Star mode
-                        .background(Color.Transparent),
+                    modifier         = Modifier.size(80.dp).clip(CircleShape).background(Color.Transparent),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = when {
-                            active                                          -> Icons.Rounded.Medication
-                            pillState == PostPillState.DISCOVERY            -> Icons.Rounded.AutoAwesome
-                            pillState == PostPillState.LEARNING             -> Icons.Rounded.AutoAwesome
-                            else                                            -> Icons.Rounded.Medication
+                            active                               -> Icons.Rounded.Medication
+                            pillState == PostPillState.DISCOVERY -> Icons.Rounded.AutoAwesome
+                            pillState == PostPillState.LEARNING  -> Icons.Rounded.AutoAwesome
+                            else                                 -> Icons.Rounded.Medication
                         },
                         contentDescription = null,
                         modifier           = Modifier.size(40.dp),
@@ -107,10 +100,10 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
 
                 Text(
                     text = when {
-                        active                                             -> "Pill Tracking Active"
-                        pillState == PostPillState.DISCOVERY               -> "Discovery Mode"
-                        pillState == PostPillState.LEARNING                -> "Learning Mode"
-                        else                                               -> "Pill Mode"
+                        active                               -> "Pill Tracking Active"
+                        pillState == PostPillState.DISCOVERY -> "Discovery Mode"
+                        pillState == PostPillState.LEARNING  -> "Learning Mode"
+                        else                                 -> "Pill Mode"
                     },
                     fontSize   = 28.sp,
                     fontFamily = BricolageGrotesque,
@@ -127,7 +120,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                         pillState == PostPillState.LEARNING  -> "Predictions are live but still refining.\nKeep logging to improve accuracy."
                         else -> "Tap the button below to set up your pack."
                     },
-                    fontSize   = 15.sp,
+                    fontSize   = SIZE_LG,
                     fontFamily = BricolageGrotesque,
                     color      = textSub,
                     textAlign  = TextAlign.Center,
@@ -139,12 +132,11 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
 
         Spacer(Modifier.height(40.dp))
 
-        // 1. LifeAfterPillCard is now ALWAYS above and visible
         LifeAfterPillCard(
-            cardBg         = cardBg,
-            textPrimary    = textPrimary,
-            textSub        = textSub,
-            postPillState  = postPillState
+            cardBg        = cardBg,
+            textPrimary   = textPrimary,
+            textSub       = textSub,
+            postPillState = postPillState
         )
 
         if (isOnPill && startDate != null) {
@@ -168,7 +160,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                 text       = "Pill History",
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
-                fontSize   = 20.sp,
+                fontSize   = SIZE_XL,
                 color      = textPrimary,
                 modifier   = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -184,7 +176,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                         "No pill history yet.",
                         color      = textSub,
                         fontFamily = BricolageGrotesque,
-                        fontSize   = 14.sp
+                        fontSize   = SIZE_MD
                     )
                 }
             } else {
@@ -198,7 +190,7 @@ fun PillTrackerScreen(viewModel: PeriodViewModel) {
                             pillBackground = pillBackground,
                             activeAccent   = themeAccent,
                             normalAccent   = textPrimary,
-                            isSwiping      = isSwiping   // THIS WAS MISSING
+                            isSwiping      = isSwiping
                         )
                     }
                     Spacer(Modifier.height(12.dp))
@@ -219,10 +211,10 @@ private fun ActivePackSection(
     accentColor: Color,
     onStop: () -> Unit
 ) {
-    val isDark = LocalAppIsDark.current
-    val daysElapsed      = ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt().coerceAtLeast(0)
-    val daysTaken        = minOf(daysElapsed + 1, pillCount)
-    val progressTarget   = (daysTaken.toFloat() / pillCount.toFloat()).coerceIn(0f, 1f)
+    val isDark       = LocalAppIsDark.current
+    val daysElapsed  = ChronoUnit.DAYS.between(startDate, LocalDate.now()).toInt().coerceAtLeast(0)
+    val daysTaken    = minOf(daysElapsed + 1, pillCount)
+    val progressTarget = (daysTaken.toFloat() / pillCount.toFloat()).coerceIn(0f, 1f)
 
     val animatedProgress by animateFloatAsState(
         targetValue   = progressTarget,
@@ -230,11 +222,8 @@ private fun ActivePackSection(
         label         = "PillProgress"
     )
 
-    // Match the brush from PredictionBanner
     val progressBrush = remember(isDark, accentColor) {
-        Brush.linearGradient(
-            colors = listOf(accentColor, accentColor)
-        )
+        Brush.linearGradient(colors = listOf(accentColor, accentColor))
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -245,21 +234,13 @@ private fun ActivePackSection(
             modifier  = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)) {
-                // Top Row: Icon and Pill Count Badge
-                Row(
-                    modifier          = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                // Top row
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier         = Modifier.size(42.dp).clip(CircleShape).background(pillBackground),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Rounded.Medication,
-                            contentDescription = null,
-                            tint     = textPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Icon(Icons.Rounded.Medication, null, tint = textPrimary, modifier = Modifier.size(24.dp))
                     }
 
                     Spacer(Modifier.width(16.dp))
@@ -269,14 +250,14 @@ private fun ActivePackSection(
                             "Active Pill Pack",
                             fontFamily = BricolageGrotesque,
                             color      = textPrimary,
-                            fontSize   = 16.sp,
+                            fontSize   = SIZE_LG,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             "Started ${startDate.pretty()}",
                             fontFamily = BricolageGrotesque,
                             color      = textSub,
-                            fontSize   = 13.sp
+                            fontSize   = SIZE_SM
                         )
                     }
 
@@ -291,77 +272,63 @@ private fun ActivePackSection(
                             fontFamily = BricolageGrotesque,
                             fontWeight = FontWeight.SemiBold,
                             color      = textPrimary,
-                            fontSize   = 11.sp
+                            fontSize   = SIZE_XXS
                         )
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
 
-                // Progress Label Row (Mirrors Banner text style)
+                // Progress label row
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment     = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Pack Progress",
+                        "Pack Progress",
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.SemiBold,
-                        color = textPrimary,
-                        fontSize = 14.sp
+                        color      = textPrimary,
+                        fontSize   = SIZE_MD
                     )
                     Text(
-                        text = "$daysTaken / $pillCount",
+                        "$daysTaken / $pillCount",
                         fontFamily = BricolageGrotesque,
-                        color = textSub,
-                        fontSize = 13.sp
+                        color      = textSub,
+                        fontSize   = SIZE_SM
                     )
                 }
 
                 Spacer(Modifier.height(12.dp))
 
-                // The Progress Bar (Mirrors PredictionBanner Canvas logic)
                 Canvas(
                     Modifier
-                        .fillMaxWidth(0.95f) // Slightly reduced width as requested
+                        .fillMaxWidth(0.95f)
                         .height(6.dp)
                         .clip(CircleShape)
                         .align(Alignment.CenterHorizontally)
                 ) {
-                    // Track
-                    drawRoundRect(
-                        color = pillBackground.copy(alpha = 0.4f),
-                        size = size,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f)
-                    )
-                    // Progress
-                    drawRoundRect(
-                        brush = progressBrush,
-                        size = androidx.compose.ui.geometry.Size(animatedProgress * size.width, size.height),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f)
-                    )
+                    drawRoundRect(color = pillBackground.copy(alpha = 0.4f), size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f))
+                    drawRoundRect(brush = progressBrush, size = androidx.compose.ui.geometry.Size(animatedProgress * size.width, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f))
                 }
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
-        // Stop Button
         Button(
             onClick   = onStop,
             modifier  = Modifier.fillMaxWidth().height(56.dp),
             shape     = RoundedCornerShape(100.dp),
-            colors    = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFFEF5350).copy(alpha = 0.1f)
-            ),
+            colors    = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350).copy(alpha = 0.1f)),
             elevation = ButtonDefaults.buttonElevation(0.dp)
         ) {
-            Icon(Icons.Rounded.StopCircle, contentDescription = null, tint = Color(0xFFEF5350))
+            Icon(Icons.Rounded.StopCircle, null, tint = Color(0xFFEF5350))
             Spacer(Modifier.width(8.dp))
             Text(
                 "Stop Taking Pills",
-                fontSize   = 16.sp,
+                fontSize   = SIZE_LG,
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
                 color      = Color(0xFFEF5350)
@@ -386,21 +353,10 @@ fun LifeAfterPillCard(
         elevation = CardDefaults.cardElevation(0.dp),
         modifier  = Modifier
             .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = { expanded = !expanded }
-            )
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = { expanded = !expanded })
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = when (postPillState) {
                         PostPillState.DISCOVERY -> "What is Discovery Mode?"
@@ -409,18 +365,14 @@ fun LifeAfterPillCard(
                     },
                     fontFamily = BricolageGrotesque,
                     color      = textPrimary,
-                    fontSize   = 16.sp,
+                    fontSize   = SIZE_LG,
                     fontWeight = FontWeight.SemiBold,
                     modifier   = Modifier.weight(1f)
                 )
-
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = textPrimary.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .size(24.dp)
-                        .graphicsLayer { rotationZ = rotation }
+                    Icons.Default.KeyboardArrowDown, null,
+                    tint     = textPrimary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = rotation }
                 )
             }
 
@@ -441,19 +393,9 @@ fun LifeAfterPillCard(
                             InfoRow("How to reach full accuracy", "Log at least 4 natural cycles after stopping. This gives the algorithm a solid baseline to work with.", textPrimary, textSub)
                         }
                         PostPillState.NORMAL -> {
-                            InfoRow(
-                                "Pill Pack Tracking",
-                                "The app tracks your active pills and breaks to help you stay consistent with your specific pack settings.",
-                                textPrimary,
-                                textSub
-                            )
+                            InfoRow("Pill Pack Tracking", "The app tracks your active pills and breaks to help you stay consistent with your specific pack settings.", textPrimary, textSub)
                             Spacer(Modifier.height(16.dp))
-                            InfoRow(
-                                "Stopping the Pill",
-                                "If you stop tracking, the app enters Discovery Mode to observe your body's natural rhythm as it restabilizes.",
-                                textPrimary,
-                                textSub
-                            )
+                            InfoRow("Stopping the Pill", "If you stop tracking, the app enters Discovery Mode to observe your body's natural rhythm as it restabilizes.", textPrimary, textSub)
                         }
                     }
                 }
@@ -463,25 +405,20 @@ fun LifeAfterPillCard(
 }
 
 @Composable
-private fun InfoRow(
-    title: String,
-    body: String,
-    textPrimary: Color,
-    textSub: Color
-) {
+private fun InfoRow(title: String, body: String, textPrimary: Color, textSub: Color) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text       = title,
             fontFamily = BricolageGrotesque,
             fontWeight = FontWeight.SemiBold,
-            fontSize   = 14.sp,
+            fontSize   = SIZE_MD,
             color      = textPrimary
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text       = body,
             fontFamily = BricolageGrotesque,
-            fontSize   = 13.sp,
+            fontSize   = SIZE_SM,
             color      = textSub,
             lineHeight = 20.sp
         )
@@ -501,16 +438,11 @@ fun PillHistoryItem(
 ) {
     Card(
         shape     = RoundedCornerShape(22.dp),
-        colors    = CardDefaults.cardColors(
-            containerColor = cardBg  // ADD THIS
-        ),
+        colors    = CardDefaults.cardColors(containerColor = cardBg),
         modifier  = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Row(
-            modifier          = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier         = Modifier.size(42.dp).clip(CircleShape).background(pillBackground),
                 contentAlignment = Alignment.Center
@@ -528,13 +460,13 @@ fun PillHistoryItem(
                     text       = if (pack.endDate == null) "Active Pack" else "Completed Pack",
                     fontFamily = BricolageGrotesque,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize   = 15.sp,
+                    fontSize   = SIZE_LG,
                     color      = if (pack.endDate == null) activeAccent else textPrimary
                 )
                 Text(
                     text       = "${pack.startDate.pretty()} — ${pack.endDate?.pretty() ?: "Ongoing"}",
                     fontFamily = BricolageGrotesque,
-                    fontSize   = 13.sp,
+                    fontSize   = SIZE_SM,
                     color      = textSub
                 )
             }
@@ -547,7 +479,7 @@ fun PillHistoryItem(
                 Text(
                     "${pack.pillCount} pills",
                     fontFamily = BricolageGrotesque,
-                    fontSize   = 11.sp,
+                    fontSize   = SIZE_XXS,
                     color      = textSub
                 )
             }

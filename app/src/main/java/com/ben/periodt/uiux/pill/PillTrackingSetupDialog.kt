@@ -16,13 +16,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.uiux.calendar.CleanDateCard
@@ -32,157 +29,141 @@ import com.ben.periodt.uiux.calendar.millisToLocalDate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+private val SIZE_MD = 14.sp
+private val SIZE_LG = 15.sp
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PillTrackingSetupDialog(
     onDismiss: () -> Unit,
     onSave: (startDate: LocalDate, pillCount: Int) -> Unit
 ) {
-    // --- STATE ---
-    var startDate by remember { mutableStateOf(LocalDate.now()) }
+    var startDate        by remember { mutableStateOf(LocalDate.now()) }
     var selectedPillCount by remember { mutableIntStateOf(21) }
-    var showDatePicker by remember { mutableStateOf(false) }
+    var showDatePicker   by remember { mutableStateOf(false) }
 
     val pillOptions = listOf(21, 24, 28)
-    val formatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
+    val formatter   = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
 
-    // --- THEME & COLORS (Synced with AddCycleDialog) ---
     val isDark = LocalAppIsDark.current
 
-    // Dynamic accent color
-    val accentColor = Color(0xFFa68e74)
-
-    val pastelGreen = Color(0xFF6d9567).copy(alpha = 0.4f)
-    val pastelOrange = Color(0xFFa68e74)
-    val pastelMaroon = Color(0xFF4E1A1A)
-
-    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+    val accentColor     = Color(0xFFa68e74)
+    val pastelGreen     = Color(0xFF6d9567).copy(alpha = 0.4f)
+    val pastelOrange    = Color(0xFFa68e74)
+    val pastelMaroon    = Color(0xFF4E1A1A)
+    val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val textPrimary     = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSub         = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val surfaceFallback = if (isDark) Color.Black else Color.White
+    val pillBackground  = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
-    val contentSurface = if (isDark) {
-        Brush.linearGradient(0.0f to Color.Black, 1.0f to Color(0xFF1B1B1B))
-    } else {
-        Brush.linearGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFf2f0e3)))
-    }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val pillBackground = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
-
-    Dialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(0.92f).padding(vertical = 24.dp),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = surfaceFallback),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        sheetState       = sheetState,
+        containerColor   = containerColor,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
         ) {
-            Column(modifier = Modifier.fillMaxWidth().background(contentSurface)) {
-                // Header
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Header
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                Text(
+                    text       = "Log Pills",
+                    fontFamily = BricolageGrotesque,
+                    style      = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color      = textPrimary
+                )
+                Box(
+                    modifier         = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "Log Pills",
-                        fontFamily = BricolageGrotesque,
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = textPrimary
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = textPrimary)
-                    }
+                    Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
+            }
 
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+            // Start date
+            CleanDateCard(
+                label    = "Pack Start Date",
+                date     = startDate.format(formatter),
+                icon     = Icons.Rounded.CalendarToday,
+                bg       = pillBackground,
+                textColor = textPrimary,
+                onClick  = { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Pill count selection
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text       = "Active Pills per Pack",
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize   = SIZE_MD,
+                    color      = textPrimary
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement   = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Explanation
-//                    Text(
-//                        text = "Set your current pack details to accurately predict your next withdrawal bleed.",
-//                        fontFamily = BricolageGrotesque,
-//                        fontSize = 14.sp,
-//                        color = textSub
-//                    )
-
-                    // Start Date Card (Matching style)
-                    CleanDateCard(
-                        label = "Pack Start Date",
-                        date = startDate.format(formatter),
-                        icon = Icons.Rounded.CalendarToday,
-                        bg = pillBackground,
-                        textColor = textPrimary,
-                        onClick = { showDatePicker = true },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    // Pill Count Selection
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = "Active Pills per Pack",
-                            fontFamily = BricolageGrotesque,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = textPrimary
-                        )
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            pillOptions.forEach { count ->
-                                EntryStylePill(
-                                    text = "$count Pills",
-                                    isSelected = selectedPillCount == count,
-                                    activeBg = accentColor, // Switched from fixed purple to theme accent
-                                    activeText = Color.White,
-                                    inactiveText = textSub,
-                                    surface = surfaceFallback,
-                                    onClick = { selectedPillCount = count }
-                                )
-                            }
-                        }
-                    }
-
-                    // Save Button (Synced with Add Cycle style)
-                    Button(
-                        onClick = { onSave(startDate, selectedPillCount) },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = CircleShape,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = accentColor, // Switched to theme accent
-                            contentColor = Color.White
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(0.dp)
-                    ) {
-                        Icon(Icons.Rounded.Medication, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Start Pill Tracking",
-                            fontFamily = BricolageGrotesque,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
+                    pillOptions.forEach { count ->
+                        EntryStylePill(
+                            text         = "$count Pills",
+                            isSelected   = selectedPillCount == count,
+                            activeBg     = accentColor,
+                            activeText   = Color.White,
+                            inactiveText = textSub,
+                            surface      = surfaceFallback,
+                            onClick      = { selectedPillCount = count }
                         )
                     }
                 }
+            }
+
+            // Save button
+            Button(
+                onClick   = { onSave(startDate, selectedPillCount) },
+                modifier  = Modifier.fillMaxWidth().padding(top = 8.dp).height(56.dp),
+                shape     = RoundedCornerShape(18.dp),
+                colors    = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Icon(Icons.Rounded.Medication, null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Start Pill Tracking",
+                    fontFamily = BricolageGrotesque,
+                    fontSize   = SIZE_LG,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 
     if (showDatePicker) {
         MinimalDatePickerDialog(
-            title = "Pack Start Date",
-            brand = accentColor,
-            gradTop = pastelGreen,
-            gradMid = pastelOrange,
-            gradBottom = pastelMaroon,
-            onGradient = Color.White,
+            title           = "Pack Start Date",
+            brand           = accentColor,
+            gradTop         = pastelGreen,
+            gradMid         = pastelOrange,
+            gradBottom      = pastelMaroon,
+            onGradient      = Color.White,
             buttonContainer = surfaceFallback,
-            buttonContent = textPrimary,
-            onDismiss = { showDatePicker = false },
-            onConfirm = { ms ->
+            buttonContent   = textPrimary,
+            onDismiss       = { showDatePicker = false },
+            onConfirm       = { ms ->
                 millisToLocalDate(ms)?.let { startDate = it }
                 showDatePicker = false
             }
