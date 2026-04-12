@@ -14,6 +14,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.ben.periodt.MainActivity
 import com.ben.periodt.R
 import com.ben.periodt.data.AppDatabase
+import com.ben.periodt.viewmodel.ACTIVE_PROFILE_ID_KEY
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,30 +25,48 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
-// 1. DATASTORE
+// ── 1. DATASTORE ──────────────────────────────────────────────────────────────
 
 val Context.dataStore by preferencesDataStore(name = "reminder_prefs")
 
 object ReminderPrefs {
-    // Period (existing keys kept for backward compat)
-    val IS_ENABLED       = booleanPreferencesKey("is_enabled")
-    val DAYS_BEFORE      = intPreferencesKey("days_before")
-    val TIME_HOUR        = intPreferencesKey("time_hour")
-    val TIME_MINUTE      = intPreferencesKey("time_minute")
 
-    // Fertility / Ovulation
-    val FERTILITY_ENABLED    = booleanPreferencesKey("fertility_enabled")
+    // ── Per-profile key factories ─────────────────────────────────────────────
+    // Keys are prefixed with "p{profileId}_" so every profile has its own
+    // independent reminder settings in the same DataStore file.
+
+    fun periodEnabled(id: Int)       = booleanPreferencesKey("p${id}_is_enabled")
+    fun periodDaysBefore(id: Int)    = intPreferencesKey("p${id}_days_before")
+    fun periodHour(id: Int)          = intPreferencesKey("p${id}_time_hour")
+    fun periodMinute(id: Int)        = intPreferencesKey("p${id}_time_minute")
+
+    fun fertilityEnabled(id: Int)    = booleanPreferencesKey("p${id}_fertility_enabled")
+    fun fertilityDaysBefore(id: Int) = intPreferencesKey("p${id}_fertility_days_before")
+    fun fertilityHour(id: Int)       = intPreferencesKey("p${id}_fertility_time_hour")
+    fun fertilityMinute(id: Int)     = intPreferencesKey("p${id}_fertility_time_minute")
+
+    fun pillEnabled(id: Int)         = booleanPreferencesKey("p${id}_pill_enabled")
+    fun pillHour(id: Int)            = intPreferencesKey("p${id}_pill_hour")
+    fun pillMinute(id: Int)          = intPreferencesKey("p${id}_pill_minute")
+
+    // ── Legacy global keys (U0) ───────────────────────────────────────────────
+    // Never written by U1+. Only read during migration in SettingsScreen so
+    // existing users don't lose their reminder settings on first upgrade.
+
+    val IS_ENABLED            = booleanPreferencesKey("is_enabled")
+    val DAYS_BEFORE           = intPreferencesKey("days_before")
+    val TIME_HOUR             = intPreferencesKey("time_hour")
+    val TIME_MINUTE           = intPreferencesKey("time_minute")
+    val FERTILITY_ENABLED     = booleanPreferencesKey("fertility_enabled")
     val FERTILITY_DAYS_BEFORE = intPreferencesKey("fertility_days_before")
-    val FERTILITY_HOUR       = intPreferencesKey("fertility_time_hour")
-    val FERTILITY_MINUTE     = intPreferencesKey("fertility_time_minute")
-
-    // Pill daily reminder
-    val PILL_ENABLED = booleanPreferencesKey("pill_reminder_enabled")
-    val PILL_HOUR    = intPreferencesKey("pill_reminder_hour")
-    val PILL_MINUTE  = intPreferencesKey("pill_reminder_minute")
+    val FERTILITY_HOUR        = intPreferencesKey("fertility_time_hour")
+    val FERTILITY_MINUTE      = intPreferencesKey("fertility_time_minute")
+    val PILL_ENABLED          = booleanPreferencesKey("pill_reminder_enabled")
+    val PILL_HOUR             = intPreferencesKey("pill_reminder_hour")
+    val PILL_MINUTE           = intPreferencesKey("pill_reminder_minute")
 }
 
-// 2. SCHEDULER
+// ── 2. SCHEDULER ──────────────────────────────────────────────────────────────
 
 object ReminderScheduler {
     private const val PERIOD_CODE    = 1001
@@ -77,7 +96,7 @@ object ReminderScheduler {
         requestCode: Int, receiverClass: Class<T>
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val pending = pendingFor(context, requestCode, receiverClass)
+        val pending      = pendingFor(context, requestCode, receiverClass)
 
         val now    = LocalDateTime.now()
         var target = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
@@ -111,21 +130,21 @@ object ReminderScheduler {
     )
 }
 
-
-// 3. PERIOD RECEIVER
-
+// ── 3. PERIOD RECEIVER ────────────────────────────────────────────────────────
 
 class ModernReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
-        val appCtx = context.applicationContext
+        val appCtx        = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val prefs      = appCtx.dataStore.data.first()
-                val isEnabled  = prefs[ReminderPrefs.IS_ENABLED] ?: false
-                val daysBefore = prefs[ReminderPrefs.DAYS_BEFORE] ?: 2
-                val hour       = prefs[ReminderPrefs.TIME_HOUR] ?: 8
-                val minute     = prefs[ReminderPrefs.TIME_MINUTE] ?: 0
+                val prefs     = appCtx.dataStore.data.first()
+                val profileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
+
+                val isEnabled  = prefs[ReminderPrefs.periodEnabled(profileId)] ?: false
+                val daysBefore = prefs[ReminderPrefs.periodDaysBefore(profileId)] ?: 2
+                val hour       = prefs[ReminderPrefs.periodHour(profileId)] ?: 8
+                val minute     = prefs[ReminderPrefs.periodMinute(profileId)] ?: 0
 
                 if (!isEnabled) return@launch
                 ReminderScheduler.scheduleNextReminder(appCtx, hour, minute)
@@ -133,25 +152,28 @@ class ModernReminderReceiver : BroadcastReceiver() {
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
 
-                val cycles = dao.getAllCyclesOnce().map { e ->
+                val cycles = dao.getCyclesForProfileOnce(profileId).map { e ->
                     PeriodViewModel.Cycle(
-                        id = e.id,
-                        startDate = LocalDate.parse(e.startDate),
-                        endDate = e.endDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
-                        bleeding = e.bleeding, bloodColor = e.bloodColor, painLevel = e.painLevel
+                        id         = e.id,
+                        startDate  = LocalDate.parse(e.startDate),
+                        endDate    = e.endDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
+                        bleeding   = e.bleeding,
+                        bloodColor = e.bloodColor,
+                        painLevel  = e.painLevel
                     )
                 }
-                val pillPacks = dao.getAllPillPacksOnce().map { e ->
+                val pillPacks = dao.getPillPacksForProfileOnce(profileId).map { e ->
                     PeriodViewModel.PillPack(
-                        id = e.id,
+                        id        = e.id,
                         startDate = LocalDate.parse(e.startDate),
                         pillCount = e.pillCount,
-                        endDate = e.endDate?.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
+                        endDate   = e.endDate?.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
                     )
                 }
 
                 val activePack   = pillPacks.firstOrNull { it.endDate == null }
-                val pillStopDate = pillPacks.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.endDate
+                val pillStopDate = pillPacks.filter { it.endDate != null }
+                    .maxByOrNull { it.endDate!! }?.endDate
 
                 var predictedStart: LocalDate? = null
 
@@ -169,12 +191,16 @@ class ModernReminderReceiver : BroadcastReceiver() {
                     val daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), predictedStart).toInt()
                     if (daysUntil == daysBefore) {
                         fireNotification(
-                            context = appCtx,
-                            channelId = "period_reminders_v2",
+                            context     = appCtx,
+                            channelId   = "period_reminders_v2",
                             channelName = "Period Reminders",
-                            title = if (daysBefore == 1) "Period starting tomorrow" else "Period in $daysBefore days",
-                            text = "Your cycle is predicted to start around ${predictedStart.format(
-                                java.time.format.DateTimeFormatter.ofPattern("MMM d"))}."
+                            title       = if (daysBefore == 1) "Period starting tomorrow"
+                            else "Period in $daysBefore days",
+                            text        = "Your cycle is predicted to start around ${
+                                predictedStart.format(
+                                    java.time.format.DateTimeFormatter.ofPattern("MMM d")
+                                )
+                            }."
                         )
                     }
                 }
@@ -187,19 +213,21 @@ class ModernReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// 4. FERTILITY RECEIVER
+// ── 4. FERTILITY RECEIVER ─────────────────────────────────────────────────────
 
 class FertilityReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
-        val appCtx = context.applicationContext
+        val appCtx        = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val prefs      = appCtx.dataStore.data.first()
-                val isEnabled  = prefs[ReminderPrefs.FERTILITY_ENABLED] ?: false
-                val daysBefore = prefs[ReminderPrefs.FERTILITY_DAYS_BEFORE] ?: 2
-                val hour       = prefs[ReminderPrefs.FERTILITY_HOUR] ?: 8
-                val minute     = prefs[ReminderPrefs.FERTILITY_MINUTE] ?: 0
+                val prefs     = appCtx.dataStore.data.first()
+                val profileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
+
+                val isEnabled  = prefs[ReminderPrefs.fertilityEnabled(profileId)] ?: false
+                val daysBefore = prefs[ReminderPrefs.fertilityDaysBefore(profileId)] ?: 2
+                val hour       = prefs[ReminderPrefs.fertilityHour(profileId)] ?: 8
+                val minute     = prefs[ReminderPrefs.fertilityMinute(profileId)] ?: 0
 
                 if (!isEnabled) return@launch
                 ReminderScheduler.scheduleNextFertilityReminder(appCtx, hour, minute)
@@ -207,56 +235,58 @@ class FertilityReminderReceiver : BroadcastReceiver() {
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
 
-                val cycles = dao.getAllCyclesOnce().map { e ->
+                val cycles = dao.getCyclesForProfileOnce(profileId).map { e ->
                     PeriodViewModel.Cycle(
-                        id = e.id,
-                        startDate = LocalDate.parse(e.startDate),
-                        endDate = e.endDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
-                        bleeding = e.bleeding, bloodColor = e.bloodColor, painLevel = e.painLevel
+                        id         = e.id,
+                        startDate  = LocalDate.parse(e.startDate),
+                        endDate    = e.endDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
+                        bleeding   = e.bleeding,
+                        bloodColor = e.bloodColor,
+                        painLevel  = e.painLevel
                     )
                 }
-                val pillPacks = dao.getAllPillPacksOnce().map { e ->
+                val pillPacks = dao.getPillPacksForProfileOnce(profileId).map { e ->
                     PeriodViewModel.PillPack(
-                        id = e.id, startDate = LocalDate.parse(e.startDate),
+                        id        = e.id,
+                        startDate = LocalDate.parse(e.startDate),
                         pillCount = e.pillCount,
-                        endDate = e.endDate?.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
+                        endDate   = e.endDate?.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
                     )
                 }
 
-                // Don't fire fertility reminders when on pill or in discovery
                 val isOnPill     = pillPacks.any { it.endDate == null }
-                val pillStopDate = pillPacks.filter { it.endDate != null }.maxByOrNull { it.endDate!! }?.endDate
+                val pillStopDate = pillPacks.filter { it.endDate != null }
+                    .maxByOrNull { it.endDate!! }?.endDate
                 if (isOnPill) return@launch
 
                 val validCycles = if (pillStopDate != null)
                     cycles.filter { !it.startDate.isBefore(pillStopDate) } else cycles
                 if (pillStopDate != null && isStillTransitioning(validCycles)) return@launch
 
-                // Inside FertilityReminderReceiver
-                val prediction = predictCycle(validCycles) ?: return@launch
+                val prediction   = predictCycle(validCycles) ?: return@launch
                 val ovulationDay = prediction.ovulationDay
-                val daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), ovulationDay).toInt()
+                val daysUntil    = ChronoUnit.DAYS.between(LocalDate.now(), ovulationDay).toInt()
 
                 if (daysUntil == daysBefore) {
-                    val dateStr = ovulationDay.format(java.time.format.DateTimeFormatter.ofPattern("MMM d"))
-
+                    val dateStr = ovulationDay.format(
+                        java.time.format.DateTimeFormatter.ofPattern("MMM d")
+                    )
                     val (notifTitle, notifText) = when {
                         daysUntil == 0 ->
                             "Ovulation Day" to "Today is your predicted ovulation day."
-
                         daysUntil <= 2 ->
-                            "Peak Fertility" to "You are in your peak fertile window. Ovulation is expected on $dateStr."
-
+                            "Peak Fertility" to
+                                    "You are in your peak fertile window. Ovulation is expected on $dateStr."
                         else ->
-                            "Fertile Window Approaching" to "Your fertile window is opening soon. Ovulation predicted for $dateStr."
+                            "Fertile Window Approaching" to
+                                    "Your fertile window is opening soon. Ovulation predicted for $dateStr."
                     }
-
                     fireNotification(
-                        context = appCtx,
-                        channelId = "fertility_reminders_v1",
+                        context     = appCtx,
+                        channelId   = "fertility_reminders_v1",
                         channelName = "Fertility",
-                        title = notifTitle,
-                        text = notifText
+                        title       = notifTitle,
+                        text        = notifText
                     )
                 }
             } catch (e: Throwable) {
@@ -268,18 +298,20 @@ class FertilityReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// 5. PILL RECEIVER
+// ── 5. PILL RECEIVER ──────────────────────────────────────────────────────────
 
 class PillReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
-        val appCtx = context.applicationContext
+        val appCtx        = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val prefs     = appCtx.dataStore.data.first()
-                val isEnabled = prefs[ReminderPrefs.PILL_ENABLED] ?: false
-                val hour      = prefs[ReminderPrefs.PILL_HOUR] ?: 8
-                val minute    = prefs[ReminderPrefs.PILL_MINUTE] ?: 0
+                val profileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
+
+                val isEnabled = prefs[ReminderPrefs.pillEnabled(profileId)] ?: false
+                val hour      = prefs[ReminderPrefs.pillHour(profileId)] ?: 8
+                val minute    = prefs[ReminderPrefs.pillMinute(profileId)] ?: 0
 
                 if (!isEnabled) return@launch
                 ReminderScheduler.scheduleNextPillReminder(appCtx, hour, minute)
@@ -287,26 +319,26 @@ class PillReminderReceiver : BroadcastReceiver() {
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
 
-                val pillPacks = dao.getAllPillPacksOnce().map { e ->
+                val pillPacks = dao.getPillPacksForProfileOnce(profileId).map { e ->
                     PeriodViewModel.PillPack(
-                        id = e.id, startDate = LocalDate.parse(e.startDate),
+                        id        = e.id,
+                        startDate = LocalDate.parse(e.startDate),
                         pillCount = e.pillCount,
-                        endDate = e.endDate?.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
+                        endDate   = e.endDate?.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
                     )
                 }
 
                 val activePack = pillPacks.firstOrNull { it.endDate == null } ?: return@launch
-
                 val today      = LocalDate.now()
                 val dayNumber  = (ChronoUnit.DAYS.between(activePack.startDate, today) + 1)
                     .toInt().coerceIn(1, activePack.pillCount)
 
                 fireNotification(
-                    context = appCtx,
-                    channelId = "pill_reminders_v1",
+                    context     = appCtx,
+                    channelId   = "pill_reminders_v1",
                     channelName = "Pill Reminders",
-                    title = "Time to take your pill 💊",
-                    text = "Day $dayNumber of ${activePack.pillCount} — stay consistent!"
+                    title       = "Time to take your pill 💊",
+                    text        = "Day $dayNumber of ${activePack.pillCount} — stay consistent!"
                 )
             } catch (e: Throwable) {
                 android.util.Log.e("PillReceiver", "Crash: ${e.message}", e)
@@ -317,7 +349,7 @@ class PillReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// 6. SHARED NOTIFICATION HELPER
+// ── 6. SHARED NOTIFICATION HELPER ────────────────────────────────────────────
 
 private fun fireNotification(
     context: Context,
