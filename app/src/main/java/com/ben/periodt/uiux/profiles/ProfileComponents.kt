@@ -117,71 +117,106 @@ fun SwipeToDeleteCard(
     onDelete: () -> Unit,
     content: @Composable (Boolean) -> Unit
 ) {
-    val density     = LocalDensity.current
-    val scope       = rememberCoroutineScope()
-    val offsetX     = remember { Animatable(0f) }
-    val revealDp    = 80.dp
-    val revealPx    = with(density) { revealDp.toPx() }
-    val deleteThreshold = with(density) { 180.dp.toPx() }
-    var widthPx by remember { mutableStateOf(0f) }
+    val density  = LocalDensity.current
+    val scope    = rememberCoroutineScope()
+    val offsetX  = remember { Animatable(0f) }
+    val revealPx = with(density) { 80.dp.toPx() }
+    val deletePx = with(density) { 150.dp.toPx() }  // lower = snappier feel
+    var widthPx  by remember { mutableStateOf(0f) }
 
-    val itemShape   = RoundedCornerShape(20.dp)
-    val bounceSpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium)
-    val isRevealed  by remember { derivedStateOf { offsetX.value.absoluteValue > revealPx / 2f } }
-    val isSwiping   by remember { derivedStateOf { offsetX.value.absoluteValue > 2f } }
+    val itemShape = RoundedCornerShape(20.dp)
 
-    Card(
-        shape     = itemShape,
-        colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier  = modifier.fillMaxWidth().onSizeChanged { widthPx = it.width.toFloat() }
+    // Three distinct specs for three distinct feelings
+    val revealSpring   = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    val snapBackSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy,     stiffness = Spring.StiffnessMediumLow)
+    val deleteExit     = tween<Float>(durationMillis = 180, easing = FastOutLinearInEasing)
+
+    val isRevealed by remember { derivedStateOf { offsetX.value.absoluteValue > revealPx * 0.55f } }
+    val isSwiping  by remember { derivedStateOf { offsetX.value.absoluteValue > 4f } }
+
+    // Smooth proportional alpha — no more hard jump
+    val bgAlpha by remember { derivedStateOf {
+        (offsetX.value.absoluteValue / revealPx).coerceIn(0f, 0.85f)
+    }}
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { widthPx = it.width.toFloat() }
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier.matchParentSize().graphicsLayer { shape = itemShape; clip = true }
-                    .background(Color.Red.copy(alpha = if (offsetX.value.absoluteValue > 10f) 0.8f else 0f))
-                    .padding(horizontal = 24.dp),
-                contentAlignment = if (offsetX.value >= 0f) Alignment.CenterStart else Alignment.CenterEnd
+        // Background layer
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(itemShape)
+                .background(Color.Red.copy(alpha = bgAlpha))
+                .padding(horizontal = 24.dp),
+            contentAlignment = if (offsetX.value >= 0f) Alignment.CenterStart else Alignment.CenterEnd
+        ) {
+            AnimatedVisibility(
+                visible = isRevealed,
+                enter   = fadeIn(tween(120)) + scaleIn(tween(120, easing = FastOutSlowInEasing)),
+                exit    = fadeOut(tween(80))  + scaleOut(tween(80))
             ) {
-                if (isRevealed) {
-                    Icon(Icons.Default.Delete, "Delete", tint = Color.White, modifier = Modifier.size(24.dp))
-                    Box(
-                        modifier = Modifier.fillMaxHeight().width(revealDp).clickable(
-                            interactionSource = remember { MutableInteractionSource() }, indication = null
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
                         ) {
                             scope.launch {
                                 val target = if (offsetX.value >= 0f) widthPx else -widthPx
-                                offsetX.animateTo(target, bounceSpring)
+                                offsetX.animateTo(target, deleteExit)
                                 onDelete()
                             }
-                        }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
-            Box(
-                modifier = Modifier.fillMaxWidth().graphicsLayer { shape = itemShape; clip = true }
-                    .offset { IntOffset(offsetX.value.toInt(), 0) }
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(onDragEnd = {
+        }
+
+        // Draggable card layer
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(itemShape)
+                .offset { IntOffset(offsetX.value.toInt(), 0) }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
                             scope.launch {
-                                val currentOff = offsetX.value
-                                val target = when {
-                                    currentOff <= -deleteThreshold -> -widthPx
-                                    currentOff >= deleteThreshold  ->  widthPx
-                                    currentOff <= -revealPx / 2f  -> -revealPx
-                                    currentOff >= revealPx / 2f   ->  revealPx
-                                    else                           ->  0f
+                                val off = offsetX.value
+                                when {
+                                    off <= -deletePx || off >= deletePx -> {
+                                        // Fast, no-bounce exit → then delete
+                                        val target = if (off < 0f) -widthPx else widthPx
+                                        offsetX.animateTo(target, deleteExit)
+                                        onDelete()
+                                    }
+                                    off <= -(revealPx * 0.5f) -> offsetX.animateTo(-revealPx, revealSpring)
+                                    off >=  (revealPx * 0.5f) -> offsetX.animateTo( revealPx, revealSpring)
+                                    else                       -> offsetX.animateTo(0f, snapBackSpring)
                                 }
-                                offsetX.animateTo(target, bounceSpring)
-                                if (kotlin.math.abs(target) == widthPx) onDelete()
                             }
                         }
-                        ) { change, dragAmount ->
-                            change.consume()
-                            scope.launch { offsetX.snapTo((offsetX.value + dragAmount).coerceIn(-widthPx, widthPx)) }
+                    ) { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            offsetX.snapTo((offsetX.value + dragAmount).coerceIn(-widthPx, widthPx))
                         }
                     }
-            ) { content(isSwiping) }
+                }
+        ) {
+            content(isSwiping)
         }
     }
 }
@@ -202,7 +237,7 @@ fun ProfileBottomSheetContent(
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub     = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val rowBg       = if (isDark) Color(0xFF252525) else Color(0xFFF1F5F9)
+    val rowBg          = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     Column(
         modifier = Modifier
@@ -288,7 +323,7 @@ private fun ProfileRow(
     onSwitch: (Int) -> Unit,
     onEdit: (PeriodViewModel.Profile) -> Unit
 ) {
-    val sheetBg = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val sheetBg = if (isDark) Color(0xFF1B1B1B) else Color.White
     val targetBg = if (isSelected) androidx.compose.ui.graphics.lerp(sheetBg, highlightColor, 0.15f) else rowBg
     val animatedBg by animateColorAsState(targetValue = targetBg, animationSpec = tween(300), label = "rowBgAnim")
 
@@ -319,7 +354,7 @@ fun ProfileEditorDialog(
     var selectedAvatar by remember(existingProfile) { mutableStateOf(existingProfile?.avatarColor ?: "avatar_1") }
     val avatars = remember { listOf("avatar_1", "avatar_2", "avatar_3", "avatar_4", "avatar_5", "avatar_6", "avatar_7", "avatar_8") }
     val avatarRows = remember(avatars) { avatars.chunked(4) }
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
@@ -338,7 +373,31 @@ fun ProfileEditorDialog(
                     Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Profile Name", fontFamily = BricolageGrotesque, fontSize = SIZE_SM) }, singleLine = true, modifier = Modifier.fillMaxWidth(), textStyle = LocalTextStyle.current.copy(fontFamily = BricolageGrotesque, fontSize = SIZE_LG), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textPrimary, unfocusedTextColor = textPrimary, focusedLabelColor = accentColor, unfocusedLabelColor = textSub, focusedBorderColor = accentColor, unfocusedBorderColor = textSub.copy(alpha = 0.5f), cursorColor = accentColor))
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Profile Name", fontFamily = BricolageGrotesque, fontSize = SIZE_SM) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = LocalTextStyle.current.copy(
+                    fontFamily = BricolageGrotesque,
+                    fontSize = SIZE_LG,
+                    color = textPrimary
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor     = textPrimary,
+                    unfocusedTextColor   = textPrimary,
+                    focusedLabelColor    = accentColor,
+                    unfocusedLabelColor  = textSub,
+                    focusedBorderColor   = accentColor,
+                    unfocusedBorderColor = textSub.copy(alpha = 0.5f),
+                    cursorColor          = accentColor,
+                    selectionColors = androidx.compose.foundation.text.selection.TextSelectionColors(
+                        handleColor = accentColor,
+                        backgroundColor = accentColor.copy(alpha = 0.3f)
+                    )
+                )
+            )
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(text = "Choose Avatar", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
                 avatarRows.forEach { rowItems ->
@@ -368,11 +427,11 @@ fun LegacyImportDialog(
     onDismiss: () -> Unit
 ) {
     val isDark         = com.ben.periodt.ui.theme.LocalAppIsDark.current
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
     val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val rowBg          = if (isDark) Color(0xFF252525) else Color(0xFFF1F5F9)
+    val rowBg          = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     // ✨ FIXED: Integrated Scroll guard into the SheetState logic
     val scrollState = rememberScrollState()
