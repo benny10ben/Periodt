@@ -187,7 +187,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(24.dp))
                         .background(accentColor.copy(alpha = 0.1f))
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -438,7 +438,7 @@ fun SettingsScreen(
 @Composable
 fun ContentDialog(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val isDark = LocalAppIsDark.current
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
 
@@ -511,7 +511,7 @@ fun SettingsSection(title: String, surfaceColor: Color, content: @Composable Col
             modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
         )
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = surfaceColor),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -581,11 +581,11 @@ fun SettingsItem(
 @Composable
 fun AppearanceDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismiss: () -> Unit) {
     val isDark         = LocalAppIsDark.current
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val rowBg          = if (isDark) Color(0xFF252525) else Color(0xFFF1F5F9)
+    val rowBg          = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss, containerColor = containerColor,
