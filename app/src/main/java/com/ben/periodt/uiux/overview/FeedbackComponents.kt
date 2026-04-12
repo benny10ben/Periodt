@@ -41,7 +41,7 @@ fun SuccessFeedbackDialog(
     onDismiss: () -> Unit
 ) {
     val isDark = LocalAppIsDark.current
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
@@ -137,7 +137,8 @@ fun DestructiveConfirmationDialog(
     onDismiss: () -> Unit
 ) {
     val isDark = LocalAppIsDark.current
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val innerPillBg     = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val dangerColor    = Color(0xFFEF5350)
@@ -207,7 +208,11 @@ fun DestructiveConfirmationDialog(
                 TextButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).height(56.dp),
-                    shape = CircleShape
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = innerPillBg,
+                        contentColor = Color.White
+                    ),
                 ) {
                     Text(
                         "Cancel",
@@ -226,7 +231,6 @@ fun DestructiveConfirmationDialog(
                         containerColor = dangerColor,
                         contentColor = Color.White
                     ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                 ) {
                     Text(
                         "Delete",
@@ -244,7 +248,7 @@ fun DestructiveConfirmationDialog(
 @Composable
 fun WhatsNewDialog(onDismiss: () -> Unit) {
     val isDark = LocalAppIsDark.current
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color(0xFFF8FAFC)
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
     val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
