@@ -151,7 +151,7 @@ fun UpcomingBannerEnhanced(
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.SemiBold,
                                 color      = activeAccent,
-                                fontSize   = SIZE_XXS // 11.sp
+                                fontSize   = SIZE_XXS
                             )
                         }
                     } else {
@@ -174,7 +174,7 @@ fun UpcomingBannerEnhanced(
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Normal,
                         color      = textSecondary,
-                        fontSize   = SIZE_XXS, // 11.sp
+                        fontSize   = SIZE_XXS,
                         modifier   = Modifier.fillMaxWidth().wrapContentWidth(Alignment.End)
                     )
                 }
@@ -186,7 +186,7 @@ fun UpcomingBannerEnhanced(
                     fontFamily = BricolageGrotesque,
                     fontWeight = FontWeight.Normal,
                     color      = textPrimary.copy(alpha = 0.9f),
-                    fontSize   = SIZE_MD // 14.sp
+                    fontSize   = SIZE_MD
                 )
 
                 Spacer(Modifier.height(4.dp))
@@ -200,7 +200,7 @@ fun UpcomingBannerEnhanced(
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Normal,
                         color      = textSecondary,
-                        fontSize   = SIZE_SM // 13.sp
+                        fontSize   = SIZE_SM
                     )
 
                     if (!isDiscoveryMode && !isLearningMode && !isOnPill && badge.isNotEmpty()) {
@@ -215,7 +215,7 @@ fun UpcomingBannerEnhanced(
                                 fontFamily = BricolageGrotesque,
                                 fontWeight = FontWeight.Bold,
                                 color      = Color.White,
-                                fontSize   = SIZE_XXS // 11.sp
+                                fontSize   = SIZE_XXS
                             )
                         }
                     }
@@ -235,7 +235,7 @@ fun UpcomingBannerEnhanced(
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.Bold,
                         color      = Color.White,
-                        fontSize   = SIZE_XXS // 11.sp
+                        fontSize   = SIZE_XXS
                     )
                 }
             }
