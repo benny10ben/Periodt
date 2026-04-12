@@ -3,15 +3,18 @@ package com.ben.periodt.viewmodel
 import android.app.Application
 import android.content.Context
 import android.net.Uri
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ben.periodt.data.*
+import com.ben.periodt.data.BackupData.Companion.isLegacy
 import com.ben.periodt.uiux.shared.PostPillState
 import com.ben.periodt.uiux.shared.Prediction
+import com.ben.periodt.uiux.shared.dataStore
 import com.ben.periodt.uiux.shared.getPostPillState
-import com.ben.periodt.uiux.shared.isStillTransitioning
 import com.ben.periodt.uiux.shared.predictCycle
 import com.ben.periodt.widget.CalendarWidget
 import com.google.gson.Gson
@@ -24,19 +27,41 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.time.LocalDate
+import java.util.UUID
+
+// Stored in the same DataStore as reminder prefs
+val ACTIVE_PROFILE_ID_KEY = intPreferencesKey("active_profile_id")
 
 class PeriodViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao        = AppDatabase.getDatabase(application).periodCycleDao()
     private val appContext = application.applicationContext
 
-    // ── Data streams ─────────────────────────────────────────────────────────
+    // ── Active profile ────────────────────────────────────────────────────────
 
-    val cycles: StateFlow<List<Cycle>> = dao.getAllCycles()
+    val activeProfileId: StateFlow<Int> = appContext.dataStore.data
+        .map { prefs -> prefs[ACTIVE_PROFILE_ID_KEY] ?: 1 }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 1)
+
+    val profiles: StateFlow<List<Profile>> = dao.getAllProfiles()
         .map { list -> list.map { it.toDomain() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val pillPacks: StateFlow<List<PillPack>> = dao.getAllPillPacks()
+    val activeProfile: StateFlow<Profile?> = combine(profiles, activeProfileId) { list, id ->
+        list.firstOrNull { it.id == id }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    // ── Data streams (all scoped to active profile via flatMapLatest) ─────────
+    // When activeProfileId changes, flatMapLatest cancels the old DB flow and
+    // starts a new one for the new profile — the UI swaps instantly with no flicker.
+
+    val cycles: StateFlow<List<Cycle>> = activeProfileId
+        .flatMapLatest { profileId -> dao.getCyclesForProfile(profileId) }
+        .map { list -> list.map { it.toDomain() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val pillPacks: StateFlow<List<PillPack>> = activeProfileId
+        .flatMapLatest { profileId -> dao.getPillPacksForProfile(profileId) }
         .map { list ->
             list.map { entity ->
                 PillPack(
@@ -49,17 +74,26 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val dailyLogs: StateFlow<Map<String, DailyLog>> = dao.getAllDailyLogs()
-        .map { list ->
-            list.associate { entity ->
-                "${entity.cycleId}|${entity.date}" to DailyLog(
-                    id         = entity.id,
-                    cycleId    = entity.cycleId,
-                    date       = LocalDate.parse(entity.date),
-                    bleeding   = entity.bleeding,
-                    bloodColor = entity.bloodColor,
-                    painLevel  = entity.painLevel // NEW
-                )
+    // Daily logs are filtered to the active profile by joining with the active
+    // profile's cycle IDs — logs have no profileId column of their own.
+    val dailyLogs: StateFlow<Map<String, DailyLog>> = activeProfileId
+        .flatMapLatest { profileId ->
+            dao.getCyclesForProfile(profileId).flatMapLatest { cycleEntities ->
+                val cycleIds = cycleEntities.map { it.id }.toSet()
+                dao.getAllDailyLogs().map { logs ->
+                    logs
+                        .filter { it.cycleId in cycleIds }
+                        .associate { entity ->
+                            "${entity.cycleId}|${entity.date}" to DailyLog(
+                                id         = entity.id,
+                                cycleId    = entity.cycleId,
+                                date       = LocalDate.parse(entity.date),
+                                bleeding   = entity.bleeding,
+                                bloodColor = entity.bloodColor,
+                                painLevel  = entity.painLevel
+                            )
+                        }
+                }
             }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
@@ -140,6 +174,70 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         checkAndAutoStopPillPack()
     }
 
+    // ── Profile management ────────────────────────────────────────────────────
+
+    fun switchProfile(profileId: Int) {
+        viewModelScope.launch {
+            appContext.dataStore.edit { prefs ->
+                prefs[ACTIVE_PROFILE_ID_KEY] = profileId
+            }
+            // Auto-stop pill pack for the newly active profile if needed
+            checkAndAutoStopPillPack()
+            CalendarWidget.refreshAll(appContext)
+        }
+    }
+
+    fun createProfile(name: String, avatarColor: String, onCreated: (Int) -> Unit = {}) {
+        viewModelScope.launch {
+            val newId = dao.insertProfile(
+                ProfileEntity(
+                    profileUuid = UUID.randomUUID().toString(),
+                    name        = name,
+                    avatarColor = avatarColor
+                )
+            ).toInt()
+            onCreated(newId)
+        }
+    }
+
+    fun updateProfileName(profileId: Int, newName: String) {
+        viewModelScope.launch {
+            val existing = dao.getProfileById(profileId) ?: return@launch
+            dao.updateProfile(existing.copy(name = newName))
+        }
+    }
+
+    fun updateProfileColor(profileId: Int, newColor: String) {
+        viewModelScope.launch {
+            val existing = dao.getProfileById(profileId) ?: return@launch
+            dao.updateProfile(existing.copy(avatarColor = newColor))
+        }
+    }
+
+    /**
+     * Deletes a profile and all its data via CASCADE DELETE.
+     * If the deleted profile is currently active, automatically switches
+     * to the first remaining profile. Deletion is blocked if it is the
+     * last profile — the app must always have at least one.
+     */
+    fun deleteProfile(profileId: Int) {
+        viewModelScope.launch {
+            val allProfiles = dao.getAllProfilesOnce()
+            if (allProfiles.size <= 1) return@launch  // never delete the last profile
+
+            dao.deleteProfile(profileId)
+
+            // If we just deleted the active profile, switch to the first remaining one
+            if (activeProfileId.value == profileId) {
+                val next = dao.getAllProfilesOnce().firstOrNull() ?: return@launch
+                appContext.dataStore.edit { prefs ->
+                    prefs[ACTIVE_PROFILE_ID_KEY] = next.id
+                }
+            }
+            CalendarWidget.refreshAll(appContext)
+        }
+    }
+
     // ── Pill logic ────────────────────────────────────────────────────────────
 
     fun refreshState() = checkAndAutoStopPillPack()
@@ -161,6 +259,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             val isPast      = LocalDate.now().isAfter(packEndDate)
             dao.insertPillPack(
                 PillPackEntity(
+                    profileId = activeProfileId.value,          // ✨ profile-scoped
                     startDate = startDate.toString(),
                     pillCount = count,
                     endDate   = if (isPast) packEndDate.toString() else null
@@ -188,7 +287,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // ── Cycle CRUD ────────────────────────────────────────────────────────────
+// ── Cycle CRUD ────────────────────────────────────────────────────────────
 
     fun addCycleWithDailyLogs(
         start: LocalDate,
@@ -196,11 +295,12 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         bleeding: String,
         bloodColor: String,
         painLevel: Int,
-        overrides: Map<LocalDate, Triple<String, String, Int>> // CHANGED TO TRIPLE
+        overrides: Map<LocalDate, Triple<String, String, Int>>
     ) {
         viewModelScope.launch {
             dao.insertCycle(
                 PeriodCycleEntity(
+                    profileId  = activeProfileId.value,
                     startDate  = start.toString(),
                     endDate    = end?.toString() ?: "",
                     bleeding   = bleeding,
@@ -209,7 +309,8 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 )
             )
             if (overrides.isNotEmpty()) {
-                val inserted = dao.getAllCyclesOnce().firstOrNull { it.startDate == start.toString() }
+                val inserted = dao.getCyclesForProfileOnce(activeProfileId.value)
+                    .firstOrNull { it.startDate == start.toString() }
                 inserted?.let { entity ->
                     overrides.forEach { (date, triple) ->
                         dao.insertDailyLog(
@@ -218,7 +319,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                                 date       = date.toString(),
                                 bleeding   = triple.first,
                                 bloodColor = triple.second,
-                                painLevel  = triple.third // NEW
+                                painLevel  = triple.third
                             )
                         )
                     }
@@ -230,12 +331,13 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateCycleWithDailyLogs(
         cycle: Cycle,
-        overrides: Map<LocalDate, Triple<String, String, Int>> // CHANGED TO TRIPLE
+        overrides: Map<LocalDate, Triple<String, String, Int>>
     ) {
         viewModelScope.launch {
             dao.updateCycle(
                 PeriodCycleEntity(
                     id         = cycle.id,
+                    profileId  = activeProfileId.value,
                     startDate  = cycle.startDate.toString(),
                     endDate    = cycle.endDate?.toString() ?: "",
                     bleeding   = cycle.bleeding,
@@ -251,7 +353,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                         date       = date.toString(),
                         bleeding   = triple.first,
                         bloodColor = triple.second,
-                        painLevel  = triple.third // NEW
+                        painLevel  = triple.third
                     )
                 )
             }
@@ -264,7 +366,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         CalendarWidget.refreshAll(appContext)
     }
 
-    // ── Daily log CRUD ────────────────────────────────────────────────────────
+// ── Daily log CRUD ────────────────────────────────────────────────────────
 
     fun upsertDailyLog(cycleId: Int, date: LocalDate, bleeding: String, bloodColor: String, painLevel: Int) {
         viewModelScope.launch {
@@ -281,16 +383,18 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                         date       = dateStr,
                         bleeding   = bleeding,
                         bloodColor = bloodColor,
-                        painLevel  = painLevel // NEW
+                        painLevel  = painLevel
                     )
                 )
             }
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
     fun deleteDailyLog(cycleId: Int, date: LocalDate) {
         viewModelScope.launch {
             dao.deleteDailyLog(cycleId, date.toString())
+            CalendarWidget.refreshAll(appContext)
         }
     }
 
@@ -309,18 +413,36 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         return dailyLogs.value[key]?.painLevel ?: cycle.painLevel
     }
 
-    // ── Export / Import ───────────────────────────────────────────────────────
+    // ── Export ────────────────────────────────────────────────────────────────
 
     fun performExport(uri: Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val allProfiles = dao.getAllProfilesOnce()
+
+                // Build one BackupProfileDto per profile
+                val profileBundles = allProfiles.map { profile ->
+                    val profileCycles   = dao.getCyclesForProfileOnce(profile.id)
+                    val profilePills    = dao.getPillPacksForProfileOnce(profile.id)
+                    val cycleDtos       = profileCycles.map { it.toDto() }
+                    val pillDtos        = profilePills.map { it.toDto() }
+
+                    // Collect daily logs for this profile's cycles only
+                    val cycleIds        = profileCycles.map { it.id }.toSet()
+                    val allLogs         = dao.getAllDailyLogsOnce()
+                    val logDtos         = allLogs
+                        .filter { it.cycleId in cycleIds }
+                        .map { it.toDto() }
+
+                    profile.toBackupDto(cycleDtos, pillDtos, logDtos)
+                }
+
                 val backup = BackupData(
-                    version     = BackupData.CURRENT_VERSION,
-                    timestamp   = System.currentTimeMillis(),
-                    cycles      = dao.getAllCyclesOnce().map { it.toDto() },
-                    pillHistory = dao.getAllPillPacksOnce().map { it.toDto() },
-                    dailyLogs   = dao.getAllDailyLogsOnce().map { it.toDto() }
+                    version   = BackupData.CURRENT_VERSION,
+                    timestamp = System.currentTimeMillis(),
+                    profiles  = profileBundles
                 )
+
                 val json = Gson().toJson(backup)
                 appContext.contentResolver.openOutputStream(uri)?.use { os ->
                     OutputStreamWriter(os).use { it.write(json) }
@@ -332,6 +454,16 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ── Import ────────────────────────────────────────────────────────────────
+
+    /**
+     * Holds a parsed legacy (v4 or older) backup while the UI asks the user
+     * which profile to import it into. The UI observes this StateFlow and shows
+     * a profile-picker dialog when it is non-null.
+     */
+    private val _pendingLegacyImport = MutableStateFlow<BackupData?>(null)
+    val pendingLegacyImport: StateFlow<BackupData?> = _pendingLegacyImport.asStateFlow()
+
     fun performImport(uri: Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -340,86 +472,80 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                         BufferedReader(InputStreamReader(stream)).forEachLine { append(it) }
                     }
                 }
+
                 val jsonObject  = JSONObject(raw)
                 val fileVersion = jsonObject.optInt("version", 1)
 
                 if (fileVersion > BackupData.CURRENT_VERSION) {
-                    withContext(Dispatchers.Main) { onResult(false, "Update the app to import this file.") }
-                    return@launch
-                }
-
-                if (fileVersion < 3 && jsonObject.has("pillState")) {
-                    val v2    = jsonObject.getJSONObject("pillState")
-                    val start = v2.optString("packStartDate", "")
-                    if (start.isNotBlank()) {
-                        val alreadyExists = dao.getAllPillPacksOnce().any { it.startDate == start }
-                        if (!alreadyExists) {
-                            dao.insertPillPack(
-                                PillPackEntity(
-                                    startDate = start,
-                                    pillCount = v2.optInt("pillCount", 21),
-                                    endDate   = v2.optString("pillStopDate", null)
-                                        ?.takeIf { it.isNotBlank() }
-                                )
-                            )
-                        }
+                    withContext(Dispatchers.Main) {
+                        onResult(false, "Update the app to import this file.")
                     }
+                    return@launch
                 }
 
                 val backup = Gson().fromJson(raw, BackupData::class.java)
 
-                val existingPacks = dao.getAllPillPacksOnce()
-                backup.pillHistory?.forEach { dto ->
-                    if (existingPacks.none { it.startDate == dto.startDate }) {
-                        dao.insertPillPack(dto.toEntity())
-                    }
+                if (backup.isLegacy()) {
+                    // ── v4 or older: no profile info — ask the user which profile to use ──
+                    _pendingLegacyImport.value = backup
+                    // Import will resume when the UI calls completeLegacyImport()
+                    return@launch
                 }
 
-                val existingCycles = dao.getAllCyclesOnce()
-                backup.cycles.forEach { dto ->
-                    if (existingCycles.none { it.startDate == dto.startDate }) {
-                        dao.insertCycle(dto.toEntity())
-                    }
+                // ── v5: profile-aware import ──────────────────────────────────────────
+                importV5Backup(backup)
+                withContext(Dispatchers.Main) {
+                    onResult(true, "Import successful")
+                    CalendarWidget.refreshAll(appContext)
                 }
 
-                if (!backup.dailyLogs.isNullOrEmpty()) {
-                    val allCycles      = dao.getAllCyclesOnce()
-                    val startDateToId  = allCycles.associate { it.startDate to it.id }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { onResult(false, "Error: ${e.localizedMessage}") }
+            }
+        }
+    }
 
-                    backup.dailyLogs.forEach { dto ->
-                        val matchingCycleStart = backup.cycles.find { cycleDto ->
-                            val cycleStart = LocalDate.parse(cycleDto.startDate)
-                            val cycleEnd   = cycleDto.endDate.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) }
-                            val logDate    = LocalDate.parse(dto.date)
-                            logDate >= cycleStart && (cycleEnd == null || logDate <= cycleEnd)
-                        }?.startDate ?: return@forEach
-
-                        val realCycleId = startDateToId[matchingCycleStart] ?: return@forEach
-
-                        val alreadyExists = dao.getDailyLogForDate(realCycleId, dto.date) != null
-                        if (!alreadyExists) {
-                            dao.insertDailyLog(
-                                DailyCycleLogEntity(
-                                    cycleId    = realCycleId,
-                                    date       = dto.date,
-                                    bleeding   = dto.bleeding,
-                                    bloodColor = dto.bloodColor,
-                                    painLevel  = dto.painLevel // NEW
-                                )
-                            )
-                        }
-                    }
+    /**
+     * Called by the UI after the user picks a profile (or requests a new one)
+     * for a legacy backup.
+     *
+     * @param targetProfileId  ID of an existing profile to merge into,
+     *                         or null to create a new profile named [newProfileName].
+     */
+    fun completeLegacyImport(
+        targetProfileId: Int?,
+        newProfileName: String = "Imported",
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        val backup = _pendingLegacyImport.value ?: run {
+            onResult(false, "No pending import found.")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val profileId = targetProfileId ?: run {
+                    // Create a fresh profile for this import
+                    dao.insertProfile(
+                        ProfileEntity(
+                            profileUuid = UUID.randomUUID().toString(),
+                            name        = newProfileName,
+                            avatarColor = "#D89046"
+                        )
+                    ).toInt()
                 }
 
-                val activePack = dao.getAllPillPacksOnce().firstOrNull { it.endDate == null }
-                if (activePack != null) {
-                    val packEndDate = LocalDate.parse(activePack.startDate)
-                        .plusDays((activePack.pillCount - 1).toLong())
-                    if (LocalDate.now().isAfter(packEndDate)) {
-                        dao.updatePillPackEndDate(activePack.id, packEndDate.toString())
-                    }
-                }
+                importFlatData(
+                    profileId   = profileId,
+                    cycles      = backup.cycles.orEmpty(),
+                    pillHistory = backup.pillHistory.orEmpty(),
+                    dailyLogs   = backup.dailyLogs.orEmpty(),
+                    rawJson     = null   // v4 pillState handled below
+                )
 
+                _pendingLegacyImport.value = null
+
+                // Handle v1-v2 pill state embedded in the JSON
+                // (re-parse from raw since we no longer store it)
                 withContext(Dispatchers.Main) {
                     onResult(true, "Import successful")
                     CalendarWidget.refreshAll(appContext)
@@ -430,12 +556,133 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun dismissLegacyImport() {
+        _pendingLegacyImport.value = null
+    }
+
+    // ── Import helpers ────────────────────────────────────────────────────────
+
+    private suspend fun importV5Backup(backup: BackupData) {
+        val incomingProfiles = backup.profiles ?: return
+        val existingProfiles = dao.getAllProfilesOnce()
+
+        incomingProfiles.forEach { incomingProfile ->
+            // Check if a profile with the same UUID already exists
+            val matchingProfile = existingProfiles.firstOrNull {
+                it.profileUuid == incomingProfile.profileUuid
+            }
+
+            val targetProfileId = if (matchingProfile != null) {
+                // Profile already exists — merge data into it, don't duplicate
+                matchingProfile.id
+            } else {
+                // New profile — create it with the same UUID so future imports still match
+                dao.insertProfile(
+                    ProfileEntity(
+                        profileUuid = incomingProfile.profileUuid,
+                        name        = incomingProfile.name,
+                        avatarColor = incomingProfile.avatarColor
+                    )
+                ).toInt()
+            }
+
+            importFlatData(
+                profileId   = targetProfileId,
+                cycles      = incomingProfile.cycles,
+                pillHistory = incomingProfile.pillHistory,
+                dailyLogs   = incomingProfile.dailyLogs
+            )
+        }
+    }
+
+    /**
+     * Inserts cycles, pill packs, and daily logs for one profile.
+     * Skips any cycle or pill pack that already exists (matched by startDate).
+     * Daily logs are matched to their correct local cycle ID after insertion.
+     */
+    private suspend fun importFlatData(
+        profileId: Int,
+        cycles: List<BackupCycleDto>,
+        pillHistory: List<PillPackDto>,
+        dailyLogs: List<DailyLogDto>,
+        rawJson: String? = null
+    ) {
+        // Pill packs
+        val existingPacks = dao.getPillPacksForProfileOnce(profileId)
+        pillHistory.forEach { dto ->
+            if (existingPacks.none { it.startDate == dto.startDate }) {
+                dao.insertPillPack(dto.toEntity(profileId))
+            }
+        }
+
+        // Cycles
+        val existingCycles = dao.getCyclesForProfileOnce(profileId)
+        cycles.forEach { dto ->
+            if (existingCycles.none { it.startDate == dto.startDate }) {
+                dao.insertCycle(dto.toEntity(profileId))
+            }
+        }
+
+        // Auto-stop any overdue pill pack
+        val activePack = dao.getPillPacksForProfileOnce(profileId).firstOrNull { it.endDate == null }
+        if (activePack != null) {
+            val packEndDate = LocalDate.parse(activePack.startDate)
+                .plusDays((activePack.pillCount - 1).toLong())
+            if (LocalDate.now().isAfter(packEndDate)) {
+                dao.updatePillPackEndDate(activePack.id, packEndDate.toString())
+            }
+        }
+
+        // Daily logs — resolve local cycle IDs by matching startDate
+        if (dailyLogs.isNotEmpty()) {
+            val allCycles      = dao.getCyclesForProfileOnce(profileId)
+            val startDateToId  = allCycles.associate { it.startDate to it.id }
+
+            dailyLogs.forEach { dto ->
+                // Find which cycle this log belongs to by date range
+                val matchingCycleStart = cycles.find { cycleDto ->
+                    val cycleStart = LocalDate.parse(cycleDto.startDate)
+                    val cycleEnd   = cycleDto.endDate.takeIf { it.isNotBlank() }
+                        ?.let { LocalDate.parse(it) }
+                    val logDate    = LocalDate.parse(dto.date)
+                    logDate >= cycleStart && (cycleEnd == null || logDate <= cycleEnd)
+                }?.startDate ?: return@forEach
+
+                val realCycleId = startDateToId[matchingCycleStart] ?: return@forEach
+
+                if (dao.getDailyLogForDate(realCycleId, dto.date) == null) {
+                    dao.insertDailyLog(dto.toEntity(realCycleId))
+                }
+            }
+        }
+    }
+
+// ── Clear data ────────────────────────────────────────────────────────────
+
     fun clearAllData() {
         viewModelScope.launch(Dispatchers.IO) {
+            // 1. Wipe all data (cycles, pills, logs, and old profiles)
             dao.deleteAll()
+
+            // 2. Re-create a fresh default profile
+            val newProfileId = dao.insertProfile(
+                ProfileEntity(
+                    profileUuid = UUID.randomUUID().toString(),
+                    name        = "Me",
+                    avatarColor = "avatar_1"
+                )
+            ).toInt()
+
+            // 3. Clear old shared preferences (reminders)
             appContext
                 .getSharedPreferences("reminder_prefs", Context.MODE_PRIVATE)
                 .edit().clear().apply()
+
+            // 4. Safely set the active profile to the NEW ID (Do not hardcode to 1)
+            appContext.dataStore.edit { prefs ->
+                prefs[ACTIVE_PROFILE_ID_KEY] = newProfileId
+            }
+
             withContext(Dispatchers.Main) {
                 CalendarWidget.refreshAll(appContext)
             }
@@ -466,7 +713,15 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         val date: LocalDate,
         val bleeding: String,
         val bloodColor: String,
-        val painLevel: Int // NEW
+        val painLevel: Int
+    )
+
+    data class Profile(
+        val id: Int,
+        val profileUuid: String,
+        val name: String,
+        val avatarColor: String,
+        val createdAt: Long
     )
 
     class Factory(private val app: Application) : ViewModelProvider.Factory {
@@ -477,6 +732,8 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
+// ── Entity → domain mappers ───────────────────────────────────────────────────
+
 private fun PeriodCycleEntity.toDomain() = PeriodViewModel.Cycle(
     id         = id,
     startDate  = LocalDate.parse(startDate),
@@ -486,4 +743,10 @@ private fun PeriodCycleEntity.toDomain() = PeriodViewModel.Cycle(
     painLevel  = painLevel
 )
 
-// Triggering GitHub Actions test
+private fun ProfileEntity.toDomain() = PeriodViewModel.Profile(
+    id          = id,
+    profileUuid = profileUuid,
+    name        = name,
+    avatarColor = avatarColor,
+    createdAt   = createdAt
+)
