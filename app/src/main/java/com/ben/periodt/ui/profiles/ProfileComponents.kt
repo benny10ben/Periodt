@@ -141,19 +141,26 @@ fun ProfileEditorDialog(
 ) {
     val context = LocalContext.current
     var name by remember(existingProfile) { mutableStateOf(existingProfile?.name ?: "") }
-    var selectedAvatar by remember(existingProfile) { mutableStateOf(existingProfile?.avatarColor ?: "avatar_17") }
 
-    // Page 0: 17-24 (Fruits) | Page 1: 1-8 (Girls) | Page 2: 9-16 (Capybara)
+    // 1. Changed default fallback from "avatar_17" to "avatar_1"
+    var selectedAvatar by remember(existingProfile) {
+        mutableStateOf(existingProfile?.avatarColor ?: "avatar_1")
+    }
+
+    // This order is now: Girls (1-8), Capybara (9-16), Fruits (17-24)
     val avatars = remember {
         (1..8).map { "avatar_$it" } +
                 (9..16).map { "avatar_$it" } +
                 (17..24).map { "avatar_$it" }
     }
     val avatarPages = remember { avatars.chunked(8) }
-    val avatarSetHeadings = remember { listOf("Fruits", "Girls", "Capybara", "Contribute") }
 
+    // 2. Updated heading order to match the avatar list above
+    val avatarSetHeadings = remember { listOf("Girls", "Capybara", "Fruits", "Contribute") }
+
+    // 3. Updated initialPage logic to default to "avatar_1"
     val initialPage = remember(existingProfile, avatars) {
-        val currentAvatar = existingProfile?.avatarColor ?: "avatar_17"
+        val currentAvatar = existingProfile?.avatarColor ?: "avatar_1"
         val index = avatars.indexOf(currentAvatar)
         if (index != -1) index / 8 else 0
     }
@@ -289,7 +296,6 @@ fun ProfileEditorDialog(
                             }
                         }
                     } else {
-                        // Contribute Page with the missing text restored
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
