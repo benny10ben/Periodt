@@ -143,7 +143,7 @@ fun AnimatedIconBackground() {
 @Composable
 fun OnboardingButton(text: String, onClick: () -> Unit) {
     val isDark = isSystemInDarkTheme()
-    val btnColor = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val btnColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val txtColor = if (isDark) Color(0xFF1B1B1B) else Color.White
 
     Box(

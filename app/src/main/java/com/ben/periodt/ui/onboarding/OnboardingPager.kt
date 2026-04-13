@@ -144,7 +144,6 @@ fun WelcomePage(onGetStarted: () -> Unit) {
         }
 
         if (showLanguageDialog) {
-            // Force the dialog to read the system theme
             CompositionLocalProvider(LocalAppIsDark provides isSystemInDarkTheme()) {
                 ContentDialog(
                     title = "Choose Language",
@@ -358,7 +357,6 @@ fun FeaturesPage(onNext: () -> Unit) {
     }
 
     if (showTermsDialog) {
-        // Force the dialog to read the system theme instead of the app's uninitialized default
         CompositionLocalProvider(LocalAppIsDark provides isSystemInDarkTheme()) {
             ContentDialog(
                 title = "Terms & Conditions",
@@ -388,12 +386,15 @@ fun ModeSelectionPage(onStart: () -> Unit) {
     val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val subTextColor = textColor.copy(alpha = 0.7f)
 
-    val infoPagerState = rememberPagerState(pageCount = { 3 })
+    // Expanded to 5 cards to include Profiles and Pills
+    val infoPagerState = rememberPagerState(pageCount = { 5 })
 
     val themeColor = when (infoPagerState.currentPage) {
-        0 -> Color(0xFF2A3825)
-        1 -> Color(0xFFD89046)
-        2 -> Color(0xFF4E1A1A)
+        0 -> if (isDark) Color(0xFF2A3825) else Color(0xFF6d9567).copy(alpha = 0.6f)// Privacy First (Olive)
+        1 -> Color(0xFFD89046) // Smart Predictions (Orange)
+        2 -> Color(0xFF4E1A1A) // Cycle Syncing (Maroon)
+        3 -> if (isDark) Color(0xFF2A3825) else Color(0xFF6d9567).copy(alpha = 0.6f) // Multi-Profile (Muted Navy/Teal)
+        4 -> Color(0xFFA68E74) // Pill Tracking (Sand/Taupe)
         else -> textColor
     }
 
@@ -440,7 +441,6 @@ fun ModeSelectionPage(onStart: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            // Tweak these values if you want to show more/less of the adjacent cards
             contentPadding = PaddingValues(horizontal = 48.dp),
             pageSpacing = 16.dp
         ) { page ->
@@ -451,7 +451,7 @@ fun ModeSelectionPage(onStart: () -> Unit) {
 
             Box(
                 modifier = Modifier
-                    .fillMaxWidth() // <--- Ensures consistent width for accurate peeking
+                    .fillMaxWidth()
                     .fillMaxHeight(0.9f)
                     .graphicsLayer {
                         scaleX = scale
@@ -461,9 +461,11 @@ fun ModeSelectionPage(onStart: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 when (page) {
-                    0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, Color(0xFF6d9567).copy(alpha = 0.4f))
+                    0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, Color(0xFF6d9567).copy(alpha = 0.6f))
                     1 -> InfoCard("Smart Predictions", "We calculate your cycle based on the average of your last 3 logs. The more you log, the more accurate we get.", Icons.Rounded.AutoAwesome, Color(0xFFD89046))
                     2 -> InfoCard("Cycle Syncing", "Get phase-specific advice on nutrition, exercise, and sleep to live in harmony with your hormones.", Icons.Rounded.SelfImprovement, Color(0xFF4E1A1A))
+                    3 -> InfoCard("Multi-Profile", "Track cycles for yourself, family, or partners effortlessly from one app with seamless profile switching.", Icons.Rounded.Group, Color(0xFF6d9567).copy(alpha = 0.6f))
+                    4 -> InfoCard("Daily Pills", "Never miss a dose. Set customizable daily reminders for your birth control, vitamins, or supplements.", Icons.Rounded.Medication, Color(0xFFA68E74))
                 }
             }
         }
@@ -478,7 +480,7 @@ fun ModeSelectionPage(onStart: () -> Unit) {
         ) {
             PageIndicator(
                 current = infoPagerState.currentPage,
-                total = 3,
+                total = 5,
                 activeColor = animatedThemeColor
             )
             Spacer(Modifier.height(32.dp))
@@ -520,7 +522,7 @@ fun InfoCard(title: String, subtitle: String, icon: ImageVector, backgroundColor
             Text(
                 subtitle,
                 fontFamily = BricolageGrotesque,
-                style = MaterialTheme.typography.bodyMedium, // Stepped down to bodyMedium for safety
+                style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.85f),
                 lineHeight = 22.sp
             )
