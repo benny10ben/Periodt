@@ -1,6 +1,5 @@
-package com.ben.periodt.uiux.overview
+package com.ben.periodt.ui.overview
 
-import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,11 +34,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.profiles.LegacyImportDialog
-import com.ben.periodt.uiux.shared.dataStore
+import com.ben.periodt.ui.profiles.LegacyImportDialog
+import com.ben.periodt.reminder.dataStore
 import com.ben.periodt.viewmodel.PeriodViewModel
+import com.ben.periodt.widget.CalendarWidget
 import kotlinx.coroutines.launch
 import nl.dionsegijn.konfetti.compose.KonfettiView
+import nl.dionsegijn.konfetti.compose.OnParticleSystemUpdateListener
 import nl.dionsegijn.konfetti.core.Party
 import nl.dionsegijn.konfetti.core.PartySystem
 import nl.dionsegijn.konfetti.core.Position
@@ -310,7 +311,7 @@ fun SettingsScreen(
             onSelect = { selected ->
                 coroutineScope.launch {
                     context.dataStore.edit { p -> p[THEME_MODE_KEY] = selected.name }
-                    com.ben.periodt.widget.CalendarWidget.refreshAll(context)
+                    CalendarWidget.refreshAll(context)
                 }
                 showAppearance = false
             },
@@ -422,7 +423,7 @@ fun SettingsScreen(
         KonfettiView(
             modifier = Modifier.fillMaxSize(),
             parties = rainConfetti(),
-            updateListener = object : nl.dionsegijn.konfetti.compose.OnParticleSystemUpdateListener {
+            updateListener = object : OnParticleSystemUpdateListener {
                 override fun onParticleSystemEnded(system: PartySystem, activeSystems: Int) { if (activeSystems == 0) showConfetti = false }
             }
         )

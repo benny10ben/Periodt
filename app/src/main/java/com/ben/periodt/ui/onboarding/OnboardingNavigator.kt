@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.onboarding
+package com.ben.periodt.ui.onboarding
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay

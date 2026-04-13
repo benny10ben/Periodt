@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.profiles
+package com.ben.periodt.ui.profiles
 
 import android.content.Intent
 import android.net.Uri

@@ -11,11 +11,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ben.periodt.data.*
 import com.ben.periodt.data.BackupData.Companion.isLegacy
-import com.ben.periodt.uiux.shared.PostPillState
-import com.ben.periodt.uiux.shared.Prediction
-import com.ben.periodt.uiux.shared.dataStore
-import com.ben.periodt.uiux.shared.getPostPillState
-import com.ben.periodt.uiux.shared.predictCycle
+import com.ben.periodt.ui.shared.PostPillState
+import com.ben.periodt.ui.shared.Prediction
+import com.ben.periodt.reminder.dataStore
+import com.ben.periodt.ui.shared.CycleRegularity
+import com.ben.periodt.ui.shared.getPostPillState
+import com.ben.periodt.ui.shared.predictCycle
 import com.ben.periodt.widget.CalendarWidget
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -155,7 +156,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                     ovulationConfidence   = 1.0f,
                     fertileWindow         = LocalDate.MIN..LocalDate.MIN,
                     cycleLength           = activeCount + 7,
-                    cycleRegularity       = com.ben.periodt.uiux.shared.CycleRegularity.VERY_REGULAR
+                    cycleRegularity       = CycleRegularity.VERY_REGULAR
                 )
             }
             transitioning -> null

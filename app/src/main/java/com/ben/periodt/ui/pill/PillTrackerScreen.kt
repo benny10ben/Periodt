@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.pill
+package com.ben.periodt.ui.pill
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -29,9 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.calendar.SwipeToDeleteCard
-import com.ben.periodt.uiux.shared.PostPillState
-import com.ben.periodt.uiux.shared.pretty
+import com.ben.periodt.ui.calendar.SwipeToDeleteCard
+import com.ben.periodt.ui.shared.PostPillState
+import com.ben.periodt.ui.shared.pretty
 import com.ben.periodt.viewmodel.PeriodViewModel
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -309,8 +311,8 @@ private fun ActivePackSection(
                         .clip(CircleShape)
                         .align(Alignment.CenterHorizontally)
                 ) {
-                    drawRoundRect(color = pillBackground.copy(alpha = 0.4f), size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f))
-                    drawRoundRect(brush = progressBrush, size = androidx.compose.ui.geometry.Size(animatedProgress * size.width, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(50f))
+                    drawRoundRect(color = pillBackground.copy(alpha = 0.4f), size = size, cornerRadius = CornerRadius(50f))
+                    drawRoundRect(brush = progressBrush, size = Size(animatedProgress * size.width, size.height), cornerRadius = CornerRadius(50f))
                 }
             }
         }

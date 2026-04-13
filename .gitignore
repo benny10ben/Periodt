@@ -1,14 +1,13 @@
 # --- Build Outputs ---
-# Excludes all build folders and generated binaries
 **/build/
 *.apk
 *.aab
 *.ap_
 *.dex
 **/release/
+*.hprof
 
 # --- Android Studio / IntelliJ ---
-# Excludes IDE-specific configuration and local paths
 .idea/
 *.iml
 .gradle/
@@ -17,9 +16,10 @@ captures/
 .externalNativeBuild
 .cxx/
 *.stackdump
+.navigation/
+lint-results*
 
 # --- Secrets & Signing (CRITICAL) ---
-# Never share these; they are required for publishing and private keys
 *.jks
 *.keystore
 *.gpg
@@ -27,12 +27,15 @@ key.properties
 google-services.json
 
 # --- OS Specific ---
-# Clean up system files
 .DS_Store
 Thumbs.db
 *~
 *.swp
 
-# --- Kotlin/Kapt ---
-# Excludes temporary files generated during Kotlin/Kapt compilation
+# --- Kotlin ---
 .kotlin/
+
+# --- Logs & Temp ---
+*.log
+*.tmp
+*.orig

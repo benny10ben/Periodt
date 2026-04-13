@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.overview
+package com.ben.periodt.ui.overview
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

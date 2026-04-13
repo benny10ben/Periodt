@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.onboarding
+package com.ben.periodt.ui.onboarding
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.translate
@@ -111,7 +112,7 @@ fun AnimatedIconBackground() {
                                     // Draw Icon
                                     with(it) {
                                         draw(
-                                            size = androidx.compose.ui.geometry.Size(iconSize, iconSize),
+                                            size = Size(iconSize, iconSize),
                                             colorFilter = ColorFilter.tint(iconColor)
                                         )
                                     }

@@ -1,5 +1,8 @@
-package com.ben.periodt.uiux.overview
+package com.ben.periodt.ui.overview
 
+import android.graphics.DashPathEffect
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -30,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,13 +61,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.shared.PostPillState
-import com.ben.periodt.uiux.shared.UpcomingBannerEnhanced
-import com.ben.periodt.uiux.shared.calculatePeriodLength
-import com.ben.periodt.uiux.shared.getConfidenceLabel
-import com.ben.periodt.uiux.shared.getCycleConfidence
-import com.ben.periodt.uiux.shared.getDisplayName
-import com.ben.periodt.uiux.shared.pretty
+import com.ben.periodt.ui.shared.PostPillState
+import com.ben.periodt.ui.shared.UpcomingBannerEnhanced
+import com.ben.periodt.ui.shared.calculatePeriodLength
+import com.ben.periodt.ui.shared.getConfidenceLabel
+import com.ben.periodt.ui.shared.getCycleConfidence
+import com.ben.periodt.ui.shared.getDisplayName
+import com.ben.periodt.ui.shared.pretty
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
@@ -84,11 +86,14 @@ import androidx.compose.animation.core.spring
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.SizeTransform
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Insights
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import com.ben.periodt.R
+import kotlin.math.round
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
@@ -161,7 +166,7 @@ fun OverviewScreen(viewModel: PeriodViewModel) {
         Triple(
             bleedingCounts.maxByOrNull { it.value }?.key ?: "Medium",
             colorCounts.maxByOrNull    { it.value }?.key ?: "Bright Red",
-            kotlin.math.round(totalPain.toFloat() / totalDays).toInt()
+            round(totalPain.toFloat() / totalDays).toInt()
         )
     }
     val recentCyclesCount = minOf(cycles.size, 6)
@@ -534,11 +539,11 @@ private fun YAxisLabels(
         val chartBottom   = size.height - bottomPadding
         yLabels.forEachIndexed { index, label ->
             val y     = chartBottom - (index.toFloat() / (yLabels.size - 1)) * chartHeight
-            val paint = android.graphics.Paint().apply {
+            val paint = Paint().apply {
                 color     = labelColor.toArgb()
                 textSize  = with(density) { SIZE_XXS.toPx() }
-                textAlign = android.graphics.Paint.Align.RIGHT
-                typeface  = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+                textAlign = Paint.Align.RIGHT
+                typeface  = Typeface.create("sans-serif", Typeface.BOLD)
             }
             val textHeight = paint.descent() - paint.ascent()
             val textOffset = (textHeight / 2) - paint.descent()
@@ -616,10 +621,10 @@ private fun LineChartContent(
         val chartHeight       = chartBottom - topPadding
 
         val ySteps    = 4
-        val gridPaint = android.graphics.Paint().apply {
+        val gridPaint = Paint().apply {
             color       = gridColor.toArgb()
             strokeWidth = 1.dp.toPx()
-            pathEffect  = android.graphics.DashPathEffect(floatArrayOf(10f, 10f), 0f)
+            pathEffect  = DashPathEffect(floatArrayOf(10f, 10f), 0f)
         }
         repeat(ySteps + 1) { i ->
             val y = chartBottom - (i.toFloat() / ySteps) * chartHeight
@@ -646,11 +651,11 @@ private fun LineChartContent(
             prevXPos = xPos; prevYPos = yPos
 
             if (index < dates.size) {
-                val paint = android.graphics.Paint().apply {
+                val paint = Paint().apply {
                     color     = labelColor.toArgb()
                     textSize  = with(density) { SIZE_XXS.toPx() }
-                    textAlign = android.graphics.Paint.Align.CENTER
-                    typeface  = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+                    textAlign = Paint.Align.CENTER
+                    typeface  = Typeface.create("sans-serif", Typeface.BOLD)
                 }
                 drawContext.canvas.nativeCanvas.drawText(dates[index], xPos, size.height - 10.dp.toPx(), paint)
             }
@@ -775,10 +780,10 @@ fun RecentTrendsBanner(trends: Triple<String, String, Int>?, cycleCount: Int) {
                     shape = cardShape
                 }
         ) {
-            androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = com.ben.periodt.R.drawable.recent),
+            Image(
+                painter = painterResource(id = R.drawable.recent),
                 contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize()
             )
 
@@ -812,13 +817,13 @@ fun RecentTrendsBanner(trends: Triple<String, String, Int>?, cycleCount: Int) {
 
                 Spacer(Modifier.height(12.dp))
 
-                val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
+                val annotatedSummary = buildAnnotatedString {
                     append("Over your last $cycleCount cycle${if (cycleCount > 1) "s" else ""}, your typical flow is ")
-                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
+                    pushStyle(SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
                     append("${trends.first.lowercase()} (${trends.second.lowercase()})")
                     pop()
                     append(", with an average pain level of ")
-                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
+                    pushStyle(SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
                     append("${trends.third}/10")
                     pop()
                     append(".")

@@ -1,10 +1,11 @@
-package com.ben.periodt.uiux.shared
+package com.ben.periodt.ui.shared
 
 import com.ben.periodt.viewmodel.PeriodViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.math.max
+import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -269,8 +270,8 @@ private fun predictOvulation(
         cycles.size >= 3                                                      -> 0.55f
         else                                                                  -> 0.40f
     }
-    val trendBoost = if (kotlin.math.abs(trendSlope) < 1.0) 0.05f else 0f
-    confidence     = kotlin.math.min(0.95f, confidence + trendBoost)
+    val trendBoost = if (abs(trendSlope) < 1.0) 0.05f else 0f
+    confidence     = min(0.95f, confidence + trendBoost)
     return OvulationPrediction(nextPeriodStart.minusDays(lutealPhase.toLong()), confidence)
 }
 

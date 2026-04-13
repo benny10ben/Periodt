@@ -1,10 +1,9 @@
-package com.ben.periodt.uiux.calendar
+package com.ben.periodt.ui.calendar
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.Update
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +46,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.animation.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
@@ -102,6 +99,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import kotlin.math.round
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
@@ -151,7 +151,7 @@ fun AddCycleDialog(
     }
     val derivedPain = remember(dailyOverrides, painLevel, cycleDays) {
         if (dailyOverrides.isEmpty() || cycleDays.isEmpty()) return@remember painLevel
-        kotlin.math.round(cycleDays.sumOf { day -> dailyOverrides[day]?.third ?: painLevel }.toFloat() / cycleDays.size).toInt()
+        round(cycleDays.sumOf { day -> dailyOverrides[day]?.third ?: painLevel }.toFloat() / cycleDays.size).toInt()
     }
 
     val isDark = LocalAppIsDark.current
@@ -226,13 +226,13 @@ fun AddCycleDialog(
                         fontSize   = SIZE_MD,
                         color      = textPrimary
                     )
-                    val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
+                    val annotatedSummary = buildAnnotatedString {
                         append("Based on your daily logs, this cycle has a peak flow of ")
-                        pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
                         append("${derivedBleeding.lowercase()} (${derivedColor.lowercase()})")
                         pop()
                         append(", with an average pain level of ")
-                        pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
                         append("$derivedPain/10")
                         pop()
                         append(".")
@@ -393,16 +393,17 @@ fun AddCycleDialog(
         }
         val tempCycle = PeriodViewModel.Cycle(id = 0, startDate = startDate, endDate = endDate, bleeding = bleeding, bloodColor = bloodColor, painLevel = painLevel)
 
-        com.ben.periodt.uiux.calendar.DayLogDialog(
-            date      = day,
-            cycle     = tempCycle,
+        DayLogDialog(
+            date = day,
+            cycle = tempCycle,
             existingLog = existingLog,
             onDismiss = { selectedDayForLog = null },
-            onSave    = { newBleeding, newColor, newPain ->
-                dailyOverrides = dailyOverrides.toMutableMap().apply { put(day, Triple(newBleeding, newColor, newPain)) }
+            onSave = { newBleeding, newColor, newPain ->
+                dailyOverrides = dailyOverrides.toMutableMap()
+                    .apply { put(day, Triple(newBleeding, newColor, newPain)) }
                 selectedDayForLog = null
             },
-            onClear   = {
+            onClear = {
                 dailyOverrides = dailyOverrides.toMutableMap().apply { remove(day) }
                 selectedDayForLog = null
             }
@@ -444,18 +445,18 @@ fun MinimalDatePickerDialog(
     onConfirm: (Long) -> Unit
 ) {
     val isDark = LocalAppIsDark.current
-    val zone   = remember { java.time.ZoneId.systemDefault() }
+    val zone   = remember { ZoneId.systemDefault() }
 
     var selectedMillis by remember {
-        mutableStateOf(java.time.Instant.now().atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli())
+        mutableStateOf(Instant.now().atZone(zone).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli())
     }
     var displayedYm by remember {
-        mutableStateOf(java.time.Instant.ofEpochMilli(selectedMillis).atZone(zone).toLocalDate().let { d -> java.time.YearMonth.of(d.year, d.month) })
+        mutableStateOf(Instant.ofEpochMilli(selectedMillis).atZone(zone).toLocalDate().let { d -> YearMonth.of(d.year, d.month) })
     }
 
-    val dateFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
     var manualDateText by remember {
-        mutableStateOf(java.time.Instant.ofEpochMilli(selectedMillis).atZone(zone).toLocalDate().format(dateFormatter))
+        mutableStateOf(Instant.ofEpochMilli(selectedMillis).atZone(zone).toLocalDate().format(dateFormatter))
     }
     var isDateError by remember { mutableStateOf(false) }
 
@@ -512,9 +513,9 @@ fun MinimalDatePickerDialog(
                 onValueChange = { newVal ->
                     manualDateText = newVal
                     try {
-                        val parsedDate = java.time.LocalDate.parse(newVal, dateFormatter)
+                        val parsedDate = LocalDate.parse(newVal, dateFormatter)
                         selectedMillis = parsedDate.atStartOfDay(zone).toInstant().toEpochMilli()
-                        displayedYm    = java.time.YearMonth.of(parsedDate.year, parsedDate.month)
+                        displayedYm    = YearMonth.of(parsedDate.year, parsedDate.month)
                         isDateError    = false
                     } catch (e: Exception) { isDateError = true }
                 },
@@ -543,7 +544,7 @@ fun MinimalDatePickerDialog(
                 onDisplayedYmChange = { displayedYm = it },
                 onSelect            = { ms ->
                     selectedMillis = ms
-                    manualDateText = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate().format(dateFormatter)
+                    manualDateText = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate().format(dateFormatter)
                     isDateError    = false
                 },
                 textColor           = textPrimary,

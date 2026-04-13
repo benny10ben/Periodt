@@ -1,21 +1,47 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Keep key attributes
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Entry points (manifest-referenced)
+-keep class ** extends android.app.Activity
+-keep class ** extends android.app.Service
+-keep class ** extends android.content.BroadcastReceiver
+-keep class ** extends android.appwidget.AppWidgetProvider
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Kotlin coroutines
+-keepclassmembers class kotlinx.coroutines.** { *; }
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Jetpack Compose
+-keepclasseswithmembers class * {
+    @androidx.compose.runtime.Composable <methods>;
+}
+-keep class androidx.compose.** { *; }
+-keep class androidx.activity.compose.** { *; }
+-keep class androidx.lifecycle.viewmodel.compose.** { *; }
+
+# Room
+-keep class androidx.room.** { *; }
+-keep @androidx.room.Entity class * { *; }
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep interface * implements androidx.room.Dao { *; }
+-dontwarn androidx.room.paging.**
+
+# SQLCipher
+-keep,includedescriptorclasses class net.sqlcipher.** { *; }
+-keep,includedescriptorclasses interface net.sqlcipher.** { *; }
+
+# AndroidX Security
+-keep class androidx.security.crypto.** { *; }
+
+# Strip debug logs
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}
+
+# Gson — only keep the library itself, data classes are protected
+# via @Keep annotations directly in source (BackupData.kt)
+-keep class com.google.gson.** { *; }
+-dontwarn com.google.gson.**

@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.pill
+package com.ben.periodt.ui.pill
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,10 +22,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.calendar.CleanDateCard
-import com.ben.periodt.uiux.calendar.EntryStylePill
-import com.ben.periodt.uiux.calendar.MinimalDatePickerDialog
-import com.ben.periodt.uiux.calendar.millisToLocalDate
+import com.ben.periodt.ui.calendar.CleanDateCard
+import com.ben.periodt.ui.calendar.EntryStylePill
+import com.ben.periodt.ui.calendar.MinimalDatePickerDialog
+import com.ben.periodt.ui.calendar.millisToLocalDate
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 

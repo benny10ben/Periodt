@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.onboarding
+package com.ben.periodt.ui.onboarding
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme

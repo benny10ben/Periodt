@@ -1,7 +1,8 @@
-package com.ben.periodt.uiux.onboarding
+package com.ben.periodt.ui.onboarding
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,8 +42,9 @@ import androidx.compose.ui.unit.sp
 import com.ben.periodt.R
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.SetSystemBars
-import com.ben.periodt.uiux.overview.ContentDialog
+import com.ben.periodt.ui.theme.SetSystemBars
+import com.ben.periodt.ui.overview.ContentDialog
+import kotlin.math.abs
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -379,7 +381,7 @@ fun FeaturesPage(onNext: () -> Unit) {
 }
 
 // --- PAGE 3: MODE SELECTION ---
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ModeSelectionPage(onStart: () -> Unit) {
     val isDark = isSystemInDarkTheme()
@@ -443,7 +445,7 @@ fun ModeSelectionPage(onStart: () -> Unit) {
             pageSpacing = 16.dp
         ) { page ->
             val pageOffset = ((infoPagerState.currentPage - page) + infoPagerState.currentPageOffsetFraction)
-                .let { kotlin.math.abs(it) }
+                .let { abs(it) }
             val scale = 1f - (0.15f * pageOffset.coerceIn(0f, 1f))
             val cardAlpha = 1f - (0.4f * pageOffset.coerceIn(0f, 1f))
 

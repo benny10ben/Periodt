@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux
+package com.ben.periodt.ui.theme
 
 import android.app.Activity
 import androidx.compose.runtime.Composable

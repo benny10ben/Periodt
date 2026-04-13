@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux.shared
+package com.ben.periodt.reminder
 
 import android.app.AlarmManager
 import android.app.NotificationChannel
@@ -8,12 +8,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.ben.periodt.MainActivity
 import com.ben.periodt.R
 import com.ben.periodt.data.AppDatabase
+import com.ben.periodt.ui.shared.isStillTransitioning
+import com.ben.periodt.ui.shared.predictCycle
 import com.ben.periodt.viewmodel.ACTIVE_PROFILE_ID_KEY
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +26,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 // ── 1. DATASTORE ──────────────────────────────────────────────────────────────
@@ -198,14 +202,14 @@ class ModernReminderReceiver : BroadcastReceiver() {
                             else "Period in $daysBefore days",
                             text        = "Your cycle is predicted to start around ${
                                 predictedStart.format(
-                                    java.time.format.DateTimeFormatter.ofPattern("MMM d")
+                                    DateTimeFormatter.ofPattern("MMM d")
                                 )
                             }."
                         )
                     }
                 }
             } catch (e: Throwable) {
-                android.util.Log.e("PeriodReceiver", "Crash: ${e.message}", e)
+                Log.e("PeriodReceiver", "Crash: ${e.message}", e)
             } finally {
                 pendingResult.finish()
             }
@@ -269,7 +273,7 @@ class FertilityReminderReceiver : BroadcastReceiver() {
 
                 if (daysUntil == daysBefore) {
                     val dateStr = ovulationDay.format(
-                        java.time.format.DateTimeFormatter.ofPattern("MMM d")
+                        DateTimeFormatter.ofPattern("MMM d")
                     )
                     val (notifTitle, notifText) = when {
                         daysUntil == 0 ->
@@ -290,7 +294,7 @@ class FertilityReminderReceiver : BroadcastReceiver() {
                     )
                 }
             } catch (e: Throwable) {
-                android.util.Log.e("FertilityReceiver", "Crash: ${e.message}", e)
+                Log.e("FertilityReceiver", "Crash: ${e.message}", e)
             } finally {
                 pendingResult.finish()
             }
@@ -341,7 +345,7 @@ class PillReminderReceiver : BroadcastReceiver() {
                     text        = "Day $dayNumber of ${activePack.pillCount} — stay consistent!"
                 )
             } catch (e: Throwable) {
-                android.util.Log.e("PillReceiver", "Crash: ${e.message}", e)
+                Log.e("PillReceiver", "Crash: ${e.message}", e)
             } finally {
                 pendingResult.finish()
             }

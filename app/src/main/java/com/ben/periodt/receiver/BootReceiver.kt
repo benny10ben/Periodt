@@ -1,8 +1,12 @@
-package com.ben.periodt.uiux.shared
+package com.ben.periodt.receiver
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
+import com.ben.periodt.reminder.ReminderPrefs
+import com.ben.periodt.reminder.ReminderScheduler
+import com.ben.periodt.reminder.dataStore
 import com.ben.periodt.viewmodel.ACTIVE_PROFILE_ID_KEY
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +61,7 @@ class BootReceiver : BroadcastReceiver() {
                 }
 
             } catch (e: Throwable) {
-                android.util.Log.e("BootReceiver", "Boot reschedule failed: ${e.message}", e)
+                Log.e("BootReceiver", "Boot reschedule failed: ${e.message}", e)
             } finally {
                 pendingResult.finish()
             }

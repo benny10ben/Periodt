@@ -1,4 +1,4 @@
-package com.ben.periodt.uiux
+package com.ben.periodt.ui
 
 import android.app.Application
 import android.content.Context
@@ -13,7 +13,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Medication
@@ -30,8 +29,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.edit
@@ -42,20 +39,23 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.calendar.AddCycleDialog
-import com.ben.periodt.uiux.calendar.CalendarScreen
-import com.ben.periodt.uiux.overview.OverviewScreen
-import com.ben.periodt.uiux.overview.RemindersDialog
-import com.ben.periodt.uiux.overview.SettingsScreen
-import com.ben.periodt.uiux.overview.THEME_MODE_KEY
-import com.ben.periodt.uiux.overview.ThemeMode
-import com.ben.periodt.uiux.overview.WhatsNewDialog
-import com.ben.periodt.uiux.pill.PillTrackerScreen
-import com.ben.periodt.uiux.pill.PillTrackingSetupDialog
-import com.ben.periodt.uiux.profiles.*
-import com.ben.periodt.uiux.shared.dataStore
+import com.ben.periodt.ui.theme.SetSystemBars
+import com.ben.periodt.ui.calendar.AddCycleDialog
+import com.ben.periodt.ui.calendar.CalendarScreen
+import com.ben.periodt.ui.overview.OverviewScreen
+import com.ben.periodt.reminder.RemindersDialog
+import com.ben.periodt.ui.overview.SettingsScreen
+import com.ben.periodt.ui.overview.THEME_MODE_KEY
+import com.ben.periodt.ui.overview.ThemeMode
+import com.ben.periodt.ui.overview.WhatsNewDialog
+import com.ben.periodt.ui.pill.PillTrackerScreen
+import com.ben.periodt.ui.pill.PillTrackingSetupDialog
+import com.ben.periodt.reminder.dataStore
+import com.ben.periodt.ui.profiles.AvatarDisplay
+import com.ben.periodt.ui.profiles.LegacyImportDialog
+import com.ben.periodt.ui.profiles.ProfileBottomSheetContent
+import com.ben.periodt.ui.profiles.ProfileEditorDialog
 import com.ben.periodt.viewmodel.PeriodViewModel
 import com.ben.periodt.widget.CalendarWidget
 import dev.chrisbanes.haze.HazeState
@@ -156,9 +156,9 @@ fun SmoothBottomNavigation(
             ) {
                 AvatarDisplay(
                     avatarString = activeProfile?.avatarColor ?: "avatar_1",
-                    name         = activeProfile?.name ?: "Me",
-                    modifier     = Modifier.size(30.dp),
-                    fontSize     = 14.sp
+                    name = activeProfile?.name ?: "Me",
+                    modifier = Modifier.size(30.dp),
+                    fontSize = 14.sp
                 )
             }
         }
@@ -383,18 +383,18 @@ private fun MainScreenContent(isDark: Boolean) {
                 modifier         = Modifier.windowInsetsPadding(WindowInsets.statusBars)
             ) {
                 ProfileBottomSheetContent(
-                    allProfiles     = allProfiles,
-                    activeProfile   = activeProfile,
-                    isDark          = isDark,
-                    onSwitch        = { viewModel.switchProfile(it); showProfileSheet = false },
-                    onEdit          = { profileToEdit = it },
-                    onDelete        = { viewModel.deleteProfile(it) },
-                    onAddClick      = { showCreateProfile = true },
+                    allProfiles = allProfiles,
+                    activeProfile = activeProfile,
+                    isDark = isDark,
+                    onSwitch = { viewModel.switchProfile(it); showProfileSheet = false },
+                    onEdit = { profileToEdit = it },
+                    onDelete = { viewModel.deleteProfile(it) },
+                    onAddClick = { showCreateProfile = true },
                     onSettingsClick = {
                         showProfileSheet = false
                         navController.navigate(Screen.Settings.route)
                     },
-                    listState       = profileListState
+                    listState = profileListState
                 )
             }
         }
@@ -402,9 +402,9 @@ private fun MainScreenContent(isDark: Boolean) {
         if (showCreateProfile || profileToEdit != null) {
             ProfileEditorDialog(
                 existingProfile = profileToEdit,
-                isDark          = isDark,
-                onDismiss       = { showCreateProfile = false; profileToEdit = null },
-                onSave          = { name, avatarString ->
+                isDark = isDark,
+                onDismiss = { showCreateProfile = false; profileToEdit = null },
+                onSave = { name, avatarString ->
                     if (profileToEdit == null) {
                         viewModel.createProfile(name, avatarString) {}
                     } else {

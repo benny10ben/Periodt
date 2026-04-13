@@ -20,8 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.core.content.ContextCompat
 import com.ben.periodt.ui.theme.PeriodTTheme
-import com.ben.periodt.uiux.MainScreen
-import com.ben.periodt.uiux.onboarding.OnboardingNavigator
+import com.ben.periodt.ui.MainScreen
+import com.ben.periodt.ui.onboarding.OnboardingNavigator
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 

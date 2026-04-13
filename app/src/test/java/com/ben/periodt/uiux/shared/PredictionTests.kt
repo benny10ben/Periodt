@@ -1,5 +1,7 @@
 package com.ben.periodt.uiux.shared
 
+import com.ben.periodt.ui.shared.CycleRegularity
+import com.ben.periodt.ui.shared.predictCycle
 import com.ben.periodt.viewmodel.PeriodViewModel
 import org.junit.Assert.*
 import org.junit.Test

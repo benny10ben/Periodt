@@ -1,10 +1,13 @@
-package com.ben.periodt.uiux.overview
+package com.ben.periodt.reminder
 
 import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -18,8 +21,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,14 +51,13 @@ import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.edit
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
-import com.ben.periodt.uiux.shared.ReminderPrefs
-import com.ben.periodt.uiux.shared.ReminderScheduler
-import com.ben.periodt.uiux.shared.dataStore
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 private val SIZE_SM = 13.sp
 private val SIZE_MD = 14.sp
@@ -109,7 +113,7 @@ fun RemindersDialog(
     var pillEnabled by remember(prefs, activeProfileId) { mutableStateOf(prefs?.get(ReminderPrefs.pillEnabled(activeProfileId)) ?: prefs?.get(ReminderPrefs.PILL_ENABLED) ?: false) }
     var pillTime    by remember(prefs, activeProfileId) { mutableStateOf(LocalTime.of(prefs?.get(ReminderPrefs.pillHour(activeProfileId)) ?: prefs?.get(ReminderPrefs.PILL_HOUR) ?: 8, prefs?.get(ReminderPrefs.pillMinute(activeProfileId)) ?: prefs?.get(ReminderPrefs.PILL_MINUTE) ?: 0)) }
 
-    val powerManager       = remember { context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager }
+    val powerManager       = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
     val isBatteryOptimized = remember { !powerManager.isIgnoringBatteryOptimizations(context.packageName) }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -163,7 +167,7 @@ fun RemindersDialog(
 
     var enableAnimations by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(400)
+        delay(400)
         enableAnimations = true
     }
 
@@ -478,8 +482,8 @@ private fun BatteryWarning(
             .background(pillBg)
             .clickable {
                 context.startActivity(
-                    Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = android.net.Uri.fromParts("package", context.packageName, null)
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
                     }
                 )
             }
@@ -632,7 +636,7 @@ fun PeriodtWheelTimeSheet(
     }
 }
 
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WheelPicker(
     items: List<String>,
@@ -645,7 +649,7 @@ fun WheelPicker(
 ) {
     val itemHeight = 50.dp
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
-    val snapBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(lazyListState = listState)
+    val snapBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -657,7 +661,7 @@ fun WheelPicker(
 
             val viewportCenter = layoutInfo.viewportEndOffset / 2
             val closestItem = visibleItemsInfo.minByOrNull {
-                kotlin.math.abs((it.offset + (it.size / 2)) - viewportCenter)
+                abs((it.offset + (it.size / 2)) - viewportCenter)
             }
             (closestItem?.index ?: 1) - 1
         }

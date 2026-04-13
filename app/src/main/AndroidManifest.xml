@@ -15,9 +15,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PeriodT">
 
-        <receiver android:name=".uiux.shared.ModernReminderReceiver" android:exported="false" />
-        <receiver android:name=".uiux.shared.FertilityReminderReceiver" android:exported="false" />
-        <receiver android:name=".uiux.shared.PillReminderReceiver"      android:exported="false" />
+        <receiver android:name=".reminder.ModernReminderReceiver" android:exported="false" />
+        <receiver android:name=".reminder.FertilityReminderReceiver" android:exported="false" />
+        <receiver android:name=".reminder.PillReminderReceiver"      android:exported="false" />
 
         <activity
             android:name=".MainActivity"
@@ -32,7 +32,7 @@
         </activity>
 
         <receiver
-            android:name=".uiux.shared.BootReceiver"
+            android:name=".receiver.BootReceiver"
             android:exported="true"
             android:enabled="true"
             android:directBootAware="true">

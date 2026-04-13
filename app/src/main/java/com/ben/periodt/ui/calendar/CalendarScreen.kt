@@ -1,6 +1,5 @@
-package com.ben.periodt.uiux.calendar
+package com.ben.periodt.ui.calendar
 
-import android.app.Application
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -107,21 +106,17 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ben.periodt.ui.theme.BricolageGrotesque
-import com.ben.periodt.uiux.shared.PostPillState
-import com.ben.periodt.uiux.shared.Prediction
-import com.ben.periodt.uiux.shared.getPostPillState
-import com.ben.periodt.uiux.shared.pretty
+import com.ben.periodt.ui.shared.PostPillState
+import com.ben.periodt.ui.shared.Prediction
+import com.ben.periodt.ui.shared.getPostPillState
+import com.ben.periodt.ui.shared.pretty
 import com.ben.periodt.viewmodel.PeriodViewModel
 import com.kizitonwose.calendar.compose.CalendarState
 import com.kizitonwose.calendar.compose.HorizontalCalendar
@@ -146,14 +141,17 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import java.time.DayOfWeek
 import com.kizitonwose.calendar.core.daysOfWeek
+import kotlin.math.abs
+import kotlin.math.round
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
@@ -445,7 +443,7 @@ fun DayLogDialog(
     var sliderPosition by remember { mutableFloatStateOf(painLevel.toFloat()) }
 
     val formatter    = remember { DateTimeFormatter.ofPattern("MMM d") }
-    val dayOfWeek    = remember { date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) }
+    val dayOfWeek    = remember { date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
 
     // 🔥 THE FIX: Dynamically check if the current selections differ from the cycle defaults
     val isOverridden = existingLog != null ||
@@ -1013,7 +1011,7 @@ fun SwipeToDeleteCard(onDelete: () -> Unit, content: @Composable (Boolean) -> Un
                                         currentOff >= revealPx / 2f   ->  revealPx
                                         else                           ->  0f
                                     }
-                                    if (kotlin.math.abs(target) == widthPx && widthPx > 0f) {
+                                    if (abs(target) == widthPx && widthPx > 0f) {
                                         offsetX.animateTo(target, bounceSpring); onDelete()
                                     } else { offsetX.animateTo(target, bounceSpring) }
                                 }
@@ -1077,7 +1075,7 @@ fun EditCycleDialog(
     }
     val derivedPain = remember(dailyOverrides, painLevel, cycleDays) {
         if (dailyOverrides.isEmpty() || cycleDays.isEmpty()) return@remember painLevel
-        kotlin.math.round(cycleDays.sumOf { day -> dailyOverrides[day]?.third ?: painLevel }.toFloat() / cycleDays.size).toInt()
+        round(cycleDays.sumOf { day -> dailyOverrides[day]?.third ?: painLevel }.toFloat() / cycleDays.size).toInt()
     }
 
     val isDark = LocalAppIsDark.current
@@ -1141,13 +1139,13 @@ fun EditCycleDialog(
                         fontSize   = SIZE_MD,
                         color      = textPrimary
                     )
-                    val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
+                    val annotatedSummary = buildAnnotatedString {
                         append("Based on your daily logs, this cycle has a peak flow of ")
-                        pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
                         append("${derivedBleeding.lowercase()} (${derivedColor.lowercase()})")
                         pop()
                         append(", with an average pain level of ")
-                        pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
                         append("$derivedPain/10")
                         pop()
                         append(".")
@@ -1395,16 +1393,16 @@ fun EntryRow(
     val pillTextColor      = if (isDark) Color.White else Color(0xFF1B1B1B)
 
     val capitalizedBleeding = remember(bleeding) {
-        bleeding.lowercase(java.util.Locale.getDefault()).replaceFirstChar { it.titlecase(java.util.Locale.getDefault()) }
+        bleeding.lowercase(Locale.getDefault()).replaceFirstChar { it.titlecase(Locale.getDefault()) }
     }
     fun shortPretty(d: String): String = runCatching {
         if (d.isBlank()) return@runCatching "?"
-        val date = java.time.LocalDate.parse(d)
-        "${date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())} ${date.dayOfMonth}"
+        val date = LocalDate.parse(d)
+        "${date.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())} ${date.dayOfMonth}"
     }.getOrElse { d }
 
-    val startDt = remember(startDate) { runCatching { java.time.LocalDate.parse(startDate) }.getOrNull() }
-    val endDt   = remember(endDate)   { runCatching { if (endDate.isNotBlank()) java.time.LocalDate.parse(endDate) else null }.getOrNull() }
+    val startDt = remember(startDate) { runCatching { LocalDate.parse(startDate) }.getOrNull() }
+    val endDt   = remember(endDate)   { runCatching { if (endDate.isNotBlank()) LocalDate.parse(endDate) else null }.getOrNull() }
     val today   = LocalDate.now()
 
     val statusText = remember(startDt, endDt) {
@@ -1522,7 +1520,7 @@ fun PredictionBanner(
     val packEndDate = remember(pillPackStartDate, pillPackCount) {
         pillPackStartDate?.plusDays((pillPackCount - 1).toLong())
     }
-    val endFormatter = remember { java.time.format.DateTimeFormatter.ofPattern("MMM dd") }
+    val endFormatter = remember { DateTimeFormatter.ofPattern("MMM dd") }
     val postPillCycles = remember(cycles, pillStopDate) {
         if (pillStopDate != null) cycles.filter { !it.startDate.isBefore(pillStopDate) } else emptyList()
     }
@@ -1581,7 +1579,7 @@ fun PredictionBanner(
             when { today.isAfter(packEndDate) -> "Pack finished"; today.isEqual(packEndDate) -> "Last pill today"; else -> "Pack ends on ${packEndDate.format(endFormatter)}" }
         } else null
         val quad = when {
-            daysUntil < 0   -> Quadruple(Icons.Rounded.Warning,   Color(0xFFEF5350), "Late by ${kotlin.math.abs(daysUntil)} days", "No stress — cycles can shift! 🧘‍♀️")
+            daysUntil < 0   -> Quadruple(Icons.Rounded.Warning,   Color(0xFFEF5350), "Late by ${abs(daysUntil)} days", "No stress — cycles can shift! 🧘‍♀️")
             daysUntil == 0L -> Quadruple(Icons.Rounded.Favorite,  if (isOnPill) Color(0xFFa68e74) else if (isDark) Color(0xFFC8D4E5) else Color(0xFF8089D2), "Starts today", if (isOnPill) "Withdrawal bleed expected today." else "Ready for your period? 🍫")
             daysUntil <= 3  -> Quadruple(Icons.Rounded.Bolt,      Color(0xFFFFB74D), "Almost time", "Rest up and stay cozy. 💧")
             else            -> {
