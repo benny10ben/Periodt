@@ -202,40 +202,48 @@ fun UpcomingBannerEnhanced(
                         fontSize   = SIZE_SM
                     )
 
-                    if (!isDiscoveryMode && !isLearningMode && !isOnPill && badge.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(activeAccent)
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text       = badge,
-                                fontFamily = BricolageGrotesque,
-                                fontWeight = FontWeight.Bold,
-                                color      = Color.White,
-                                fontSize   = SIZE_XXS
-                            )
-                        }
-                    }
+                    // The confidence badge was removed from here
                 }
             }
 
-            if (!isDiscoveryMode && !daysLeftLabel.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .clip(RoundedCornerShape(50))
-                        .background(activeAccent)
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text       = daysLeftLabel,
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.Bold,
-                        color      = Color.White,
-                        fontSize   = SIZE_XXS
-                    )
+            // Both pills moved to the bottom right and styled identically
+            Row(
+                modifier = Modifier.align(Alignment.BottomEnd),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!isDiscoveryMode && !isLearningMode && !isOnPill && badge.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(activeAccent)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text       = badge,
+                            fontFamily = BricolageGrotesque,
+                            fontWeight = FontWeight.Bold,
+                            color      = Color.White,
+                            fontSize   = SIZE_XXS
+                        )
+                    }
+                }
+
+                if (!isDiscoveryMode && !daysLeftLabel.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(activeAccent)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text       = daysLeftLabel,
+                            fontFamily = BricolageGrotesque,
+                            fontWeight = FontWeight.Bold,
+                            color      = Color.White,
+                            fontSize   = SIZE_XXS
+                        )
+                    }
                 }
             }
         }
