@@ -145,9 +145,9 @@ fun ProfileEditorDialog(
 
     // Page 0: 17-24 (Fruits) | Page 1: 1-8 (Girls) | Page 2: 9-16 (Capybara)
     val avatars = remember {
-        (17..24).map { "avatar_$it" } +
-                (1..8).map { "avatar_$it" } +
-                (9..16).map { "avatar_$it" }
+        (1..8).map { "avatar_$it" } +
+                (9..16).map { "avatar_$it" } +
+                (17..24).map { "avatar_$it" }
     }
     val avatarPages = remember { avatars.chunked(8) }
     val avatarSetHeadings = remember { listOf("Fruits", "Girls", "Capybara", "Contribute") }
