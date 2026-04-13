@@ -180,9 +180,9 @@ fun OverviewScreen(viewModel: PeriodViewModel) {
                 .padding(bottom = 90.dp)
                 .padding(top = 16.dp)
         ) {
-            if (!isOnPill && !isDiscoveryMode && !isLearningMode) {
-                RecentTrendsBanner(trends = recentTrends, cycleCount = recentCyclesCount)
-            }
+//            if (!isOnPill && !isDiscoveryMode && !isLearningMode) {
+//                RecentTrendsBanner(trends = recentTrends, cycleCount = recentCyclesCount)
+//            }
 
             CombinedStatsCard(
                 totalCycles = "${cycles.size}",
@@ -795,8 +795,8 @@ fun RecentTrendsBanner(trends: Triple<String, String, Int>?, cycleCount: Int) {
                         Brush.horizontalGradient(
                             colors = listOf(
                                 if (isDark) Color.Black.copy(alpha = 0.90f) else Color.White.copy(alpha = 1f),
-                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.8f),
-                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.1f)
+                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.6f),
+                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.0f)
                             )
                         )
                     )
