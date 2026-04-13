@@ -66,9 +66,14 @@ android {
         }
         jniLibs {
             useLegacyPackaging = false
+            pickFirsts += setOf("**/libc++_shared.so", "**/libsqlcipher.so")
         }
-        pickFirst("**/libc++_shared.so")
-        pickFirst("**/libsqlcipher.so")
+    }
+
+    sourceSets {
+        getByName("main") {
+            res.srcDirs("src/main/res", "src/main/res-avatars")
+        }
     }
 }
 
@@ -109,6 +114,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
     implementation("dev.chrisbanes.haze:haze:0.5.4")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     // --- TESTING ---
     testImplementation("junit:junit:4.13.2")
