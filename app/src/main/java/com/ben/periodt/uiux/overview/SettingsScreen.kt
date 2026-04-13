@@ -4,9 +4,6 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -287,7 +284,7 @@ fun SettingsScreen(
 
                 // 4. MORE
                 SettingsSection(title = "More", surfaceColor) {
-                    SettingsItem(icon = Icons.Rounded.Info, title = "About Periodt", subtitle = "v1.1.9", tint = textPrimary, onClick = { showAbout = true })
+                    SettingsItem(icon = Icons.Rounded.Info, title = "About Periodt", subtitle = "v1.2.0", tint = textPrimary, onClick = { showAbout = true })
                     SettingsItem(icon = Icons.Rounded.PrivacyTip, title = "Privacy Policy", tint = textPrimary, onClick = { showPrivacy = true })
                 }
 
@@ -456,12 +453,6 @@ fun ContentDialog(title: String, onDismiss: () -> Unit, content: @Composable Col
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp)
                 .verticalScroll(rememberScrollState())
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
-                )
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
@@ -599,13 +590,7 @@ fun AppearanceDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismis
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
-                ),
+                .padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(

@@ -83,10 +83,12 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.animation.SizeTransform
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.graphicsLayer
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
@@ -746,42 +748,70 @@ fun RecentTrendsBanner(trends: Triple<String, String, Int>?, cycleCount: Int) {
     if (trends == null || cycleCount == 0) return
 
     val isDark      = LocalAppIsDark.current
-    val textPrimary = Color.White
-    val textSub     = Color.White
+    val textPrimary = if (isDark) Color.White else Color.Black
+    val textSub     = if (isDark) Color.White else Color.Black
+    val dividerColor = textPrimary.copy(alpha = 0.15f)
+
+    // Explicitly define the background to match your app's theme
+    // This prevents the "halo" effect caused by blending against transparency
+    val appBackgroundColor = if (isDark) Color.Black else Color.White
+    val cardShape = RoundedCornerShape(26.dp)
 
     Card(
-        modifier  = Modifier.fillMaxWidth().padding(bottom = 14.dp),
-        shape     = RoundedCornerShape(26.dp),
-        colors    = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 14.dp),
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = appBackgroundColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        // The "Seal": A hairline border that swallows sub-pixel rendering artifacts
+        border = BorderStroke(0.5.dp, appBackgroundColor)
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    clip = true
+                    shape = cardShape
+                }
+        ) {
             androidx.compose.foundation.Image(
-                painter      = androidx.compose.ui.res.painterResource(id = com.ben.periodt.R.drawable.recent),
+                painter = androidx.compose.ui.res.painterResource(id = com.ben.periodt.R.drawable.recent),
                 contentDescription = null,
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier     = Modifier.matchParentSize()
+                modifier = Modifier.matchParentSize()
             )
+
+            // Gradient Overlay
             Box(
-                modifier = Modifier.matchParentSize().background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            if (isDark) Color.Black.copy(alpha = 0.90f) else Color.Black.copy(alpha = 1f),
-                            if (isDark) Color.Black.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.80f),
-                            if (isDark) Color.Black.copy(alpha = 0.40f) else Color.Black.copy(alpha = 0.40f)
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                if (isDark) Color.Black.copy(alpha = 0.90f) else Color.White.copy(alpha = 1f),
+                                if (isDark) Color.Black.copy(alpha = 0.80f) else Color.White.copy(alpha = 0.8f),
+                                if (isDark) Color.Black.copy(alpha = 0.40f) else Color.White.copy(alpha = 0.1f)
+                            )
                         )
                     )
-                )
             )
-            Column(modifier = Modifier.padding(24.dp).fillMaxWidth(0.85f)) {
+
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(0.85f)
+            ) {
                 Text(
-                    text       = "Recent Trends",
+                    text = "Recent Trends",
                     fontFamily = BricolageGrotesque,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize   = SIZE_XL,
-                    color      = textPrimary
+                    fontSize = SIZE_XL,
+                    color = textPrimary
                 )
+
                 Spacer(Modifier.height(12.dp))
+
                 val annotatedSummary = androidx.compose.ui.text.buildAnnotatedString {
                     append("Over your last $cycleCount cycle${if (cycleCount > 1) "s" else ""}, your typical flow is ")
                     pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.ExtraBold, color = textPrimary))
@@ -793,11 +823,12 @@ fun RecentTrendsBanner(trends: Triple<String, String, Int>?, cycleCount: Int) {
                     pop()
                     append(".")
                 }
+
                 Text(
-                    text       = annotatedSummary,
+                    text = annotatedSummary,
                     fontFamily = BricolageGrotesque,
-                    fontSize   = SIZE_MD,
-                    color      = textSub,
+                    fontSize = SIZE_MD,
+                    color = textSub,
                     lineHeight = 20.sp
                 )
             }

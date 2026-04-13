@@ -446,8 +446,7 @@ private fun ReminderTimePicker(
             Text(
                 time.format(DateTimeFormatter.ofPattern("hh:mm a")),
                 fontFamily = BricolageGrotesque,
-                fontWeight = FontWeight.Bold,
-                color = accentColor,
+                color = textPrimary,
                 fontSize = SIZE_MD
             )
         }
