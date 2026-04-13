@@ -1,8 +1,5 @@
 package com.ben.periodt.uiux.overview
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -59,13 +56,7 @@ fun SuccessFeedbackDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
-                ),
+                .padding(bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -156,13 +147,7 @@ fun DestructiveConfirmationDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
-                ),
+                .padding(bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -267,13 +252,7 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
                 .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
                 .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState())
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
-                ),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             // Header
@@ -302,7 +281,7 @@ fun WhatsNewDialog(onDismiss: () -> Unit) {
             }
 
             Text(
-                text = "Version 1.1.9",
+                text = "Version 1.2.0",
                 fontFamily = BricolageGrotesque,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary,
