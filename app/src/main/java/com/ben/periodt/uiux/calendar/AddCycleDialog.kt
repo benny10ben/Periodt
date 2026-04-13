@@ -20,14 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.viewmodel.PeriodViewModel
@@ -42,6 +38,70 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.animation.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.util.lerp
+import kotlinx.coroutines.launch
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.material.icons.rounded.EventRepeat
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.style.TextAlign
+import kotlin.math.absoluteValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import java.util.Locale
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
@@ -446,7 +506,8 @@ fun MinimalDatePickerDialog(
                 }
             }
 
-            OutlinedTextField(
+            // Replace OutlinedTextField + error Text with this:
+            DateInputField(
                 value         = manualDateText,
                 onValueChange = { newVal ->
                     manualDateText = newVal
@@ -457,36 +518,11 @@ fun MinimalDatePickerDialog(
                         isDateError    = false
                     } catch (e: Exception) { isDateError = true }
                 },
-                label         = {
-                    Text(
-                        "Date (DD/MM/YYYY)",
-                        fontFamily = BricolageGrotesque,
-                        fontSize   = SIZE_XS
-                    )
-                },
-                isError       = isDateError,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                modifier      = Modifier.fillMaxWidth(),
-                textStyle = LocalTextStyle.current.copy(
-                    fontFamily = BricolageGrotesque,
-                    fontSize = SIZE_LG,
-                    color = textPrimary
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor     = textPrimary,
-                    unfocusedTextColor   = textPrimary,
-                    focusedLabelColor    = accentColor,
-                    unfocusedLabelColor  = textSub,
-                    focusedBorderColor   = accentColor,
-                    unfocusedBorderColor = textSub.copy(alpha = 0.5f),
-                    cursorColor          = accentColor,
-                    errorBorderColor     = Color(0xFFEF5350),
-                    selectionColors = androidx.compose.foundation.text.selection.TextSelectionColors(
-                        handleColor = accentColor,
-                        backgroundColor = accentColor.copy(alpha = 0.3f)
-                    )
-                ),
-                singleLine = true
+                isError     = isDateError,
+                isDark      = isDark,
+                accentColor = accentColor,
+                textPrimary = textPrimary,
+                textSub     = textSub
             )
 
             if (isDateError) {
@@ -499,7 +535,7 @@ fun MinimalDatePickerDialog(
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
 
             MinimalMonthPicker(
                 displayedYm         = displayedYm,
@@ -515,7 +551,7 @@ fun MinimalDatePickerDialog(
                 weekStartsOnMonday  = false
             )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(8.dp))
 
             Button(
                 onClick   = { if (!isDateError) onConfirm(selectedMillis) },
@@ -550,109 +586,355 @@ fun MinimalMonthPicker(
     weekStartsOnMonday: Boolean
 ) {
     val isDark = LocalAppIsDark.current
-    val zone   = remember { ZoneId.systemDefault() }
-    val today  = remember { LocalDate.now(zone) }
+    val zone = remember { ZoneId.systemDefault() }
+    val today = remember { LocalDate.now(zone) }
     val selectedDate = selectedMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
+
+    // Styling derived from target CalendarCard
+    val backgroundBrush = if (isDark) Color(0xFF1B1B1B).copy(alpha = 0.5f) else Color.White
+    val onCardContent = textColor
+    val onCardContentMuted = onCardContent.copy(alpha = 0.70f)
 
     fun weekdayIndex(d: LocalDate): Int {
         val iso = d.dayOfWeek.value
         return if (weekStartsOnMonday) iso - 1 else (iso % 7)
     }
 
-    val firstOfMonth  = displayedYm.atDay(1)
-    val daysInMonth   = displayedYm.lengthOfMonth()
-    val leadingBlanks = weekdayIndex(firstOfMonth)
-    val totalCells    = leadingBlanks + daysInMonth
-    val rows          = ceil(totalCells / 7f).toInt()
+    val scope = rememberCoroutineScope()
+    val swipeOffsetX = remember { Animatable(0f) }
+    var isSwiping by remember { mutableStateOf(false) }
+    val swipeThreshold = 60f
 
-    // Month/year header + nav
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.CenterVertically
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
     ) {
-        Text(
-            text       = "${displayedYm.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${displayedYm.year}",
-            fontFamily = BricolageGrotesque,
-            fontWeight = FontWeight.Bold,
-            fontSize   = SIZE_MD,
-            color      = textColor
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            IconButton(onClick = { onDisplayedYmChange(displayedYm.minusMonths(1)) }, modifier = Modifier.size(32.dp)) {
-                Text("‹", fontFamily = BricolageGrotesque, color = textColor.copy(alpha = 0.7f), fontSize = 24.sp)
-            }
-            IconButton(onClick = { onDisplayedYmChange(displayedYm.plusMonths(1)) }, modifier = Modifier.size(32.dp)) {
-                Text("›", fontFamily = BricolageGrotesque, color = textColor.copy(alpha = 0.7f), fontSize = 24.sp)
-            }
-        }
-    }
+        Box(
+            modifier = Modifier
+                .background(backgroundBrush)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Column {
+                // Header
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val monthName = displayedYm.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault())
+                    Text(
+                        text = "$monthName ${displayedYm.year}",
+                        fontFamily = BricolageGrotesque,
+                        color = onCardContent,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
 
-    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.width(12.dp))
 
-    // Day-of-week headers
-    val labels = if (weekStartsOnMonday) listOf("MON","TUE","WED","THU","FRI","SAT","SUN")
-    else listOf("SUN","MON","TUE","WED","THU","FRI","SAT")
+                    Text(
+                        text = "‹",
+                        color = onCardContentMuted,
+                        fontSize = 24.sp,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable { onDisplayedYmChange(displayedYm.minusMonths(1)) }
+                            .wrapContentSize(Alignment.Center),
+                        textAlign = TextAlign.Center
+                    )
 
-    Row(Modifier.fillMaxWidth()) {
-        labels.forEach { label ->
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text(
-                    text       = label,
-                    fontFamily = BricolageGrotesque,
-                    fontSize   = SIZE_XXS,
-                    color      = textColor.copy(alpha = 0.5f),
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
+                    Text(
+                        text = "›",
+                        color = onCardContentMuted,
+                        fontSize = 24.sp,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable { onDisplayedYmChange(displayedYm.plusMonths(1)) }
+                            .wrapContentSize(Alignment.Center),
+                        textAlign = TextAlign.Center
+                    )
 
-    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.weight(1f))
 
-    val todayChipBg      = textColor.copy(alpha = 0.1f)
-    val selectedChipBg   = accentColor
-    val selectedChipText = if (isDark) Color.Black else Color.White
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable { onDisplayedYmChange(YearMonth.now(zone)) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.EventRepeat,
+                            contentDescription = "Today",
+                            tint = onCardContent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
 
-    var day = 1
-    repeat(rows) { r ->
-        Row(Modifier.fillMaxWidth()) {
-            repeat(7) { c ->
-                val idx = r * 7 + c
-                Box(modifier = Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-                    if (idx >= leadingBlanks && day <= daysInMonth) {
-                        val date       = displayedYm.atDay(day)
-                        val isToday    = date == today
-                        val isSelected = date == selectedDate
-                        val dayTextColor = if (isSelected) selectedChipText else textColor
-                        val click = { val ms = date.atStartOfDay(zone).toInstant().toEpochMilli(); onSelect(ms) }
+                Spacer(Modifier.height(14.dp))
 
-                        val chipBg = when { isSelected -> selectedChipBg; isToday -> todayChipBg; else -> Color.Transparent }
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(chipBg)
-                                .clickable(onClick = click),
-                            contentAlignment = Alignment.Center
-                        ) {
+                // Day-of-week headers
+                val labels = if (weekStartsOnMonday) listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                else listOf("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
+
+                Row(Modifier.fillMaxWidth()) {
+                    labels.forEach { label ->
+                        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                             Text(
-                                text       = "$day",
+                                text = label,
                                 fontFamily = BricolageGrotesque,
-                                color      = dayTextColor,
-                                fontSize   = SIZE_MD,
-                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
+                                fontSize = SIZE_XXS,
+                                color = onCardContentMuted,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
-                        day++
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                val todayChipBg = onCardContent.copy(alpha = 0.1f)
+                val selectedChipBg = accentColor
+                val selectedChipText = if (isDark) Color.Black else Color.White
+
+                // Swipeable Calendar Grid
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize()
+                        .pointerInput(displayedYm) {
+                            detectHorizontalDragGestures(
+                                onDragStart = { isSwiping = true },
+                                onDragEnd = {
+                                    isSwiping = false
+                                    scope.launch {
+                                        when {
+                                            swipeOffsetX.value < -swipeThreshold -> {
+                                                swipeOffsetX.animateTo(
+                                                    -size.width.toFloat(),
+                                                    tween(180, easing = FastOutLinearInEasing)
+                                                )
+                                                onDisplayedYmChange(displayedYm.plusMonths(1))
+                                                swipeOffsetX.snapTo(0f)
+                                            }
+                                            swipeOffsetX.value > swipeThreshold -> {
+                                                swipeOffsetX.animateTo(
+                                                    size.width.toFloat(),
+                                                    tween(180, easing = FastOutLinearInEasing)
+                                                )
+                                                onDisplayedYmChange(displayedYm.minusMonths(1))
+                                                swipeOffsetX.snapTo(0f)
+                                            }
+                                            else -> swipeOffsetX.animateTo(
+                                                0f,
+                                                spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)
+                                            )
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    isSwiping = false
+                                    scope.launch {
+                                        swipeOffsetX.animateTo(0f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
+                                    }
+                                }
+                            ) { change, dragAmount ->
+                                change.consume()
+                                scope.launch { swipeOffsetX.snapTo(swipeOffsetX.value + dragAmount) }
+                            }
+                        }
+                ) {
+                    listOf(-1, 0, 1).forEach { offset ->
+                        val targetYm = displayedYm.plusMonths(offset.toLong())
+                        val firstOfMonth = targetYm.atDay(1)
+                        val daysInMonth = targetYm.lengthOfMonth()
+                        val leadingBlanks = weekdayIndex(firstOfMonth)
+                        val totalCells = leadingBlanks + daysInMonth
+                        val rows = ceil(totalCells / 7f).toInt()
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    val height = if (offset == 0) placeable.height else 0
+                                    layout(placeable.width, height) {
+                                        placeable.placeRelative(0, 0)
+                                    }
+                                }
+                                .graphicsLayer {
+                                    translationX = swipeOffsetX.value + (offset * size.width)
+                                    alpha = 1f - (swipeOffsetX.value.absoluteValue / 600f).coerceIn(0f, 0.4f)
+                                }
+                        ) {
+                            var day = 1
+                            repeat(rows) { r ->
+                                Row(Modifier.fillMaxWidth()) {
+                                    repeat(7) { c ->
+                                        val idx = r * 7 + c
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(1f),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (idx >= leadingBlanks && day <= daysInMonth) {
+                                                val date = targetYm.atDay(day)
+                                                val isToday = date == today
+                                                val isSelected = date == selectedDate
+                                                val dayTextColor = if (isSelected) selectedChipText else onCardContent
+                                                val click = {
+                                                    if (!isSwiping) {
+                                                        val ms = date.atStartOfDay(zone).toInstant().toEpochMilli()
+                                                        onSelect(ms)
+                                                    }
+                                                }
+
+                                                val chipBg = when {
+                                                    isSelected -> selectedChipBg
+                                                    isToday -> todayChipBg
+                                                    else -> Color.Transparent
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(36.dp)
+                                                        .clip(CircleShape)
+                                                        .background(chipBg)
+                                                        .clickable(onClick = click),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "$day",
+                                                        fontFamily = BricolageGrotesque,
+                                                        color = dayTextColor,
+                                                        fontSize = SIZE_MD, // Assuming this is defined elsewhere
+                                                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                }
+                                                day++
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(2.dp))
+                            }
+                        }
                     }
                 }
             }
         }
-        Spacer(Modifier.height(2.dp))
     }
 }
 
 /* ---------- Utils ---------- */
 fun millisToLocalDate(millis: Long?): LocalDate? =
     millis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
+
+@Composable
+fun DateInputField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isError: Boolean,
+    isDark: Boolean,
+    accentColor: Color,
+    textPrimary: Color,
+    textSub: Color
+) {
+    val isFocused = remember { mutableStateOf(false) }
+    val errorColor = Color(0xFFEF5350)
+    val fieldBg = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
+
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            isError -> errorColor.copy(alpha = 0.8f)
+            isFocused.value -> accentColor.copy(alpha = 0.8f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(200),
+        label = "dateFieldBorder"
+    )
+
+    val labelFloat by animateFloatAsState(
+        targetValue = if (isFocused.value || value.isNotEmpty()) 1f else 0f,
+        animationSpec = tween(180),
+        label = "dateLabelFloat"
+    )
+    val labelSize = lerp(SIZE_LG.value, SIZE_SM.value, labelFloat)
+    val labelColor by animateColorAsState(
+        targetValue = when {
+            isError -> errorColor
+            isFocused.value -> accentColor
+            else -> textSub
+        },
+        animationSpec = tween(180),
+        label = "dateLabelColor"
+    )
+
+    Column {
+        CompositionLocalProvider(
+            LocalTextSelectionColors provides TextSelectionColors(
+                handleColor = accentColor,
+                backgroundColor = accentColor.copy(alpha = 0.25f)
+            )
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = TextStyle(
+                    fontFamily = BricolageGrotesque,
+                    fontSize = SIZE_LG,
+                    color = textPrimary
+                ),
+                cursorBrush = SolidColor(if (isError) errorColor else accentColor),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { isFocused.value = it.isFocused },
+                decorationBox = { innerTextField ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(fieldBg)
+                            .border(1.5.dp, borderColor, RoundedCornerShape(18.dp))
+                            .animateContentSize(animationSpec = tween(180))
+                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                    ) {
+                        Text(
+                            text = "Date (DD/MM/YYYY)",
+                            fontFamily = BricolageGrotesque,
+                            fontSize = labelSize.sp,
+                            color = labelColor,
+                            modifier = Modifier.graphicsLayer {
+                                translationY = lerp(0f, -12f, labelFloat)
+                            }
+                        )
+                        Box(modifier = Modifier.padding(top = if (labelFloat > 0.5f) 24.dp else 0.dp)) {
+                            innerTextField()
+                        }
+                    }
+                }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = isError,
+            enter = fadeIn(tween(150)) + expandVertically(tween(150)),
+            exit = fadeOut(tween(100)) + shrinkVertically(tween(100))
+        ) {
+            Text(
+                text = "Invalid format. Use DD/MM/YYYY",
+                color = errorColor,
+                fontSize = SIZE_XS,
+                fontFamily = BricolageGrotesque,
+                modifier = Modifier.padding(top = 6.dp, start = 20.dp)
+            )
+        }
+    }
+}

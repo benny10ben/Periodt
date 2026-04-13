@@ -157,7 +157,7 @@ import com.kizitonwose.calendar.core.daysOfWeek
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
-private val SIZE_SM  = 13.sp
+val SIZE_SM  = 13.sp
 private val SIZE_MD  = 14.sp
 private val SIZE_LG  = 15.sp
 private val SIZE_XL  = 20.sp
