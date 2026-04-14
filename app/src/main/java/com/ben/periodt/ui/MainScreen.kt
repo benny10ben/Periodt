@@ -113,14 +113,14 @@ fun SmoothBottomNavigation(
     modifier: Modifier = Modifier
 ) {
     val dimens = LocalAppDimens.current
-    val navBarBg = Color(0xFF6d9567).copy(alpha = 0.5f)
+    val isDark = LocalAppIsDark.current
+    val navBarBg = if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
 
     Box(
         modifier = modifier
             .wrapContentWidth()
             .height(dimens.barHeight)
             .shadow(14.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.6f), spotColor = Color.Black.copy(alpha = 0.6f))
-            .hazeChild(state = hazeState, shape = CircleShape, style = HazeStyle(blurRadius = 14.dp))
             .clip(CircleShape)
             .background(navBarBg)
     ) {
@@ -306,7 +306,7 @@ private fun MainScreenContent(isDark: Boolean) {
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             Box(
-                modifier = Modifier.fillMaxWidth().background(bottomFadeBrush).windowInsetsPadding(WindowInsets.navigationBars).padding(top = 48.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(top = 48.dp, bottom = 24.dp),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -314,9 +314,8 @@ private fun MainScreenContent(isDark: Boolean) {
                         modifier = Modifier
                             .size(dimens.barHeight)
                             .shadow(14.dp, RoundedCornerShape(percent = 49), ambientColor = Color.Black.copy(alpha = 0.6f), spotColor = Color.Black.copy(alpha = 0.6f))
-                            .hazeChild(state = hazeState, shape = CircleShape, style = HazeStyle(blurRadius = 14.dp))
                             .clip(CircleShape)
-                            .background(Color(0xFF6d9567).copy(alpha = 0.5f))
+                            .background(if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3))
                             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                                 when (currentRoute) {
                                     Screen.Pill.route -> showAddPillDialog = true
