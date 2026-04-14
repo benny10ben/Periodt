@@ -133,7 +133,7 @@ fun OverviewScreen(viewModel: PeriodViewModel) {
     val subCol  = if (isDark) Color(0xFFBFC6D1) else Color(0xFF1b1b1b)
 
     val bleedingChartColor = Color(0xFFD89046)
-    val painChartColor     = Color(0xFF6d9567).copy(alpha = 0.4f)
+    val painChartColor     = if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
 
     val avgPeriodLength = calculatePeriodLength(cycles).takeIf { cycles.any { c -> c.endDate != null } }
     val avgCycleLength  = calculateAvgCycleLength(cycles)
@@ -186,8 +186,8 @@ fun OverviewScreen(viewModel: PeriodViewModel) {
 
             CombinedStatsCard(
                 totalCycles = "${cycles.size}",
-                avgPeriod   = avgPeriodLength?.let { "$it d" } ?: "-",
-                avgCycle    = avgCycleLength?.let  { "$it d" } ?: "-"
+                avgPeriod   = avgPeriodLength?.let { "$it d" } ?: "0",
+                avgCycle    = avgCycleLength?.let  { "$it d" } ?: "0"
             )
 
             Spacer(Modifier.height(14.dp))
@@ -448,9 +448,9 @@ private fun BloodColorPieChart(
     modifier: Modifier = Modifier
 ) {
     if (data.isEmpty()) {
-        Box(Modifier.height(150.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
             Text(
-                "No data",
+                "No data yet",
                 fontFamily = BricolageGrotesque,
                 fontSize   = SIZE_MD,
                 color      = labelColor.copy(0.5f)

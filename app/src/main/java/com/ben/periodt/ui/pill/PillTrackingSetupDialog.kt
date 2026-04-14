@@ -86,7 +86,7 @@ fun PillTrackingSetupDialog(
 
     val isDark = LocalAppIsDark.current
     val accentColor     = Color(0xFFa68e74)
-    val pastelGreen     = Color(0xFF6d9567).copy(alpha = 0.4f)
+    val pastelGreen     = if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
     val pastelOrange    = Color(0xFFa68e74)
     val pastelMaroon    = Color(0xFF4E1A1A)
     val containerColor  = if (isDark) Color(0xFF1B1B1B) else Color.White

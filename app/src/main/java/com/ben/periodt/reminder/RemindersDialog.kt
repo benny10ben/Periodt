@@ -180,8 +180,8 @@ fun RemindersDialog(
     val surfaceFallback = if (isDark) Color.Black else Color.Black.copy(alpha = 0.05f)
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val fertilityAccent = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
+    val fertilityAccent = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
     val pillAccent = Color(0xFFa68e74)
 
     ModalBottomSheet(

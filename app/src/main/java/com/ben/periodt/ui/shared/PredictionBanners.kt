@@ -54,7 +54,7 @@ fun UpcomingBannerEnhanced(
 
     // --- COLOR LOGIC ---
     val starIconColor = if (isDark) Color(0xFF8089D2) else Color(0xFF2C3F70)
-    val themeAccent = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val themeAccent = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
     val themeAccent2 = Color(0xFFa68e74)
     val activeAccent = if (isOnPill) themeAccent2 else themeAccent
 

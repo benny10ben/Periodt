@@ -390,10 +390,10 @@ fun ModeSelectionPage(onStart: () -> Unit) {
     val infoPagerState = rememberPagerState(pageCount = { 5 })
 
     val themeColor = when (infoPagerState.currentPage) {
-        0 -> if (isDark) Color(0xFF2A3825) else Color(0xFF6d9567).copy(alpha = 0.6f)// Privacy First (Olive)
+        0 -> if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
         1 -> Color(0xFFD89046) // Smart Predictions (Orange)
         2 -> Color(0xFF4E1A1A) // Cycle Syncing (Maroon)
-        3 -> if (isDark) Color(0xFF2A3825) else Color(0xFF6d9567).copy(alpha = 0.6f) // Multi-Profile (Muted Navy/Teal)
+        3 -> if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
         4 -> Color(0xFFA68E74) // Pill Tracking (Sand/Taupe)
         else -> textColor
     }
@@ -461,10 +461,10 @@ fun ModeSelectionPage(onStart: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 when (page) {
-                    0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, Color(0xFF6d9567).copy(alpha = 0.6f))
+                    0 -> InfoCard("Privacy First", "All your data is stored locally on your device. We never upload your personal history to any servers.", Icons.Rounded.PrivacyTip, if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3))
                     1 -> InfoCard("Smart Predictions", "We calculate your cycle based on the average of your last 3 logs. The more you log, the more accurate we get.", Icons.Rounded.AutoAwesome, Color(0xFFD89046))
                     2 -> InfoCard("Cycle Syncing", "Get phase-specific advice on nutrition, exercise, and sleep to live in harmony with your hormones.", Icons.Rounded.SelfImprovement, Color(0xFF4E1A1A))
-                    3 -> InfoCard("Multi-Profile", "Track cycles for yourself, family, or partners effortlessly from one app with seamless profile switching.", Icons.Rounded.Group, Color(0xFF6d9567).copy(alpha = 0.6f))
+                    3 -> InfoCard("Multi-Profile", "Track cycles for yourself, family, or partners effortlessly from one app with seamless profile switching.", Icons.Rounded.Group, if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3))
                     4 -> InfoCard("Daily Pills", "Never miss a dose. Set customizable daily reminders for your birth control, vitamins, or supplements.", Icons.Rounded.Medication, Color(0xFFA68E74))
                 }
             }

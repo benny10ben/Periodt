@@ -398,7 +398,7 @@ fun ProfileEditorDialog(
     val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -554,7 +554,7 @@ fun ProfileBottomSheetContent(
 ) {
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
     val rowBg = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     Column(
@@ -653,7 +653,7 @@ fun LegacyImportDialog(
     val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
     val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
     val rowBg = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
     val configuration = LocalConfiguration.current
