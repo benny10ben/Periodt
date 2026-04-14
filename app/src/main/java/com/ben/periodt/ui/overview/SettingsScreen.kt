@@ -3,6 +3,9 @@ package com.ben.periodt.ui.overview
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -48,6 +51,17 @@ import nl.dionsegijn.konfetti.core.emitter.Emitter
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.material3.SheetState
 
 const val GITHUB_REPO_URL = "https://github.com/benny10ben/Periodt/"
 
@@ -440,9 +454,55 @@ fun ContentDialog(title: String, onDismiss: () -> Unit, content: @Composable Col
     val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
     val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
 
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val thresholdPx = remember(configuration.screenHeightDp) {
+        with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() }
+    }
+
+    var expandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val sheetHolder = remember { SheetStateHolder() }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = sheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - expandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else {
+                        true
+                    }
+                } catch (e: Exception) {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    )
+
+    sheetHolder.state = sheetState
+
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Expanded) {
+            try {
+                expandedOffset = sheetState.requireOffset()
+            } catch (e: Exception) {}
+        }
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss, containerColor = containerColor,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = onDismiss,
+        containerColor = containerColor,
+        sheetState = sheetState,
         scrimColor = Color.Black.copy(alpha = 0.32f),
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
         dragHandle = { BottomSheetDefaults.DragHandle(color = textSub.copy(alpha = 0.2f)) }
@@ -450,13 +510,20 @@ fun ContentDialog(title: String, onDismiss: () -> Unit, content: @Composable Col
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState())
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness    = Spring.StiffnessMediumLow
+                    )
+                )
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -469,13 +536,29 @@ fun ContentDialog(title: String, onDismiss: () -> Unit, content: @Composable Col
                     color = textPrimary
                 )
                 Box(
-                    modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(textSub.copy(alpha = 0.1f))
+                        .clickable {
+                            coroutineScope.launch {
+                                sheetState.hide()
+                                onDismiss()
+                            }
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
-            content()
+
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                content()
+            }
         }
     }
 }
@@ -579,9 +662,55 @@ fun AppearanceDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismis
     val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
     val rowBg          = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val thresholdPx = remember(configuration.screenHeightDp) {
+        with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() }
+    }
+
+    var expandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val sheetHolder = remember { SheetStateHolder() }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = sheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - expandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else {
+                        true
+                    }
+                } catch (e: Exception) {
+                    true
+                }
+            } else {
+                true
+            }
+        }
+    )
+
+    sheetHolder.state = sheetState
+
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Expanded) {
+            try {
+                expandedOffset = sheetState.requireOffset()
+            } catch (e: Exception) {}
+        }
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss, containerColor = containerColor,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = onDismiss,
+        containerColor = containerColor,
+        sheetState = sheetState,
         scrimColor = Color.Black.copy(alpha = 0.32f),
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
         dragHandle = { BottomSheetDefaults.DragHandle(color = textSub.copy(alpha = 0.2f)) }
@@ -589,13 +718,20 @@ fun AppearanceDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismis
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 16.dp)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness    = Spring.StiffnessMediumLow
+                    )
+                )
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -607,15 +743,47 @@ fun AppearanceDialog(current: ThemeMode, onSelect: (ThemeMode) -> Unit, onDismis
                     color = textPrimary
                 )
                 Box(
-                    modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(textSub.copy(alpha = 0.1f))
+                        .clickable {
+                            coroutineScope.launch {
+                                sheetState.hide()
+                                onDismiss()
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
-            ThemeOptionRow("System Default", current == ThemeMode.SYSTEM, textPrimary, rowBg, accentColor) { onSelect(ThemeMode.SYSTEM) }
-            ThemeOptionRow("Light Mode",     current == ThemeMode.LIGHT,   textPrimary, rowBg, accentColor) { onSelect(ThemeMode.LIGHT)  }
-            ThemeOptionRow("Dark Mode",      current == ThemeMode.DARK,    textPrimary, rowBg, accentColor) { onSelect(ThemeMode.DARK)   }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ThemeOptionRow("System Default", current == ThemeMode.SYSTEM, textPrimary, rowBg, accentColor) {
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onSelect(ThemeMode.SYSTEM)
+                    }
+                }
+                ThemeOptionRow("Light Mode",     current == ThemeMode.LIGHT,   textPrimary, rowBg, accentColor) {
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onSelect(ThemeMode.LIGHT)
+                    }
+                }
+                ThemeOptionRow("Dark Mode",      current == ThemeMode.DARK,    textPrimary, rowBg, accentColor) {
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onSelect(ThemeMode.DARK)
+                    }
+                }
+            }
         }
     }
 }
