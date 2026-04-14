@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -145,6 +146,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import com.ben.periodt.ui.theme.LocalAppIsDark
@@ -152,6 +154,9 @@ import java.time.DayOfWeek
 import com.kizitonwose.calendar.core.daysOfWeek
 import kotlin.math.abs
 import kotlin.math.round
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SheetState
+import kotlinx.coroutines.delay
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
@@ -159,7 +164,7 @@ val SIZE_SM  = 13.sp
 private val SIZE_MD  = 14.sp
 private val SIZE_LG  = 15.sp
 private val SIZE_XL  = 20.sp
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,17 +225,17 @@ fun CalendarScreen(viewModel: PeriodViewModel) {
             val currentMonth = YearMonth.from(currentDate)
 
             val targetDate = if (visibleMonth == currentMonth) {
-                // 1. If looking at the current month, snap exactly to today's week
+                
                 currentDate
             } else {
-                // 2. If looking at another month, snap to the first week of THAT month
+                
                 state.firstVisibleMonth.weekDays.flatten()
                     .firstOrNull { it.position == DayPosition.MonthDate }?.date ?: currentDate
             }
 
             weekState.animateScrollToWeek(targetDate)
         } else {
-            // When expanding, stay on the month of the currently viewed week
+            
             val targetDate = weekState.firstVisibleWeek.days.getOrNull(3)?.date ?: currentDate
             state.animateScrollToMonth(YearMonth.from(targetDate))
         }
@@ -430,8 +435,8 @@ fun DayLogDialog(
     val textPrimary     = if (isDark) Color.White else Color(0xFF0F172A)
     val textSub         = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
 
-    val pastelGreen  = Color(0xFF6d9567).copy(alpha = 0.6f)
-    val pastelOrange = Color(0xFFD89046)
+    val pastelGreen  = Color(0xFF6d9567).copy(alpha = 0.4f)
+    val pastelOrange = Color(0xFFa68e74)
     val pastelMaroon = Color(0xFF4E1A1A)
 
     val bleedingOptions = listOf("Heavy", "Medium", "Light", "Spotting")
@@ -443,40 +448,72 @@ fun DayLogDialog(
     var sliderPosition by remember { mutableFloatStateOf(painLevel.toFloat()) }
 
     val formatter    = remember { DateTimeFormatter.ofPattern("MMM d") }
-    val dayOfWeek    = remember { date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()) }
+    val dayOfWeek    = remember { date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault()) }
 
-    // 🔥 THE FIX: Dynamically check if the current selections differ from the cycle defaults
+    
     val isOverridden = existingLog != null ||
             bleeding != cycle.bleeding ||
             bloodColor != cycle.bloodColor ||
             painLevel != cycle.painLevel
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+
+    val thresholdPx = remember(configuration.screenHeightDp) {
+        with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() }
+    }
+    var expandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val sheetHolder = remember { SheetStateHolder() }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = sheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - expandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else true
+                } catch (e: Exception) { true }
+            } else true
+        }
+    )
+    sheetHolder.state = sheetState
+
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Expanded) {
+            try { expandedOffset = sheetState.requireOffset() } catch (e: Exception) {}
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState       = sheetState,
         containerColor   = containerColor,
-        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+        modifier         = Modifier.windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState())
                 .animateContentSize(
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness    = Spring.StiffnessMediumLow
                     )
-                ),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                )
         ) {
-            // Header
+            
             Row(
-                modifier              = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                modifier              = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
@@ -495,79 +532,97 @@ fun DayLogDialog(
                     )
                 }
                 Box(
-                    modifier         = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss),
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f))
+                        .clickable { coroutineScope.launch { sheetState.hide(); onDismiss() } },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
 
-            // Flow Intensity
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text       = "Flow Intensity",
-                    fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = SIZE_MD,
-                    color      = textPrimary
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    bleedingOptions.forEach { option ->
-                        val isSelected      = bleeding.equals(option, ignoreCase = true)
-                        val activePillColor = when (option) { "Heavy" -> pastelMaroon; "Medium" -> pastelOrange; else -> pastelGreen }
-                        EntryStylePill(option, isSelected, activePillColor, Color.White, textSub, surfaceFallback) { bleeding = option }
-                    }
-                }
-            }
-
-            // Blood Color
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text       = "Blood Color",
-                    fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = SIZE_MD,
-                    color      = textPrimary
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    colorOptions.forEach { option ->
-                        val isSelected      = bloodColor.equals(option, ignoreCase = true)
-                        val activePillColor = when (option) { "Bright Red" -> pastelGreen; "Dark Red" -> Color(0xFF4E1A1A); "Brown" -> pastelOrange; else -> accentColor }
-                        EntryStylePill(option, isSelected, activePillColor, Color.White, textSub, surfaceFallback) { bloodColor = option }
-                    }
-                }
-            }
-
-            // Pain Level
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text       = "Cramps & Pain",
+                        text       = "Flow Intensity",
                         fontFamily = BricolageGrotesque,
                         fontWeight = FontWeight.SemiBold,
                         fontSize   = SIZE_MD,
                         color      = textPrimary
                     )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        bleedingOptions.forEach { option ->
+                            val isSelected      = bleeding.equals(option, ignoreCase = true)
+                            val activePillColor = when (option) { "Heavy" -> pastelMaroon; "Medium" -> pastelOrange; else -> pastelGreen }
+                            EntryStylePill(option, isSelected, activePillColor, Color.White, textSub, surfaceFallback) { bleeding = option }
+                        }
+                    }
+                }
+
+                
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text       = "$painLevel / 10",
+                        text       = "Blood Color",
                         fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         fontSize   = SIZE_MD,
-                        color      = accentColor
+                        color      = textPrimary
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        colorOptions.forEach { option ->
+                            val isSelected      = bloodColor.equals(option, ignoreCase = true)
+                            val activePillColor = when (option) { "Bright Red" -> pastelGreen; "Dark Red" -> Color(0xFF4E1A1A); "Brown" -> pastelOrange; else -> accentColor }
+                            EntryStylePill(option, isSelected, activePillColor, Color.White, textSub, surfaceFallback) { bloodColor = option }
+                        }
+                    }
+                }
+
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text       = "Cramps & Pain",
+                            fontFamily = BricolageGrotesque,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = SIZE_MD,
+                            color      = textPrimary
+                        )
+                        Text(
+                            text       = "$painLevel / 10",
+                            fontFamily = BricolageGrotesque,
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = SIZE_MD,
+                            color      = accentColor
+                        )
+                    }
+                    Slider(
+                        value         = sliderPosition,
+                        onValueChange = { sliderPosition = it; painLevel = it.toInt() },
+                        valueRange    = 0f..10f,
+                        colors        = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor, inactiveTrackColor = pillBackground)
                     )
                 }
-                Slider(
-                    value         = sliderPosition,
-                    onValueChange = { sliderPosition = it; painLevel = it.toInt() },
-                    valueRange    = 0f..10f,
-                    colors        = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor, inactiveTrackColor = pillBackground)
-                )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            
+            Column(
+                modifier = Modifier.padding(top = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Button(
-                    onClick   = { onSave(bleeding, bloodColor, painLevel) },
-                    modifier  = Modifier.fillMaxWidth().padding(top = 8.dp).height(56.dp),
+                    onClick   = {
+                        coroutineScope.launch {
+                            sheetState.hide()
+                            onSave(bleeding, bloodColor, painLevel)
+                        }
+                    },
+                    modifier  = Modifier.fillMaxWidth().height(56.dp),
                     shape     = RoundedCornerShape(18.dp),
                     colors    = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
                     elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
@@ -581,7 +636,15 @@ fun DayLogDialog(
                 }
 
                 if (isOverridden) {
-                    TextButton(onClick = onClear, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                sheetState.hide()
+                                onClear()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
                             text       = "Reset to cycle default",
                             fontFamily = BricolageGrotesque,
@@ -675,7 +738,7 @@ fun CalendarCard(
     ) {
         Box(modifier = Modifier.background(backgroundBrush).padding(horizontal = 14.dp, vertical = 12.dp)) {
             Column {
-                // Header
+                
                 val headerText = if (isCollapsed) {
                     val currentWeek  = weekState.firstVisibleWeek
                     val dominantDate = currentWeek.days.getOrNull(3)?.date ?: currentWeek.days.first().date
@@ -738,7 +801,7 @@ fun CalendarCard(
 
                 Spacer(Modifier.height(14.dp))
 
-                // Day-of-week headers
+                
                 Row(Modifier.fillMaxWidth()) {
                     daysOfWeek.forEach { dayOfWeek ->
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -951,7 +1014,7 @@ fun DayText(date: LocalDate, isCurrentMonth: Boolean, isHighlighted: Boolean) {
     )
 }
 
-// ---------- Swipe row, entry row ----------
+
 @Composable
 fun SwipeToDeleteCard(onDelete: () -> Unit, content: @Composable (Boolean) -> Unit) {
     val density     = LocalDensity.current
@@ -1091,180 +1154,187 @@ fun EditCycleDialog(
     val textSub         = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1B1B1B)
 
     val formatter  = remember { DateTimeFormatter.ofPattern("MMM dd") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = containerColor, modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+    
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+
+    
+    val scrollState = rememberScrollState()
+
+    val thresholdPx = remember(configuration.screenHeightDp) {
+        with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() }
+    }
+    var expandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val sheetHolder = remember { SheetStateHolder() }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = sheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - expandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else true
+                } catch (e: Exception) { true }
+            } else true
+        }
+    )
+    sheetHolder.state = sheetState
+
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Expanded) {
+            try { expandedOffset = sheetState.requireOffset() } catch (e: Exception) {}
+        }
+    }
+
+    
+    LaunchedEffect(showDailyLog) {
+        if (showDailyLog) {
+            delay(150)
+            scrollState.animateScrollTo(
+                value = scrollState.maxValue,
+                animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
+            )
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = containerColor,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
                 .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState())
-                .animateContentSize(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness    = Spring.StiffnessMediumLow
-                    )
-                ),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .animateContentSize(spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow))
         ) {
-            // Header
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
                 Text(
                     text       = "Edit Entry",
                     fontFamily = BricolageGrotesque,
                     style      = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color      = textPrimary
                 )
-                Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier         = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f))
+                        .clickable { coroutineScope.launch { sheetState.hide(); onDismiss() } },
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
 
-            // Date selectors
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CleanDateCard("Start Date", startDate.format(formatter), Icons.Rounded.CalendarToday, pillBackground, pillTextColor, { showStartPicker = true }, Modifier.weight(1f))
-                CleanDateCard("End Date", endDate?.format(formatter) ?: "Ongoing", if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable, pillBackground, pillTextColor, { showEndPicker = true }, Modifier.weight(1f))
-            }
-
-            // Summary or pickers
-            if (dailyOverrides.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Summary",
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize   = SIZE_MD,
-                        color      = textPrimary
-                    )
-                    val annotatedSummary = buildAnnotatedString {
-                        append("Based on your daily logs, this cycle has a peak flow of ")
-                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
-                        append("${derivedBleeding.lowercase()} (${derivedColor.lowercase()})")
-                        pop()
-                        append(", with an average pain level of ")
-                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
-                        append("$derivedPain/10")
-                        pop()
-                        append(".")
-                    }
-                    Text(
-                        text       = annotatedSummary,
-                        fontFamily = BricolageGrotesque,
-                        fontSize   = SIZE_MD,
-                        color      = textSub,
-                        lineHeight = 20.sp
-                    )
+            
+            Column(
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CleanDateCard("Start Date", startDate.format(formatter), Icons.Rounded.CalendarToday, pillBackground, pillTextColor, { showStartPicker = true }, Modifier.weight(1f))
+                    CleanDateCard("End Date", endDate?.format(formatter) ?: "Ongoing", if (endDate == null) Icons.Rounded.Update else Icons.Rounded.EventAvailable, pillBackground, pillTextColor, { showEndPicker = true }, Modifier.weight(1f))
                 }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Flow Intensity", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        bleedingOptions.forEach { option ->
-                            val isSelected = bleeding.equals(option, ignoreCase = true)
-                            val activeBg   = when (option) { "Heavy" -> pastelMaroon; "Medium" -> pastelOrange; else -> pastelGreen }
-                            EntryStylePill(option, isSelected, activeBg, Color.White, textSub, surfaceFallback) { bleeding = option }
+
+                if (dailyOverrides.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Summary", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
+                        val annotatedSummary = buildAnnotatedString {
+                            append("Based on your daily logs, this cycle has a peak flow of ")
+                            pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                            append("${derivedBleeding.lowercase()} (${derivedColor.lowercase()})")
+                            pop()
+                            append(", with an average pain level of ")
+                            pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = textPrimary))
+                            append("$derivedPain/10")
+                            pop()
+                            append(".")
+                        }
+                        Text(text = annotatedSummary, fontFamily = BricolageGrotesque, fontSize = SIZE_MD, color = textSub, lineHeight = 20.sp)
+                    }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Flow Intensity", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            bleedingOptions.forEach { option ->
+                                val isSelected = bleeding.equals(option, ignoreCase = true)
+                                val activeBg   = when (option) { "Heavy" -> pastelMaroon; "Medium" -> pastelOrange; else -> pastelGreen }
+                                EntryStylePill(option, isSelected, activeBg, Color.White, textSub, surfaceFallback) { bleeding = option }
+                            }
                         }
                     }
-                }
 
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Blood Color", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        colorOptions.forEach { option ->
-                            val isSelected = bloodColor.equals(option, ignoreCase = true)
-                            val activeBg   = when (option) { "Bright Red" -> pastelGreen; "Dark Red" -> Color(0xFF4E1A1A); "Brown" -> pastelOrange; else -> accentColor }
-                            EntryStylePill(option, isSelected, activeBg, Color.White, textSub, surfaceFallback) { bloodColor = option }
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("Blood Color", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            colorOptions.forEach { option ->
+                                val isSelected = bloodColor.equals(option, ignoreCase = true)
+                                val activeBg   = when (option) { "Bright Red" -> pastelGreen; "Dark Red" -> Color(0xFF4E1A1A); "Brown" -> pastelOrange; else -> accentColor }
+                                EntryStylePill(option, isSelected, activeBg, Color.White, textSub, surfaceFallback) { bloodColor = option }
+                            }
                         }
                     }
-                }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Cramps & Pain", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
-                        Text(
-                            "${sliderPosition.toInt()} / 10",
-                            fontFamily = BricolageGrotesque,
-                            fontWeight = FontWeight.Bold,
-                            fontSize   = SIZE_MD,
-                            color      = accentColor
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Cramps & Pain", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
+                            Text("${sliderPosition.toInt()} / 10", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, fontSize = SIZE_MD, color = accentColor)
+                        }
+                        Slider(
+                            value         = sliderPosition,
+                            onValueChange = { sliderPosition = it; painLevel = it.toInt() },
+                            valueRange    = 0f..10f,
+                            colors        = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor, inactiveTrackColor = pillBackground)
                         )
                     }
-                    Slider(
-                        value         = sliderPosition,
-                        onValueChange = { sliderPosition = it; painLevel = it.toInt() },
-                        valueRange    = 0f..10f,
-                        colors        = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor, inactiveTrackColor = pillBackground)
-                    )
                 }
-            }
 
-            // Daily log section
-            if (cycleDays.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pillBackground).clickable { showDailyLog = !showDailyLog }.padding(16.dp, 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment     = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                "Log by day",
-                                fontFamily = BricolageGrotesque,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize   = SIZE_LG,
-                                color      = pillTextColor
-                            )
-                            Text(
-                                if (dailyOverrides.isEmpty()) "Optional • uses cycle default"
-                                else "${dailyOverrides.size} day${if (dailyOverrides.size > 1) "s" else ""} customized",
-                                fontFamily = BricolageGrotesque,
-                                fontSize   = SIZE_XS,
-                                color      = if (dailyOverrides.isEmpty()) pillTextColor.copy(alpha = 0.5f) else accentColor
-                            )
+                if (cycleDays.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(pillBackground).clickable { showDailyLog = !showDailyLog }.padding(16.dp, 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment     = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Log by day", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_LG, color = pillTextColor)
+                                Text(if (dailyOverrides.isEmpty()) "Optional • uses cycle default" else "${dailyOverrides.size} day${if (dailyOverrides.size > 1) "s" else ""} customized", fontFamily = BricolageGrotesque, fontSize = SIZE_XS, color = if (dailyOverrides.isEmpty()) pillTextColor.copy(alpha = 0.5f) else accentColor)
+                            }
+                            Icon(Icons.Default.KeyboardArrowDown, null, tint = pillTextColor.copy(alpha = 0.5f), modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = dailyLogRotation })
                         }
-                        Icon(Icons.Default.KeyboardArrowDown, null, tint = pillTextColor.copy(alpha = 0.5f), modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = dailyLogRotation })
-                    }
 
-                    if (showDailyLog) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            cycleDays.forEach { day ->
-                                val override    = dailyOverrides[day]
-                                val dayBleeding = override?.first  ?: bleeding
-                                val dayColor    = override?.second ?: bloodColor
-                                val dayPain     = override?.third  ?: painLevel
-                                val dayLabel    = day.format(DateTimeFormatter.ofPattern("EEE, MMM d"))
-                                val isCustom    = override != null
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(if (isCustom) accentColor.copy(alpha = 0.12f) else pillBackground)
-                                        .clickable { selectedDayForLog = day }
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment     = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text       = dayLabel,
-                                            fontFamily = BricolageGrotesque,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize   = SIZE_LG,
-                                            color      = if (isCustom) textPrimary else textPrimary.copy(alpha = 0.8f)
-                                        )
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(
-                                            text       = "$dayBleeding • $dayColor • Pain: $dayPain/10",
-                                            fontFamily = BricolageGrotesque,
-                                            fontSize   = SIZE_XS,
-                                            color      = textSub.copy(alpha = 0.6f)
-                                        )
+                        
+                        if (showDailyLog) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                cycleDays.forEach { day ->
+                                    val override = dailyOverrides[day]
+                                    val isCustom = override != null
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (isCustom) accentColor.copy(alpha = 0.12f) else pillBackground).clickable { selectedDayForLog = day }.padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment     = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(text = day.format(DateTimeFormatter.ofPattern("EEE, MMM d")), fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_LG, color = if (isCustom) textPrimary else textPrimary.copy(alpha = 0.8f))
+                                            Spacer(Modifier.height(2.dp))
+                                            Text(text = "${override?.first ?: bleeding} • ${override?.second ?: bloodColor} • Pain: ${override?.third ?: painLevel}/10", fontFamily = BricolageGrotesque, fontSize = SIZE_XS, color = textSub.copy(alpha = 0.6f))
+                                        }
+                                        Icon(Icons.Default.Edit, "Edit", tint = if (isCustom) accentColor else textSub.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                                     }
-                                    Icon(Icons.Default.Edit, "Edit", tint = if (isCustom) accentColor else textSub.copy(alpha = 0.3f), modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
@@ -1272,19 +1342,15 @@ fun EditCycleDialog(
                 }
             }
 
+            
             Button(
-                onClick   = { onSave(cycle.copy(startDate = startDate, endDate = endDate, bleeding = derivedBleeding, bloodColor = derivedColor, painLevel = derivedPain), dailyOverrides) },
-                modifier  = Modifier.fillMaxWidth().padding(top = 8.dp).height(56.dp),
+                onClick   = { coroutineScope.launch { sheetState.hide(); onSave(cycle.copy(startDate = startDate, endDate = endDate, bleeding = derivedBleeding, bloodColor = derivedColor, painLevel = derivedPain), dailyOverrides) } },
+                modifier  = Modifier.fillMaxWidth().padding(top = 24.dp).height(56.dp),
                 shape     = RoundedCornerShape(18.dp),
                 colors    = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Text(
-                    "Update Entry",
-                    fontFamily = BricolageGrotesque,
-                    fontSize   = SIZE_LG,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Update Entry", fontFamily = BricolageGrotesque, fontSize = SIZE_LG, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1295,6 +1361,7 @@ fun EditCycleDialog(
             PeriodViewModel.DailyLog(id = 0, cycleId = cycle.id, date = day, bleeding = it.first, bloodColor = it.second, painLevel = it.third)
         }
         val tempCycle = cycle.copy(startDate = startDate, endDate = endDate, bleeding = bleeding, bloodColor = bloodColor, painLevel = painLevel)
+
         DayLogDialog(
             date      = day, cycle = tempCycle, existingLog = existingLog,
             onDismiss = { selectedDayForLog = null },
@@ -1311,18 +1378,14 @@ fun EditCycleDialog(
 
     if (showStartPicker) {
         MinimalDatePickerDialog(
-            title = "Start Date", brand = accentColor,
-            gradTop = pastelGreen, gradMid = pastelOrange, gradBottom = pastelMaroon,
-            onGradient = Color.White, buttonContainer = surfaceFallback, buttonContent = textPrimary,
+            title = "Start Date", brand = accentColor, gradTop = pastelGreen, gradMid = pastelOrange, gradBottom = pastelMaroon, onGradient = Color.White, buttonContainer = surfaceFallback, buttonContent = textPrimary,
             onDismiss = { showStartPicker = false },
             onConfirm = { ms -> millisToLocalDate(ms)?.let { startDate = it }; showStartPicker = false }
         )
     }
     if (showEndPicker) {
         MinimalDatePickerDialog(
-            title = "End Date", brand = accentColor,
-            gradTop = pastelGreen, gradMid = pastelOrange, gradBottom = pastelMaroon,
-            onGradient = Color.White, buttonContainer = surfaceFallback, buttonContent = textPrimary,
+            title = "End Date", brand = accentColor, gradTop = pastelGreen, gradMid = pastelOrange, gradBottom = pastelMaroon, onGradient = Color.White, buttonContainer = surfaceFallback, buttonContent = textPrimary,
             onDismiss = { showEndPicker = false },
             onConfirm = { ms -> millisToLocalDate(ms)?.let { endDate = it }; showEndPicker = false }
         )
@@ -1502,7 +1565,7 @@ fun RowScope.InfoBox(label: String, value: String, bg: Color, textColor: Color) 
     }
 }
 
-// ─── Wellness card copy lists (unchanged) ────────────────────────────────────
+
 private val activeCycleMessages = listOf("Focus on self-care and hydration today.", "Warm baths and rest go a long way right now.", "Your body is doing a lot — be gentle with yourself.", "A heating pad and something comforting sounds right.", "This is a great time to slow down and recharge.", "Listen to what your body needs today.", "Dark chocolate counts as self-care. 🍫", "Rest is productive. You're allowed to take it easy.", "Check in with yourself — how are you feeling today?", "Hydrate, rest, repeat. You've got this. 💪")
 private val naturalFlowMessages = listOf("Enjoy your natural flow. ✨", "Your cycle is doing its thing. ✨", "A calm phase — make the most of it. 🌿", "Good things ahead. Keep logging for better predictions.", "You're in a great window right now. 🌸", "Feeling yourself? This phase tends to be the best. ✨", "Your body is in rhythm. Stay consistent. 🌿", "The quiet before the storm — rest up and enjoy! ☀️", "Track how you feel today — patterns matter. 📊", "Energy up? Use it well. ✨")
 private val pillFlowMessages    = listOf("Stay consistent with your pack! 💊", "One pill a day keeps the guesswork away. 💊", "Consistency is key — keep it up! ✨", "On track with your pack. Great work! 💊", "Remember to take your pill at the same time each day.", "Staying consistent helps your body stay regulated. 💊", "You're doing great — keep the streak going! ✨", "Same time every day is the goal. You've got this! 💊", "Your pack is on track. Stay consistent! 🌿", "Pill taken? Check. You're doing amazing. ✨")
@@ -1637,7 +1700,7 @@ fun PredictionBanner(
     }
 }
 
-// ─── Wellness phase copy lists (unchanged) ───────────────────────────────────
+
 private val bleedingDo   = listOf("Take it slow and rest up.", "Curl up with something cozy.", "Give yourself permission to do nothing.", "A warm bath can do wonders today.", "Journal how you're feeling today.", "Low effort, high reward — rest wins.", "Cancel what you can. Rest first.")
 private val bleedingMove = listOf("Try gentle stretching or yoga.", "A slow walk outside is enough.", "Restorative yoga is perfect right now.", "Light stretching before bed tonight.", "Child's pose. That's it. That's enough.", "Breathwork counts as movement today.", "Gentle mobility work if you have energy.")
 private val bleedingEat  = listOf("Comfort food rich in iron.", "Dark leafy greens and lentils today.", "Warm soups are your best friend.", "Iron-rich foods help with fatigue.", "Magnesium-rich foods ease cramps.", "Bone broth or a hearty stew.", "Dark chocolate has iron — treat yourself.")
