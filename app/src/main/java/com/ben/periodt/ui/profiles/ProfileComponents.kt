@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import coil.compose.AsyncImage
 import com.ben.periodt.R
 import com.ben.periodt.ui.theme.BricolageGrotesque
@@ -60,7 +63,6 @@ import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
-import androidx.compose.ui.util.lerp
 
 private val SIZE_SM = 13.sp
 private val SIZE_MD = 14.sp
@@ -109,10 +111,10 @@ fun AvatarDisplay(
         val resId = AvatarResMap[avatarString]
         if (resId != null) {
             AsyncImage(
-                model            = resId,
+                model = resId,
                 contentDescription = null,
-                contentScale     = ContentScale.Crop,
-                modifier         = modifier.clip(CircleShape)
+                contentScale = ContentScale.Crop,
+                modifier = modifier.clip(CircleShape)
             )
         } else {
             Box(
@@ -120,254 +122,12 @@ fun AvatarDisplay(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text       = name.firstOrNull()?.uppercase() ?: "M",
-                    color      = Color.White,
+                    text = name.firstOrNull()?.uppercase() ?: "M",
+                    color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontFamily = BricolageGrotesque,
-                    fontSize   = fontSize
+                    fontSize = fontSize
                 )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-fun ProfileEditorDialog(
-    existingProfile: PeriodViewModel.Profile?,
-    isDark: Boolean,
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    val context = LocalContext.current
-    var name by remember(existingProfile) { mutableStateOf(existingProfile?.name ?: "") }
-
-    // 1. Changed default fallback from "avatar_17" to "avatar_1"
-    var selectedAvatar by remember(existingProfile) {
-        mutableStateOf(existingProfile?.avatarColor ?: "avatar_1")
-    }
-
-    // This order is now: Girls (1-8), Capybara (9-16), Fruits (17-24)
-    val avatars = remember {
-        (1..8).map { "avatar_$it" } +
-                (9..16).map { "avatar_$it" } +
-                (17..24).map { "avatar_$it" }
-    }
-    val avatarPages = remember { avatars.chunked(8) }
-
-    // 2. Updated heading order to match the avatar list above
-    val avatarSetHeadings = remember { listOf("Girls", "Capybara", "Fruits", "Contribute") }
-
-    // 3. Updated initialPage logic to default to "avatar_1"
-    val initialPage = remember(existingProfile, avatars) {
-        val currentAvatar = existingProfile?.avatarColor ?: "avatar_1"
-        val index = avatars.indexOf(currentAvatar)
-        if (index != -1) index / 8 else 0
-    }
-
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { avatarSetHeadings.size }
-    )
-
-    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
-    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = containerColor,
-        contentColor = textPrimary,
-        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .navigationBarsPadding()
-                .padding(bottom = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (existingProfile == null) "New Profile" else "Edit Profile",
-                    fontFamily = BricolageGrotesque,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = textPrimary
-                )
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(textSub.copy(alpha = 0.1f))
-                        .clickable(onClick = onDismiss),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
-                }
-            }
-
-            ProfileNameField(
-                value = name,
-                onValueChange = { name = it },
-                isDark = isDark,
-                accentColor = accentColor,
-                textPrimary = textPrimary,
-                textSub = textSub
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Choose Avatar",
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = SIZE_MD,
-                        color = textPrimary
-                    )
-
-                    Text(text = "•", fontFamily = BricolageGrotesque, fontSize = SIZE_MD, color = textSub.copy(alpha = 0.4f))
-
-                    AnimatedContent(
-                        targetState = avatarSetHeadings.getOrElse(pagerState.currentPage) { "" },
-                        transitionSpec = {
-                            (fadeIn() + slideInVertically { it / 2 }).togetherWith(fadeOut() + slideOutVertically { -it / 2 })
-                        },
-                        label = "AvatarSetHeading"
-                    ) { heading ->
-                        Text(
-                            text = heading,
-                            fontFamily = BricolageGrotesque,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = SIZE_SM,
-                            color = accentColor
-                        )
-                    }
-                }
-
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxWidth()
-                ) { page ->
-                    if (page < avatarPages.size) {
-                        val pageAvatars = avatarPages[page]
-                        val rows = pageAvatars.chunked(4)
-
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            rows.forEach { rowItems ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    rowItems.forEach { avatarName ->
-                                        val isSelected = selectedAvatar == avatarName
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .aspectRatio(1f)
-                                                .clip(CircleShape)
-                                                .background(if (isSelected) accentColor.copy(alpha = 0.2f) else Color.Transparent)
-                                                .then(if (isSelected) Modifier.border(2.5.dp, accentColor, CircleShape) else Modifier)
-                                                .clickable { selectedAvatar = avatarName }
-                                                .padding(4.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            AvatarDisplay(avatarString = avatarName, name = "", modifier = Modifier.fillMaxSize())
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(2.1f)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(textSub.copy(alpha = 0.05f))
-                                .padding(20.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "Would you like to contribute more diverse sets of avatars?",
-                                    fontFamily = BricolageGrotesque,
-                                    fontSize = SIZE_MD,
-                                    color = textPrimary,
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    text = "contact me at",
-                                    fontFamily = BricolageGrotesque,
-                                    fontSize = SIZE_SM,
-                                    color = textSub,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "developer.ben10@gmail.com",
-                                    fontFamily = BricolageGrotesque,
-                                    fontSize = SIZE_MD,
-                                    color = accentColor,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.clickable {
-                                        val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                            data = Uri.parse("mailto:developer.ben10@gmail.com")
-                                        }
-                                        try { context.startActivity(intent) } catch (e: Exception) { }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Page indicators
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    repeat(avatarSetHeadings.size) { iteration ->
-                        val color = if (pagerState.currentPage == iteration) accentColor else textSub.copy(alpha = 0.2f)
-                        val size = if (pagerState.currentPage == iteration) 8.dp else 6.dp
-                        Box(
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .size(size)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                    }
-                }
-            }
-
-            Button(
-                onClick = { if (name.isNotBlank()) onSave(name, selectedAvatar) },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(56.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-            ) {
-                Text("Save Profile", fontFamily = BricolageGrotesque, fontSize = SIZE_LG, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -386,8 +146,7 @@ fun ProfileNameField(
     val fieldBg = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.05f)
 
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused.value) accentColor.copy(alpha = 0.8f)
-        else Color.Transparent,
+        targetValue = if (isFocused.value) accentColor.copy(alpha = 0.8f) else Color.Transparent,
         animationSpec = tween(200),
         label = "fieldBorder"
     )
@@ -459,34 +218,29 @@ fun SwipeToDeleteCard(
     onDelete: () -> Unit,
     content: @Composable (Boolean) -> Unit
 ) {
-    val density  = LocalDensity.current
-    val scope    = rememberCoroutineScope()
-    val offsetX  = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val offsetX = remember { Animatable(0f) }
     val revealPx = with(density) { 80.dp.toPx() }
-    val deletePx = with(density) { 150.dp.toPx() }  // lower = snappier feel
-    var widthPx  by remember { mutableStateOf(0f) }
+    val deletePx = with(density) { 150.dp.toPx() }
+    var widthPx by remember { mutableStateOf(0f) }
 
     val itemShape = RoundedCornerShape(20.dp)
 
-    // Three distinct specs for three distinct feelings
-    val revealSpring   = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
-    val snapBackSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy,     stiffness = Spring.StiffnessMediumLow)
-    val deleteExit     = tween<Float>(durationMillis = 180, easing = FastOutLinearInEasing)
+    val revealSpring = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    val snapBackSpring = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    val deleteExit = tween<Float>(durationMillis = 180, easing = FastOutLinearInEasing)
 
     val isRevealed by remember { derivedStateOf { offsetX.value.absoluteValue > revealPx * 0.55f } }
-    val isSwiping  by remember { derivedStateOf { offsetX.value.absoluteValue > 4f } }
+    val isSwiping by remember { derivedStateOf { offsetX.value.absoluteValue > 4f } }
 
-    // Smooth proportional alpha — no more hard jump
-    val bgAlpha by remember { derivedStateOf {
-        (offsetX.value.absoluteValue / revealPx).coerceIn(0f, 0.85f)
-    }}
+    val bgAlpha by remember { derivedStateOf { (offsetX.value.absoluteValue / revealPx).coerceIn(0f, 0.85f) } }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .onSizeChanged { widthPx = it.width.toFloat() }
     ) {
-        // Background layer
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -497,17 +251,14 @@ fun SwipeToDeleteCard(
         ) {
             AnimatedVisibility(
                 visible = isRevealed,
-                enter   = fadeIn(tween(120)) + scaleIn(tween(120, easing = FastOutSlowInEasing)),
-                exit    = fadeOut(tween(80))  + scaleOut(tween(80))
+                enter = fadeIn(tween(120)) + scaleIn(tween(120, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(80)) + scaleOut(tween(80))
             ) {
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                             scope.launch {
                                 val target = if (offsetX.value >= 0f) widthPx else -widthPx
                                 offsetX.animateTo(target, deleteExit)
@@ -516,17 +267,11 @@ fun SwipeToDeleteCard(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp))
                 }
             }
         }
 
-        // Draggable card layer
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -539,115 +284,23 @@ fun SwipeToDeleteCard(
                                 val off = offsetX.value
                                 when {
                                     off <= -deletePx || off >= deletePx -> {
-                                        // Fast, no-bounce exit → then delete
                                         val target = if (off < 0f) -widthPx else widthPx
                                         offsetX.animateTo(target, deleteExit)
                                         onDelete()
                                     }
                                     off <= -(revealPx * 0.5f) -> offsetX.animateTo(-revealPx, revealSpring)
-                                    off >=  (revealPx * 0.5f) -> offsetX.animateTo( revealPx, revealSpring)
-                                    else                       -> offsetX.animateTo(0f, snapBackSpring)
+                                    off >= (revealPx * 0.5f) -> offsetX.animateTo(revealPx, revealSpring)
+                                    else -> offsetX.animateTo(0f, snapBackSpring)
                                 }
                             }
                         }
                     ) { change, dragAmount ->
                         change.consume()
-                        scope.launch {
-                            offsetX.snapTo((offsetX.value + dragAmount).coerceIn(-widthPx, widthPx))
-                        }
+                        scope.launch { offsetX.snapTo((offsetX.value + dragAmount).coerceIn(-widthPx, widthPx)) }
                     }
                 }
         ) {
             content(isSwiping)
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-fun ProfileBottomSheetContent(
-    allProfiles: List<PeriodViewModel.Profile>,
-    activeProfile: PeriodViewModel.Profile?,
-    isDark: Boolean,
-    onSwitch: (Int) -> Unit,
-    onEdit: (PeriodViewModel.Profile) -> Unit,
-    onDelete: (Int) -> Unit,
-    onAddClick: () -> Unit,
-    onSettingsClick: () -> Unit,
-    listState: LazyListState = rememberLazyListState()
-) {
-    val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
-    val textSub     = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val rowBg          = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(vertical = 8.dp)
-            .animateContentSize(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness    = Spring.StiffnessMediumLow
-                )
-            ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // --- Header (Padding added back locally) ---
-        Column(
-            modifier = Modifier.padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(text = "Profiles", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = textPrimary)
-                Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onSettingsClick), contentAlignment = Alignment.Center) {
-                    Icon(imageVector = Icons.Rounded.Settings, contentDescription = "Settings", tint = textPrimary, modifier = Modifier.size(20.dp))
-                }
-            }
-            Text(text = "Long press to edit • Swipe to delete", fontFamily = BricolageGrotesque, fontSize = SIZE_SM, color = textSub)
-        }
-
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f, fill = false),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 4.dp)
-        ) {
-            items(items = allProfiles, key = { it.id }) { profile ->
-                val isSelected = profile.id == activeProfile?.id
-                val highlightColor = if (profile.avatarColor.startsWith("#")) {
-                    try { Color(android.graphics.Color.parseColor(profile.avatarColor)) } catch (e: Exception) { accentColor }
-                } else accentColor
-                val canDelete = allProfiles.size > 1 && !isSelected
-                val itemModifier = Modifier.animateItem()
-
-                if (canDelete) {
-                    SwipeToDeleteCard(modifier = itemModifier, onDelete = { onDelete(profile.id) }) { isSwiping ->
-                        ProfileRow(profile = profile, isSelected = isSelected, highlightColor = highlightColor, rowBg = if (isSelected) highlightColor.copy(alpha = 0.15f) else rowBg, isDark = isDark, textPrimary = textPrimary, onSwitch = { if (!isSwiping) onSwitch(it) }, onEdit = { if (!isSwiping) onEdit(it) })
-                    }
-                } else {
-                    ProfileRow(modifier = itemModifier, profile = profile, isSelected = isSelected, highlightColor = highlightColor, rowBg = if (isSelected) highlightColor.copy(alpha = 0.15f) else rowBg, isDark = isDark, textPrimary = textPrimary, onSwitch = onSwitch, onEdit = onEdit)
-                }
-            }
-        }
-
-        // --- Button (Padding added back locally) ---
-        Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-            Button(
-                onClick = onAddClick,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp).height(56.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
-            ) {
-                Icon(Icons.Rounded.Add, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
-                Text(text = "Add Profile", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, fontSize = SIZE_LG)
-            }
         }
     }
 }
@@ -684,6 +337,311 @@ private fun ProfileRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun ProfileEditorDialog(
+    existingProfile: PeriodViewModel.Profile?,
+    isDark: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit
+) {
+    val context = LocalContext.current
+    var name by remember(existingProfile) { mutableStateOf(existingProfile?.name ?: "") }
+    var selectedAvatar by remember(existingProfile) {
+        mutableStateOf(existingProfile?.avatarColor ?: "avatar_1")
+    }
+
+    val avatars = remember { (1..24).map { "avatar_$it" } }
+    val avatarPages = remember { avatars.chunked(8) }
+    val avatarSetHeadings = remember { listOf("Girls", "Capybara", "Fruits", "Contribute") }
+
+    val initialPage = remember(existingProfile, avatars) {
+        val currentAvatar = existingProfile?.avatarColor ?: "avatar_1"
+        val index = avatars.indexOf(currentAvatar)
+        if (index != -1) index / 8 else 0
+    }
+
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { avatarSetHeadings.size })
+
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+    val thresholdPx = remember(configuration.screenHeightDp) { with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() } }
+    var expandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val sheetHolder = remember { SheetStateHolder() }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = sheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - expandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else true
+                } catch (e: Exception) { true }
+            } else true
+        }
+    )
+    sheetHolder.state = sheetState
+
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Expanded) {
+            try { expandedOffset = sheetState.requireOffset() } catch (e: Exception) {}
+        }
+    }
+
+    val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
+    val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = containerColor,
+        contentColor = textPrimary,
+        modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (existingProfile == null) "New Profile" else "Edit Profile",
+                    fontFamily = BricolageGrotesque,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = textPrimary
+                )
+                Box(
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f))
+                        .clickable { coroutineScope.launch { sheetState.hide(); onDismiss() } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                ProfileNameField(name, { name = it }, isDark, accentColor, textPrimary, textSub)
+
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Choose Avatar", fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_MD, color = textPrimary)
+                        Text("•", color = textSub.copy(alpha = 0.4f))
+                        AnimatedContent(
+                            targetState = avatarSetHeadings.getOrElse(pagerState.currentPage) { "" },
+                            transitionSpec = { (fadeIn() + slideInVertically { it / 2 }).togetherWith(fadeOut() + slideOutVertically { -it / 2 }) },
+                            label = ""
+                        ) { heading ->
+                            Text(heading, fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, fontSize = SIZE_SM, color = accentColor)
+                        }
+                    }
+
+                    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth(), pageSpacing = 16.dp) { page ->
+                        if (page < avatarPages.size) {
+                            val rows = avatarPages[page].chunked(4)
+                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                rows.forEach { rowItems ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        rowItems.forEach { avatarName ->
+                                            val isSelected = selectedAvatar == avatarName
+                                            Box(
+                                                modifier = Modifier.weight(1f).aspectRatio(1f).clip(CircleShape)
+                                                    .background(if (isSelected) accentColor.copy(alpha = 0.2f) else Color.Transparent)
+                                                    .then(if (isSelected) Modifier.border(2.5.dp, accentColor, CircleShape) else Modifier)
+                                                    .clickable { selectedAvatar = avatarName }.padding(4.dp)
+                                            ) {
+                                                AvatarDisplay(avatarString = avatarName, name = "", modifier = Modifier.fillMaxSize())
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().aspectRatio(2.1f).clip(RoundedCornerShape(20.dp)).background(textSub.copy(alpha = 0.05f)).padding(20.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "Would you like to contribute more diverse sets of avatars?",
+                                        fontFamily = BricolageGrotesque,
+                                        fontSize = SIZE_MD,
+                                        color = textPrimary,
+                                        textAlign = TextAlign.Center,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Text(
+                                        text = "contact me at",
+                                        fontFamily = BricolageGrotesque,
+                                        fontSize = SIZE_SM,
+                                        color = textSub,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "developer.ben10@gmail.com",
+                                        fontFamily = BricolageGrotesque,
+                                        fontSize = SIZE_MD,
+                                        color = accentColor,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.clickable {
+                                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                                data = Uri.parse("mailto:developer.ben10@gmail.com")
+                                            }
+                                            try { context.startActivity(intent) } catch (e: Exception) { }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(Modifier.fillMaxWidth(), Arrangement.Center, Alignment.CenterVertically) {
+                        repeat(avatarSetHeadings.size) { iteration ->
+                            val color = if (pagerState.currentPage == iteration) accentColor else textSub.copy(alpha = 0.2f)
+                            Box(Modifier.padding(horizontal = 4.dp).size(if (pagerState.currentPage == iteration) 8.dp else 6.dp).clip(CircleShape).background(color))
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = { if (name.isNotBlank()) { coroutineScope.launch { sheetState.hide(); onSave(name, selectedAvatar) } } },
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp).height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Text("Save Profile", fontFamily = BricolageGrotesque, fontSize = SIZE_LG, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileBottomSheetContent(
+    allProfiles: List<PeriodViewModel.Profile>,
+    activeProfile: PeriodViewModel.Profile?,
+    isDark: Boolean,
+    onSwitch: (Int) -> Unit,
+    onEdit: (PeriodViewModel.Profile) -> Unit,
+    onDelete: (Int) -> Unit,
+    onAddClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    listState: LazyListState = rememberLazyListState()
+) {
+    val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val rowBg = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(bottom = 16.dp)
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness    = Spring.StiffnessMediumLow
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                Text("Profiles", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = textPrimary)
+                Box(Modifier.size(36.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onSettingsClick), Alignment.Center) {
+                    Icon(Icons.Rounded.Settings, null, tint = textPrimary, modifier = Modifier.size(20.dp))
+                }
+            }
+            Text("Long press to edit • Swipe to delete", fontFamily = BricolageGrotesque, fontSize = SIZE_SM, color = textSub)
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f, fill = false),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 4.dp)
+        ) {
+            items(items = allProfiles, key = { it.id }) { profile ->
+                val isSelected = profile.id == activeProfile?.id
+                val highlightColor = if (profile.avatarColor.startsWith("#")) {
+                    try { Color(android.graphics.Color.parseColor(profile.avatarColor)) } catch (e: Exception) { accentColor }
+                } else accentColor
+                val canDelete = allProfiles.size > 1 && !isSelected
+                val itemModifier = Modifier.animateItem()
+
+                if (canDelete) {
+                    SwipeToDeleteCard(modifier = itemModifier, onDelete = { onDelete(profile.id) }) { isSwiping ->
+                        ProfileRow(
+                            modifier = Modifier,
+                            profile = profile,
+                            isSelected = isSelected,
+                            highlightColor = highlightColor,
+                            rowBg = if (isSelected) highlightColor.copy(alpha = 0.15f) else rowBg,
+                            isDark = isDark,
+                            textPrimary = textPrimary,
+                            onSwitch = { if (!isSwiping) onSwitch(profile.id) },
+                            onEdit = { if (!isSwiping) onEdit(profile) }
+                        )
+                    }
+                } else {
+                    ProfileRow(
+                        modifier = itemModifier,
+                        profile = profile,
+                        isSelected = isSelected,
+                        highlightColor = highlightColor,
+                        rowBg = if (isSelected) highlightColor.copy(alpha = 0.15f) else rowBg,
+                        isDark = isDark,
+                        textPrimary = textPrimary,
+                        onSwitch = onSwitch,
+                        onEdit = onEdit
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.padding(horizontal = 24.dp).padding(top = 16.dp)) {
+            Button(
+                onClick = onAddClick,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Icon(Icons.Rounded.Add, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Add Profile", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, fontSize = SIZE_LG)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LegacyImportDialog(
@@ -691,62 +649,112 @@ fun LegacyImportDialog(
     onImportToProfile: (Int?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val isDark         = LocalAppIsDark.current
+    val isDark = LocalAppIsDark.current
     val containerColor = if (isDark) Color(0xFF1B1B1B) else Color.White
-    val textPrimary    = if (isDark) Color.White else Color(0xFF1B1B1B)
-    val textSub        = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
-    val accentColor    = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
-    val rowBg          = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+    val textPrimary = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val textSub = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFF6d9567).copy(alpha = 0.6f)
+    val rowBg = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
 
-    // ✨ FIXED: Integrated Scroll guard into the SheetState logic
-    val scrollState = rememberScrollState()
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+    val thresholdPx = remember(configuration.screenHeightDp) { with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() } }
+    var expandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val sheetHolder = remember { SheetStateHolder() }
+
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
-        confirmValueChange = { newValue ->
-            // Prevent closing via swipe-down if the user hasn't scrolled all the way up
-            if (newValue == SheetValue.Hidden) scrollState.value == 0 else true
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = sheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - expandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else true
+                } catch (e: Exception) { true }
+            } else true
         }
     )
+    sheetHolder.state = sheetState
+
+    LaunchedEffect(sheetState.currentValue) {
+        if (sheetState.currentValue == SheetValue.Expanded) {
+            try { expandedOffset = sheetState.requireOffset() } catch (e: Exception) {}
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState       = sheetState,
-        containerColor   = containerColor,
-        contentColor     = textPrimary,
+        sheetState = sheetState,
+        containerColor = containerColor,
+        contentColor = textPrimary,
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 16.dp)
-                .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .animateContentSize(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness    = Spring.StiffnessMediumLow
+                    )
+                )
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "Legacy Backup", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = textPrimary)
-                Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f)).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Close, "Close", tint = textPrimary, modifier = Modifier.size(18.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Legacy Backup", fontFamily = BricolageGrotesque, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold), color = textPrimary)
+                Box(
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(textSub.copy(alpha = 0.1f))
+                        .clickable { coroutineScope.launch { sheetState.hide(); onDismiss() } },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, null, tint = textPrimary, modifier = Modifier.size(18.dp))
                 }
             }
 
-            Text(text = "We found an older backup format that doesn't contain profile information. Which profile should we merge this data into?", fontFamily = BricolageGrotesque, fontSize = SIZE_MD, color = textSub, lineHeight = 22.sp, modifier = Modifier.padding(horizontal = 24.dp))
+            Column(
+                modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Text("We found an older backup format... Which profile should we merge this data into?", fontFamily = BricolageGrotesque, fontSize = SIZE_MD, color = textSub, lineHeight = 22.sp)
 
-            Column(modifier = Modifier.padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                profiles.forEach { p ->
-                    Row(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(rowBg).clickable { onImportToProfile(p.id) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AvatarDisplay(avatarString = p.avatarColor, name = p.name, modifier = Modifier.size(40.dp), fontSize = SIZE_MD)
-                        Spacer(Modifier.width(16.dp))
-                        Text(text = "Merge into ${p.name}", color = textPrimary, fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_LG)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    profiles.forEach { p ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(rowBg)
+                                .clickable { coroutineScope.launch { sheetState.hide(); onImportToProfile(p.id) } }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AvatarDisplay(p.avatarColor, p.name, Modifier.size(40.dp), SIZE_MD)
+                            Spacer(Modifier.width(16.dp))
+                            Text("Merge into ${p.name}", color = textPrimary, fontFamily = BricolageGrotesque, fontWeight = FontWeight.SemiBold, fontSize = SIZE_LG)
+                        }
                     }
                 }
             }
 
-            Box(modifier = Modifier.padding(horizontal = 24.dp)) {
-                Button(onClick = { onImportToProfile(null) }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(56.dp), shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White), elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
-                    Text(text = "Create New Profile", fontFamily = BricolageGrotesque, fontSize = SIZE_LG, fontWeight = FontWeight.Bold)
-                }
+            Button(
+                onClick = { coroutineScope.launch { sheetState.hide(); onImportToProfile(null) } },
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp).height(56.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = accentColor, contentColor = Color.White),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Icon(Icons.Rounded.Add, null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Create New Profile", fontFamily = BricolageGrotesque, fontSize = SIZE_LG, fontWeight = FontWeight.Bold)
             }
         }
     }

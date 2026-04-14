@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -132,7 +133,7 @@ fun SmoothBottomNavigation(
                 )
 
                 Box(
-                    modifier = Modifier.width(dimens.barHeight).fillMaxHeight().clickable( // ✨ Width matches Height
+                    modifier = Modifier.width(dimens.barHeight).fillMaxHeight().clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null, onClick = { onNavigate(screen.route) }
                     ),
@@ -143,7 +144,7 @@ fun SmoothBottomNavigation(
             }
 
             Box(
-                modifier = Modifier.width(dimens.barHeight).fillMaxHeight().clickable( // ✨ Width matches Height
+                modifier = Modifier.width(dimens.barHeight).fillMaxHeight().clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null, onClick = onProfileClick
                 ),
@@ -197,11 +198,46 @@ private fun MainScreenContent(isDark: Boolean) {
 
     val dimens = LocalAppDimens.current
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
+
     val prefs by context.dataStore.data.collectAsState(initial = null)
     var showWhatsNew by remember { mutableStateOf(false) }
 
     val currentVersion = remember { context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt() }
+
+    // ✨ Custom Swipe Threshold Logic for Profile Sheet
+    val thresholdPx = remember(configuration.screenHeightDp) {
+        with(density) { (configuration.screenHeightDp.dp * 0.20f).toPx() }
+    }
+    var profileExpandedOffset by remember { mutableFloatStateOf(0f) }
+
+    class SheetStateHolder { var state: SheetState? = null }
+    val profileSheetHolder = remember { SheetStateHolder() }
+
+    val profileSheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { targetValue ->
+            if (targetValue == SheetValue.Hidden) {
+                try {
+                    val currentState = profileSheetHolder.state
+                    if (currentState != null) {
+                        val currentOffset = currentState.requireOffset()
+                        val dragDistance = currentOffset - profileExpandedOffset
+                        dragDistance <= 10f || dragDistance >= thresholdPx
+                    } else true
+                } catch (e: Exception) { true }
+            } else true
+        }
+    )
+    profileSheetHolder.state = profileSheetState
+
+    LaunchedEffect(profileSheetState.currentValue) {
+        if (profileSheetState.currentValue == SheetValue.Expanded) {
+            try { profileExpandedOffset = profileSheetState.requireOffset() } catch (e: Exception) {}
+        }
+    }
 
     LaunchedEffect(prefs) {
         prefs ?: return@LaunchedEffect
@@ -214,7 +250,19 @@ private fun MainScreenContent(isDark: Boolean) {
     }
 
     val fadeColor = if (isDark) Color.Black else Color.White
-    val bottomFadeBrush = Brush.verticalGradient(listOf(Color.Transparent, fadeColor.copy(alpha = 0f), fadeColor.copy(alpha = 0.6f), fadeColor))
+    val bottomFadeBrush = Brush.verticalGradient(listOf(fadeColor.copy(alpha = 0f), fadeColor.copy(alpha = 0f), fadeColor.copy(alpha = 0.8f), fadeColor))
+
+    val bgGradient = if (isDark) {
+        Brush.linearGradient(
+            0.0f to Color.Black, 0.7f to Color.Black, 1.0f to Color.Black,
+            start = Offset(0f, 0f), end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+    } else {
+        Brush.linearGradient(
+            colors = listOf(Color(0xFFe8ebed), Color(0xFFf2f0e3)),
+            start  = Offset(0f, 0f), end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+        )
+    }
 
     val navController = rememberNavController()
     val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context.applicationContext as Application))
@@ -235,7 +283,7 @@ private fun MainScreenContent(isDark: Boolean) {
     val currentRoute = navBackStackEntry?.destination?.route
     val hazeState = remember { HazeState() }
 
-    Box(modifier = Modifier.fillMaxSize().background(if (isDark) Color.Black else Color(0xFFF2F0E3))) {
+    Box(modifier = Modifier.fillMaxSize().background(bgGradient)) {
         NavHost(
             navController = navController,
             startDestination = Screen.Calendar.route,
@@ -262,15 +310,14 @@ private fun MainScreenContent(isDark: Boolean) {
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // ✨ FAB now uses size(dimens.barHeight) and CircleShape for perfect circularity
                     Box(
                         modifier = Modifier
                             .size(dimens.barHeight)
-                            .shadow(14.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.6f), spotColor = Color.Black.copy(alpha = 0.6f))
+                            .shadow(14.dp, RoundedCornerShape(percent = 49), ambientColor = Color.Black.copy(alpha = 0.6f), spotColor = Color.Black.copy(alpha = 0.6f))
                             .hazeChild(state = hazeState, shape = CircleShape, style = HazeStyle(blurRadius = 14.dp))
                             .clip(CircleShape)
                             .background(Color(0xFF6d9567).copy(alpha = 0.5f))
-                            .clickable {
+                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                                 when (currentRoute) {
                                     Screen.Pill.route -> showAddPillDialog = true
                                     Screen.Overview.route -> showRemindersSheet = true
@@ -301,20 +348,36 @@ private fun MainScreenContent(isDark: Boolean) {
                 }
             }
         }
-        // ... Sheets & Dialogs Logic remains identical ...
+
         if (showProfileSheet) {
             val profileListState = rememberLazyListState()
-            val profileSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
-                onDismissRequest = { showProfileSheet = false }, sheetState = profileSheetState,
+                onDismissRequest = { showProfileSheet = false },
+                sheetState = profileSheetState,
                 containerColor = if (isDark) Color(0xFF1b1b1b) else Color.White,
                 modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
             ) {
                 ProfileBottomSheetContent(
-                    allProfiles = allProfiles, activeProfile = activeProfile, isDark = isDark,
-                    onSwitch = { viewModel.switchProfile(it); showProfileSheet = false },
-                    onEdit = { profileToEdit = it }, onDelete = { viewModel.deleteProfile(it) },
-                    onAddClick = { showCreateProfile = true }, onSettingsClick = { showProfileSheet = false; navController.navigate(Screen.Settings.route) },
+                    allProfiles = allProfiles,
+                    activeProfile = activeProfile,
+                    isDark = isDark,
+                    onSwitch = { id ->
+                        coroutineScope.launch {
+                            profileSheetState.hide()
+                            viewModel.switchProfile(id)
+                            showProfileSheet = false
+                        }
+                    },
+                    onEdit = { profileToEdit = it },
+                    onDelete = { viewModel.deleteProfile(it) },
+                    onAddClick = { showCreateProfile = true },
+                    onSettingsClick = {
+                        coroutineScope.launch {
+                            profileSheetState.hide()
+                            showProfileSheet = false
+                            navController.navigate(Screen.Settings.route)
+                        }
+                    },
                     listState = profileListState
                 )
             }
