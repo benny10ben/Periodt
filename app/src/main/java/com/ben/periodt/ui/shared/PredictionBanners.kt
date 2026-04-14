@@ -29,10 +29,7 @@ private val SIZE_XXS = 11.sp
 private val SIZE_SM  = 13.sp
 private val SIZE_MD  = 14.sp
 private val SIZE_LG  = 15.sp
-
 private val SIZE_XL  = 20.sp
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 fun UpcomingBannerEnhanced(
@@ -201,12 +198,8 @@ fun UpcomingBannerEnhanced(
                         color      = textSecondary,
                         fontSize   = SIZE_SM
                     )
-
-                    // The confidence badge was removed from here
                 }
             }
-
-            // Both pills moved to the bottom right and styled identically
             Row(
                 modifier = Modifier.align(Alignment.BottomEnd),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
