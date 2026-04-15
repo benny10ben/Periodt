@@ -65,6 +65,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Create the new profiles table
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS profiles (
                         id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -75,16 +76,59 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
 
-                val uuid      = UUID.randomUUID().toString()
-                val now       = System.currentTimeMillis()
+                // 2. Insert the default profile
+                val uuid = UUID.randomUUID().toString()
+                val now = System.currentTimeMillis()
                 db.execSQL(
                     "INSERT INTO profiles (profileUuid, name, avatarColor, createdAt) VALUES (?, 'Me', 'avatar_1', ?)",
                     arrayOf(uuid, now)
                 )
 
-                db.execSQL("ALTER TABLE period_cycles ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+                // 3. Recreate period_cycles with the correct Foreign Key
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS period_cycles_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        profileId INTEGER NOT NULL,
+                        startDate TEXT NOT NULL,
+                        endDate TEXT NOT NULL,
+                        bleeding TEXT NOT NULL,
+                        bloodColor TEXT NOT NULL,
+                        painLevel INTEGER NOT NULL DEFAULT 5,
+                        FOREIGN KEY(profileId) REFERENCES profiles(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
 
-                db.execSQL("ALTER TABLE pill_packs ADD COLUMN profileId INTEGER NOT NULL DEFAULT 1")
+                // Copy old cycle data over and assign it to profile 1
+                db.execSQL("""
+                    INSERT INTO period_cycles_new (id, profileId, startDate, endDate, bleeding, bloodColor, painLevel)
+                    SELECT id, 1, startDate, endDate, bleeding, bloodColor, painLevel FROM period_cycles
+                """.trimIndent())
+
+                db.execSQL("DROP TABLE period_cycles")
+                db.execSQL("ALTER TABLE period_cycles_new RENAME TO period_cycles")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_period_cycles_profileId ON period_cycles(profileId)")
+
+                // 4. Recreate pill_packs with the correct Foreign Key
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS pill_packs_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        profileId INTEGER NOT NULL,
+                        startDate TEXT NOT NULL,
+                        pillCount INTEGER NOT NULL,
+                        endDate TEXT,
+                        FOREIGN KEY(profileId) REFERENCES profiles(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+
+                // Copy old pill data over and assign it to profile 1
+                db.execSQL("""
+                    INSERT INTO pill_packs_new (id, profileId, startDate, pillCount, endDate)
+                    SELECT id, 1, startDate, pillCount, endDate FROM pill_packs
+                """.trimIndent())
+
+                db.execSQL("DROP TABLE pill_packs")
+                db.execSQL("ALTER TABLE pill_packs_new RENAME TO pill_packs")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pill_packs_profileId ON pill_packs(profileId)")
             }
         }
 
