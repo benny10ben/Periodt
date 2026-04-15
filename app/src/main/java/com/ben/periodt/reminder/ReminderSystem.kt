@@ -7,9 +7,15 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.ben.periodt.MainActivity
@@ -53,8 +59,6 @@ object ReminderPrefs {
     fun pillMinute(id: Int)          = intPreferencesKey("p${id}_pill_minute")
 
     // ── Legacy global keys (U0) ───────────────────────────────────────────────
-    // Never written by U1+. Only read during migration in SettingsScreen so
-    // existing users don't lose their reminder settings on first upgrade.
 
     val IS_ENABLED            = booleanPreferencesKey("is_enabled")
     val DAYS_BEFORE           = intPreferencesKey("days_before")
@@ -149,8 +153,6 @@ class ModernReminderReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Read profileId from the Intent — not from ACTIVE_PROFILE_ID_KEY.
-                // Using the active profile key meant only the currently-selected
-                // profile ever fired, breaking all other profiles' reminders.
                 val profileId = intent.getIntExtra(EXTRA_PROFILE_ID, -1)
                 if (profileId == -1) return@launch
 
@@ -167,8 +169,10 @@ class ModernReminderReceiver : BroadcastReceiver() {
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
 
-                // Fetch profile name for personalised notification text
-                val profileName = dao.getProfileById(profileId)?.name
+                // Fetch profile avatar and name for personalised notification
+                val profile = dao.getProfileById(profileId)
+                val profileName = profile?.name
+                val avatarString = profile?.avatarColor
                 val namePrefix  = profileName?.let { possessive(it) } ?: "Your"
 
                 val cycles = dao.getCyclesForProfileOnce(profileId).map { e ->
@@ -210,14 +214,16 @@ class ModernReminderReceiver : BroadcastReceiver() {
                     val daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), predictedStart).toInt()
                     if (daysUntil == daysBefore) {
                         fireNotification(
-                            context     = appCtx,
-                            channelId   = "period_reminders_v2",
-                            channelName = "Period Reminders",
-                            title       = if (daysBefore == 1) "Period starting tomorrow"
+                            context      = appCtx,
+                            channelId    = "period_reminders_v2",
+                            channelName  = "Period Reminders",
+                            title        = if (daysBefore == 1) "Period starting tomorrow"
                             else "Period in $daysBefore days",
-                            text        = "$namePrefix cycle is predicted to start around ${
+                            text         = "$namePrefix cycle is predicted to start around ${
                                 predictedStart.format(DateTimeFormatter.ofPattern("MMM d"))
-                            }."
+                            }.",
+                            avatarString = avatarString,
+                            profileName  = profileName
                         )
                     }
                 }
@@ -253,7 +259,10 @@ class FertilityReminderReceiver : BroadcastReceiver() {
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
 
-                val profileName = dao.getProfileById(profileId)?.name
+                // Fetch profile avatar and name for personalised notification
+                val profile = dao.getProfileById(profileId)
+                val profileName = profile?.name
+                val avatarString = profile?.avatarColor
                 val namePrefix  = profileName?.let { possessive(it) } ?: "Your"
 
                 val cycles = dao.getCyclesForProfileOnce(profileId).map { e ->
@@ -302,11 +311,13 @@ class FertilityReminderReceiver : BroadcastReceiver() {
                                     "$namePrefix fertile window is opening soon. Ovulation predicted for $dateStr."
                     }
                     fireNotification(
-                        context     = appCtx,
-                        channelId   = "fertility_reminders_v1",
-                        channelName = "Fertility",
-                        title       = notifTitle,
-                        text        = notifText
+                        context      = appCtx,
+                        channelId    = "fertility_reminders_v1",
+                        channelName  = "Fertility",
+                        title        = notifTitle,
+                        text         = notifText,
+                        avatarString = avatarString,
+                        profileName  = profileName
                     )
                 }
             } catch (e: Throwable) {
@@ -340,7 +351,10 @@ class PillReminderReceiver : BroadcastReceiver() {
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
 
-                val profileName = dao.getProfileById(profileId)?.name
+                // Fetch profile avatar and name for personalised notification
+                val profile = dao.getProfileById(profileId)
+                val profileName = profile?.name
+                val avatarString = profile?.avatarColor
                 val namePrefix  = profileName?.let { possessive(it) } ?: "Your"
 
                 val pillPacks = dao.getPillPacksForProfileOnce(profileId).map { e ->
@@ -358,11 +372,13 @@ class PillReminderReceiver : BroadcastReceiver() {
                     .toInt().coerceIn(1, activePack.pillCount)
 
                 fireNotification(
-                    context     = appCtx,
-                    channelId   = "pill_reminders_v1",
-                    channelName = "Pill Reminders",
-                    title       = "Time to take $namePrefix pill 💊",
-                    text        = "Day $dayNumber of ${activePack.pillCount} — stay consistent!"
+                    context      = appCtx,
+                    channelId    = "pill_reminders_v1",
+                    channelName  = "Pill Reminders",
+                    title        = "Time to take $namePrefix pill 💊",
+                    text         = "Day $dayNumber of ${activePack.pillCount} — stay consistent!",
+                    avatarString = avatarString,
+                    profileName  = profileName
                 )
             } catch (e: Throwable) {
                 Log.e("PillReceiver", "Crash: ${e.message}", e)
@@ -374,20 +390,50 @@ class PillReminderReceiver : BroadcastReceiver() {
 }
 
 // ── 6. SHARED HELPERS ─────────────────────────────────────────────────────────
-
-/**
- * Returns the English possessive form of a name.
- * "Sophie" → "Sophie's", "James" → "James'"
- */
 private fun possessive(name: String): String =
     if (name.endsWith("s", ignoreCase = true)) "$name'" else "$name's"
+
+private fun createAvatarBitmap(context: Context, avatarStr: String, name: String): Bitmap {
+    val size = 150 // Standard size for Large Icons
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    if (avatarStr.startsWith("#")) {
+        val color = try { android.graphics.Color.parseColor(avatarStr) } catch(e: Exception) { android.graphics.Color.parseColor("#D89046") }
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = android.graphics.Color.WHITE
+            textSize = size / 2.2f
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val initial = name.firstOrNull()?.uppercase() ?: "M"
+        val textBounds = Rect()
+        textPaint.getTextBounds(initial, 0, 1, textBounds)
+        val y = (size / 2f) + (textBounds.height() / 2f)
+        canvas.drawText(initial, size / 2f, y, textPaint)
+    } else {
+        // Resolve dynamic resource ID (e.g., "avatar_1")
+        val resId = context.resources.getIdentifier(avatarStr, "drawable", context.packageName)
+        if (resId != 0) {
+            val drawable = ContextCompat.getDrawable(context, resId)
+            drawable?.setBounds(0, 0, size, size)
+            drawable?.draw(canvas)
+        }
+    }
+    return bitmap
+}
 
 private fun fireNotification(
     context: Context,
     channelId: String,
     channelName: String,
     title: String,
-    text: String
+    text: String,
+    avatarString: String?,
+    profileName: String?
 ) {
     val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -407,16 +453,20 @@ private fun fireNotification(
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    val notification = NotificationCompat.Builder(context, channelId)
+    val builder = NotificationCompat.Builder(context, channelId)
         .setSmallIcon(R.drawable.logo_trans)
         .setContentTitle(title)
         .setContentText(text)
         .setAutoCancel(true)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
         .setContentIntent(contentIntent)
-        .build()
+
+    if (avatarString != null && profileName != null) {
+        val avatarBitmap = createAvatarBitmap(context, avatarString, profileName)
+        builder.setLargeIcon(avatarBitmap)
+    }
 
     notificationManager.notify(
-        (System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification
+        (System.currentTimeMillis() % Int.MAX_VALUE).toInt(), builder.build()
     )
 }
