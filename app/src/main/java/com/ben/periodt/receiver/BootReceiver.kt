@@ -4,10 +4,10 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.ben.periodt.data.AppDatabase
 import com.ben.periodt.reminder.ReminderPrefs
 import com.ben.periodt.reminder.ReminderScheduler
 import com.ben.periodt.reminder.dataStore
-import com.ben.periodt.viewmodel.ACTIVE_PROFILE_ID_KEY
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -34,30 +34,42 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val prefs = appCtx.dataStore.data.first()
-                val activeProfileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
 
-                if (prefs[ReminderPrefs.periodEnabled(activeProfileId)] == true) {
-                    ReminderScheduler.scheduleNextReminder(
-                        context = appCtx,
-                        hour = prefs[ReminderPrefs.periodHour(activeProfileId)] ?: 8,
-                        minute = prefs[ReminderPrefs.periodMinute(activeProfileId)] ?: 0
-                    )
-                }
+                // Load database to fetch all profiles
+                System.loadLibrary("sqlcipher")
+                val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
+                val profiles = dao.getAllProfilesOnce()
 
-                if (prefs[ReminderPrefs.fertilityEnabled(activeProfileId)] == true) {
-                    ReminderScheduler.scheduleNextFertilityReminder(
-                        context = appCtx,
-                        hour = prefs[ReminderPrefs.fertilityHour(activeProfileId)] ?: 8,
-                        minute = prefs[ReminderPrefs.fertilityMinute(activeProfileId)] ?: 0
-                    )
-                }
+                // Loop through EVERY profile and restore its specific alarms
+                for (profile in profiles) {
+                    val profileId = profile.id
 
-                if (prefs[ReminderPrefs.pillEnabled(activeProfileId)] == true) {
-                    ReminderScheduler.scheduleNextPillReminder(
-                        context = appCtx,
-                        hour = prefs[ReminderPrefs.pillHour(activeProfileId)] ?: 8,
-                        minute = prefs[ReminderPrefs.pillMinute(activeProfileId)] ?: 0
-                    )
+                    if (prefs[ReminderPrefs.periodEnabled(profileId)] == true) {
+                        ReminderScheduler.scheduleNextReminder(
+                            context = appCtx,
+                            profileId = profileId,
+                            hour = prefs[ReminderPrefs.periodHour(profileId)] ?: 8,
+                            minute = prefs[ReminderPrefs.periodMinute(profileId)] ?: 0
+                        )
+                    }
+
+                    if (prefs[ReminderPrefs.fertilityEnabled(profileId)] == true) {
+                        ReminderScheduler.scheduleNextFertilityReminder(
+                            context = appCtx,
+                            profileId = profileId,
+                            hour = prefs[ReminderPrefs.fertilityHour(profileId)] ?: 8,
+                            minute = prefs[ReminderPrefs.fertilityMinute(profileId)] ?: 0
+                        )
+                    }
+
+                    if (prefs[ReminderPrefs.pillEnabled(profileId)] == true) {
+                        ReminderScheduler.scheduleNextPillReminder(
+                            context = appCtx,
+                            profileId = profileId,
+                            hour = prefs[ReminderPrefs.pillHour(profileId)] ?: 8,
+                            minute = prefs[ReminderPrefs.pillMinute(profileId)] ?: 0
+                        )
+                    }
                 }
 
             } catch (e: Throwable) {
