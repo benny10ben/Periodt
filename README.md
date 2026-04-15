@@ -37,7 +37,7 @@ Periodt is a privacy‑first Android app that keeps all cycle data on the device
 - **Period tracker** — log cycles with daily bleeding intensity, blood color, and pain levels
 - **Multiple profiles** — track for yourself or someone else, switch instantly from the nav bar
 - **Private** — no internet permission, no analytics, no cloud sync. your data never leaves your device
-- **Encrypted** — local database secured with SQLCipher and Android Keystore
+- **Encrypted** — your data is locked on your device, nobody else can read it
 - **Pill tracker** — pack logging and daily reminders
 - **Smart predictions** — learns your patterns over time with outlier filtering and a personalised luteal phase
 - **Reminders** — period, fertile window, and pill notifications, all processed on-device
