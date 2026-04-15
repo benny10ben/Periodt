@@ -65,70 +65,72 @@ abstract class AppDatabase : RoomDatabase() {
 
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Create the new profiles table
+                // 1. Create the new profiles table exactly as Room strictly expects it
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS profiles (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        profileUuid TEXT NOT NULL,
-                        name TEXT NOT NULL,
-                        avatarColor TEXT NOT NULL DEFAULT '#D89046',
-                        createdAt INTEGER NOT NULL
+                    CREATE TABLE IF NOT EXISTS `profiles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `profileUuid` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `avatarColor` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
                     )
                 """.trimIndent())
 
-                // 2. Insert the default profile
-                val uuid = UUID.randomUUID().toString()
+                // 2. EXPLICITLY set the ID to 1 to guarantee the profile links perfectly
+                val uuid = java.util.UUID.randomUUID().toString()
                 val now = System.currentTimeMillis()
                 db.execSQL(
-                    "INSERT INTO profiles (profileUuid, name, avatarColor, createdAt) VALUES (?, 'Me', 'avatar_1', ?)",
+                    "INSERT INTO `profiles` (`id`, `profileUuid`, `name`, `avatarColor`, `createdAt`) VALUES (1, ?, 'Me', 'avatar_1', ?)",
                     arrayOf(uuid, now)
                 )
 
-                // 3. Recreate period_cycles with the correct Foreign Key
+                // 3. Recreate period_cycles with the exact columns and Foreign Key
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS period_cycles_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        profileId INTEGER NOT NULL,
-                        startDate TEXT NOT NULL,
-                        endDate TEXT NOT NULL,
-                        bleeding TEXT NOT NULL,
-                        bloodColor TEXT NOT NULL,
-                        painLevel INTEGER NOT NULL DEFAULT 5,
-                        FOREIGN KEY(profileId) REFERENCES profiles(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    CREATE TABLE IF NOT EXISTS `period_cycles_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `profileId` INTEGER NOT NULL,
+                        `startDate` TEXT NOT NULL,
+                        `endDate` TEXT NOT NULL,
+                        `bleeding` TEXT NOT NULL,
+                        `bloodColor` TEXT NOT NULL,
+                        `painLevel` INTEGER NOT NULL,
+                        FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """.trimIndent())
 
-                // Copy old cycle data over and assign it to profile 1
+                // Securely copy 100% of the old data into the new table, assigning it to Profile 1
                 db.execSQL("""
-                    INSERT INTO period_cycles_new (id, profileId, startDate, endDate, bleeding, bloodColor, painLevel)
-                    SELECT id, 1, startDate, endDate, bleeding, bloodColor, painLevel FROM period_cycles
+                    INSERT INTO `period_cycles_new` (`id`, `profileId`, `startDate`, `endDate`, `bleeding`, `bloodColor`, `painLevel`)
+                    SELECT `id`, 1, `startDate`, `endDate`, `bleeding`, `bloodColor`, `painLevel` FROM `period_cycles`
                 """.trimIndent())
 
-                db.execSQL("DROP TABLE period_cycles")
-                db.execSQL("ALTER TABLE period_cycles_new RENAME TO period_cycles")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_period_cycles_profileId ON period_cycles(profileId)")
+                // Swap tables
+                db.execSQL("DROP TABLE `period_cycles`")
+                db.execSQL("ALTER TABLE `period_cycles_new` RENAME TO `period_cycles`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_period_cycles_profileId` ON `period_cycles` (`profileId`)")
 
-                // 4. Recreate pill_packs with the correct Foreign Key
+                // 4. Recreate pill_packs with the exact columns and Foreign Key
                 db.execSQL("""
-                    CREATE TABLE IF NOT EXISTS pill_packs_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        profileId INTEGER NOT NULL,
-                        startDate TEXT NOT NULL,
-                        pillCount INTEGER NOT NULL,
-                        endDate TEXT,
-                        FOREIGN KEY(profileId) REFERENCES profiles(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    CREATE TABLE IF NOT EXISTS `pill_packs_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `profileId` INTEGER NOT NULL,
+                        `startDate` TEXT NOT NULL,
+                        `pillCount` INTEGER NOT NULL,
+                        `endDate` TEXT,
+                        FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """.trimIndent())
 
-                // Copy old pill data over and assign it to profile 1
+                // Securely copy 100% of the old pill data over, assigning it to Profile 1
                 db.execSQL("""
-                    INSERT INTO pill_packs_new (id, profileId, startDate, pillCount, endDate)
-                    SELECT id, 1, startDate, pillCount, endDate FROM pill_packs
+                    INSERT INTO `pill_packs_new` (`id`, `profileId`, `startDate`, `pillCount`, `endDate`)
+                    SELECT `id`, 1, `startDate`, `pillCount`, `endDate` FROM `pill_packs`
                 """.trimIndent())
 
-                db.execSQL("DROP TABLE pill_packs")
-                db.execSQL("ALTER TABLE pill_packs_new RENAME TO pill_packs")
-                db.execSQL("CREATE INDEX IF NOT EXISTS index_pill_packs_profileId ON pill_packs(profileId)")
+                // Swap tables
+                db.execSQL("DROP TABLE `pill_packs`")
+                db.execSQL("ALTER TABLE `pill_packs_new` RENAME TO `pill_packs`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pill_packs_profileId` ON `pill_packs` (`profileId`)")
             }
         }
 
