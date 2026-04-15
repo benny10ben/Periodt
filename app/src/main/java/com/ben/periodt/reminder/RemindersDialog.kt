@@ -165,12 +165,15 @@ fun RemindersDialog(
                 p[ReminderPrefs.pillHour(activeProfileId)] = pillTime.hour
                 p[ReminderPrefs.pillMinute(activeProfileId)] = pillTime.minute
             }
-            if (periodEnabled) ReminderScheduler.scheduleNextReminder(context, periodTime.hour, periodTime.minute)
-            else ReminderScheduler.cancelReminder(context)
-            if (fertilityEnabled) ReminderScheduler.scheduleNextFertilityReminder(context, fertilityTime.hour, fertilityTime.minute)
-            else ReminderScheduler.cancelFertilityReminder(context)
-            if (pillEnabled) ReminderScheduler.scheduleNextPillReminder(context, pillTime.hour, pillTime.minute)
-            else ReminderScheduler.cancelPillReminder(context)
+            // Pass activeProfileId so each profile gets its own alarm slot.
+            // Without this, all profiles shared request codes 1001/1002/1003,
+            // and whichever profile saved last would overwrite the others' alarms.
+            if (periodEnabled) ReminderScheduler.scheduleNextReminder(context, activeProfileId, periodTime.hour, periodTime.minute)
+            else ReminderScheduler.cancelReminder(context, activeProfileId)
+            if (fertilityEnabled) ReminderScheduler.scheduleNextFertilityReminder(context, activeProfileId, fertilityTime.hour, fertilityTime.minute)
+            else ReminderScheduler.cancelFertilityReminder(context, activeProfileId)
+            if (pillEnabled) ReminderScheduler.scheduleNextPillReminder(context, activeProfileId, pillTime.hour, pillTime.minute)
+            else ReminderScheduler.cancelPillReminder(context, activeProfileId)
         }
     }
 

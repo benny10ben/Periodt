@@ -17,7 +17,6 @@ import com.ben.periodt.R
 import com.ben.periodt.data.AppDatabase
 import com.ben.periodt.ui.shared.isStillTransitioning
 import com.ben.periodt.ui.shared.predictCycle
-import com.ben.periodt.viewmodel.ACTIVE_PROFILE_ID_KEY
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,36 +70,43 @@ object ReminderPrefs {
 }
 
 // ── 2. SCHEDULER ──────────────────────────────────────────────────────────────
+//
+// Request codes are derived from the profile ID so each profile gets its own
+// independent alarm slot. Without this, all profiles share a single alarm and
+// only the currently-active profile ever receives notifications.
+//
+//   Period    alarms: 1000 + profileId
+//   Fertility alarms: 2000 + profileId
+//   Pill      alarms: 3000 + profileId
+
+private const val EXTRA_PROFILE_ID = "profile_id"
 
 object ReminderScheduler {
-    private const val PERIOD_CODE    = 1001
-    private const val FERTILITY_CODE = 1002
-    private const val PILL_CODE      = 1003
 
-    fun scheduleNextReminder(context: Context, hour: Int, minute: Int) =
-        schedule(context, hour, minute, PERIOD_CODE, ModernReminderReceiver::class.java)
+    fun scheduleNextReminder(context: Context, profileId: Int, hour: Int, minute: Int) =
+        schedule(context, hour, minute, 1000 + profileId, profileId, ModernReminderReceiver::class.java)
 
-    fun cancelReminder(context: Context) =
-        cancel(context, PERIOD_CODE, ModernReminderReceiver::class.java)
+    fun cancelReminder(context: Context, profileId: Int) =
+        cancel(context, 1000 + profileId, profileId, ModernReminderReceiver::class.java)
 
-    fun scheduleNextFertilityReminder(context: Context, hour: Int, minute: Int) =
-        schedule(context, hour, minute, FERTILITY_CODE, FertilityReminderReceiver::class.java)
+    fun scheduleNextFertilityReminder(context: Context, profileId: Int, hour: Int, minute: Int) =
+        schedule(context, hour, minute, 2000 + profileId, profileId, FertilityReminderReceiver::class.java)
 
-    fun cancelFertilityReminder(context: Context) =
-        cancel(context, FERTILITY_CODE, FertilityReminderReceiver::class.java)
+    fun cancelFertilityReminder(context: Context, profileId: Int) =
+        cancel(context, 2000 + profileId, profileId, FertilityReminderReceiver::class.java)
 
-    fun scheduleNextPillReminder(context: Context, hour: Int, minute: Int) =
-        schedule(context, hour, minute, PILL_CODE, PillReminderReceiver::class.java)
+    fun scheduleNextPillReminder(context: Context, profileId: Int, hour: Int, minute: Int) =
+        schedule(context, hour, minute, 3000 + profileId, profileId, PillReminderReceiver::class.java)
 
-    fun cancelPillReminder(context: Context) =
-        cancel(context, PILL_CODE, PillReminderReceiver::class.java)
+    fun cancelPillReminder(context: Context, profileId: Int) =
+        cancel(context, 3000 + profileId, profileId, PillReminderReceiver::class.java)
 
     private fun <T : BroadcastReceiver> schedule(
         context: Context, hour: Int, minute: Int,
-        requestCode: Int, receiverClass: Class<T>
+        requestCode: Int, profileId: Int, receiverClass: Class<T>
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val pending      = pendingFor(context, requestCode, receiverClass)
+        val pending      = pendingFor(context, requestCode, profileId, receiverClass)
 
         val now    = LocalDateTime.now()
         var target = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
@@ -119,17 +125,17 @@ object ReminderScheduler {
     }
 
     private fun <T : BroadcastReceiver> cancel(
-        context: Context, requestCode: Int, receiverClass: Class<T>
+        context: Context, requestCode: Int, profileId: Int, receiverClass: Class<T>
     ) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.cancel(pendingFor(context, requestCode, receiverClass))
+        alarmManager.cancel(pendingFor(context, requestCode, profileId, receiverClass))
     }
 
     private fun <T : BroadcastReceiver> pendingFor(
-        context: Context, requestCode: Int, receiverClass: Class<T>
+        context: Context, requestCode: Int, profileId: Int, receiverClass: Class<T>
     ): PendingIntent = PendingIntent.getBroadcast(
         context, requestCode,
-        Intent(context, receiverClass),
+        Intent(context, receiverClass).putExtra(EXTRA_PROFILE_ID, profileId),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 }
@@ -142,19 +148,28 @@ class ModernReminderReceiver : BroadcastReceiver() {
         val appCtx        = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val prefs     = appCtx.dataStore.data.first()
-                val profileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
+                // Read profileId from the Intent — not from ACTIVE_PROFILE_ID_KEY.
+                // Using the active profile key meant only the currently-selected
+                // profile ever fired, breaking all other profiles' reminders.
+                val profileId = intent.getIntExtra(EXTRA_PROFILE_ID, -1)
+                if (profileId == -1) return@launch
 
+                val prefs      = appCtx.dataStore.data.first()
                 val isEnabled  = prefs[ReminderPrefs.periodEnabled(profileId)] ?: false
                 val daysBefore = prefs[ReminderPrefs.periodDaysBefore(profileId)] ?: 2
                 val hour       = prefs[ReminderPrefs.periodHour(profileId)] ?: 8
                 val minute     = prefs[ReminderPrefs.periodMinute(profileId)] ?: 0
 
                 if (!isEnabled) return@launch
-                ReminderScheduler.scheduleNextReminder(appCtx, hour, minute)
+                // Reschedule for tomorrow using the same profile's alarm slot
+                ReminderScheduler.scheduleNextReminder(appCtx, profileId, hour, minute)
 
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
+
+                // Fetch profile name for personalised notification text
+                val profileName = dao.getProfileById(profileId)?.name
+                val namePrefix  = profileName?.let { possessive(it) } ?: "Your"
 
                 val cycles = dao.getCyclesForProfileOnce(profileId).map { e ->
                     PeriodViewModel.Cycle(
@@ -200,10 +215,8 @@ class ModernReminderReceiver : BroadcastReceiver() {
                             channelName = "Period Reminders",
                             title       = if (daysBefore == 1) "Period starting tomorrow"
                             else "Period in $daysBefore days",
-                            text        = "Your cycle is predicted to start around ${
-                                predictedStart.format(
-                                    DateTimeFormatter.ofPattern("MMM d")
-                                )
+                            text        = "$namePrefix cycle is predicted to start around ${
+                                predictedStart.format(DateTimeFormatter.ofPattern("MMM d"))
                             }."
                         )
                     }
@@ -225,19 +238,23 @@ class FertilityReminderReceiver : BroadcastReceiver() {
         val appCtx        = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val prefs     = appCtx.dataStore.data.first()
-                val profileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
+                val profileId = intent.getIntExtra(EXTRA_PROFILE_ID, -1)
+                if (profileId == -1) return@launch
 
+                val prefs      = appCtx.dataStore.data.first()
                 val isEnabled  = prefs[ReminderPrefs.fertilityEnabled(profileId)] ?: false
                 val daysBefore = prefs[ReminderPrefs.fertilityDaysBefore(profileId)] ?: 2
                 val hour       = prefs[ReminderPrefs.fertilityHour(profileId)] ?: 8
                 val minute     = prefs[ReminderPrefs.fertilityMinute(profileId)] ?: 0
 
                 if (!isEnabled) return@launch
-                ReminderScheduler.scheduleNextFertilityReminder(appCtx, hour, minute)
+                ReminderScheduler.scheduleNextFertilityReminder(appCtx, profileId, hour, minute)
 
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
+
+                val profileName = dao.getProfileById(profileId)?.name
+                val namePrefix  = profileName?.let { possessive(it) } ?: "Your"
 
                 val cycles = dao.getCyclesForProfileOnce(profileId).map { e ->
                     PeriodViewModel.Cycle(
@@ -272,18 +289,17 @@ class FertilityReminderReceiver : BroadcastReceiver() {
                 val daysUntil    = ChronoUnit.DAYS.between(LocalDate.now(), ovulationDay).toInt()
 
                 if (daysUntil == daysBefore) {
-                    val dateStr = ovulationDay.format(
-                        DateTimeFormatter.ofPattern("MMM d")
-                    )
+                    val dateStr = ovulationDay.format(DateTimeFormatter.ofPattern("MMM d"))
                     val (notifTitle, notifText) = when {
                         daysUntil == 0 ->
-                            "Ovulation Day" to "Today is your predicted ovulation day."
+                            "Ovulation Day" to
+                                    "$namePrefix predicted ovulation day is today."
                         daysUntil <= 2 ->
                             "Peak Fertility" to
-                                    "You are in your peak fertile window. Ovulation is expected on $dateStr."
+                                    "$namePrefix fertile window is at its peak. Ovulation expected on $dateStr."
                         else ->
                             "Fertile Window Approaching" to
-                                    "Your fertile window is opening soon. Ovulation predicted for $dateStr."
+                                    "$namePrefix fertile window is opening soon. Ovulation predicted for $dateStr."
                     }
                     fireNotification(
                         context     = appCtx,
@@ -310,18 +326,22 @@ class PillReminderReceiver : BroadcastReceiver() {
         val appCtx        = context.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val prefs     = appCtx.dataStore.data.first()
-                val profileId = prefs[ACTIVE_PROFILE_ID_KEY] ?: 1
+                val profileId = intent.getIntExtra(EXTRA_PROFILE_ID, -1)
+                if (profileId == -1) return@launch
 
+                val prefs     = appCtx.dataStore.data.first()
                 val isEnabled = prefs[ReminderPrefs.pillEnabled(profileId)] ?: false
                 val hour      = prefs[ReminderPrefs.pillHour(profileId)] ?: 8
                 val minute    = prefs[ReminderPrefs.pillMinute(profileId)] ?: 0
 
                 if (!isEnabled) return@launch
-                ReminderScheduler.scheduleNextPillReminder(appCtx, hour, minute)
+                ReminderScheduler.scheduleNextPillReminder(appCtx, profileId, hour, minute)
 
                 System.loadLibrary("sqlcipher")
                 val dao = AppDatabase.getDatabase(appCtx).periodCycleDao()
+
+                val profileName = dao.getProfileById(profileId)?.name
+                val namePrefix  = profileName?.let { possessive(it) } ?: "Your"
 
                 val pillPacks = dao.getPillPacksForProfileOnce(profileId).map { e ->
                     PeriodViewModel.PillPack(
@@ -341,7 +361,7 @@ class PillReminderReceiver : BroadcastReceiver() {
                     context     = appCtx,
                     channelId   = "pill_reminders_v1",
                     channelName = "Pill Reminders",
-                    title       = "Time to take your pill 💊",
+                    title       = "Time to take $namePrefix pill 💊",
                     text        = "Day $dayNumber of ${activePack.pillCount} — stay consistent!"
                 )
             } catch (e: Throwable) {
@@ -353,7 +373,14 @@ class PillReminderReceiver : BroadcastReceiver() {
     }
 }
 
-// ── 6. SHARED NOTIFICATION HELPER ────────────────────────────────────────────
+// ── 6. SHARED HELPERS ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the English possessive form of a name.
+ * "Sophie" → "Sophie's", "James" → "James'"
+ */
+private fun possessive(name: String): String =
+    if (name.endsWith("s", ignoreCase = true)) "$name'" else "$name's"
 
 private fun fireNotification(
     context: Context,
