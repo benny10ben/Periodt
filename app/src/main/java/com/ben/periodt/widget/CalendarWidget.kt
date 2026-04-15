@@ -162,21 +162,7 @@ class CalendarWidget : GlanceAppWidget() {
                 }
 
                 val prediction: Prediction? = when {
-                    activePack != null -> {
-                        val activeStart = LocalDate.parse(activePack.startDate)
-                        val withdrawalStart = activeStart.plusDays(activePack.pillCount.toLong() + 2)
-                        Prediction(
-                            minPeriodStart = withdrawalStart.minusDays(1),
-                            maxPeriodStart = withdrawalStart.plusDays(1),
-                            mostLikelyPeriodStart = withdrawalStart,
-                            periodLength = 4,
-                            ovulationDay = withdrawalStart,
-                            ovulationConfidence = 1.0f,
-                            fertileWindow = LocalDate.MIN..LocalDate.MIN,
-                            cycleLength = activePack.pillCount + 7,
-                            cycleRegularity = CycleRegularity.VERY_REGULAR
-                        )
-                    }
+                    activePack != null -> null
                     isTransitioning -> null
                     else -> {
                         val validCycles = if (stopDate != null) domainCycles.filter { !it.startDate.isBefore(stopDate) } else domainCycles
@@ -367,11 +353,16 @@ private fun DayCellGlance(
     val fertileColor = themeColorProvider(Color(0xFFA6BFA2), Color(0xFF4C6549), themeMode)
     val pillColor = themeColorProvider(Color(0xFFa68e74), Color(0xFFa68e74), themeMode)
 
-    val bgColorProvider = when (phase) {
-        1 -> loggedColor
-        2 -> upcomingColor
-        3 -> fertileColor
-        5 -> pillColor
+    val today = LocalDate.now()
+    val isPillPast = phase == 5 && date.isBefore(today)
+    val pillFadedColor = themeColorProvider(Color(0xFFa68e74).copy(alpha = 0.2f), Color(0xFFa68e74).copy(alpha = 0.2f), themeMode)
+
+    val bgColorProvider = when {
+        phase == 1 -> loggedColor
+        phase == 2 -> upcomingColor
+        phase == 3 -> fertileColor
+        phase == 5 && isPillPast -> pillFadedColor
+        phase == 5 -> pillColor
         else -> ColorProvider(Color.Transparent)
     }
 
