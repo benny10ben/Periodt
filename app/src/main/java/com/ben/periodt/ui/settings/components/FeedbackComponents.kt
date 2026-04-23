@@ -1,4 +1,4 @@
-package com.ben.periodt.ui.overview
+package com.ben.periodt.ui.settings
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring

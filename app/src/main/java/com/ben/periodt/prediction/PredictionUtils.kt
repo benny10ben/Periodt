@@ -1,4 +1,4 @@
-package com.ben.periodt.ui.shared
+package com.ben.periodt.prediction
 
 import com.ben.periodt.viewmodel.PeriodViewModel
 import java.time.LocalDate
