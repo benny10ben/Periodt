@@ -1,4 +1,4 @@
-package com.ben.periodt.ui.calendar
+package com.ben.periodt.ui.calendar.components
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -111,6 +111,7 @@ import kotlin.math.round
 
 private val SIZE_XXS = 11.sp
 private val SIZE_XS  = 12.sp
+private val SIZE_SM  = 13.sp
 private val SIZE_MD  = 14.sp
 private val SIZE_LG  = 15.sp
 
