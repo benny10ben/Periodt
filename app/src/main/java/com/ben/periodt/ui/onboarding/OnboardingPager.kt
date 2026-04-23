@@ -43,7 +43,7 @@ import com.ben.periodt.R
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.ui.theme.SetSystemBars
-import com.ben.periodt.ui.overview.ContentDialog
+import com.ben.periodt.ui.settings.components.ContentDialog
 import kotlin.math.abs
 
 @OptIn(ExperimentalAnimationApi::class)

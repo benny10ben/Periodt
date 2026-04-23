@@ -21,8 +21,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.ben.periodt.MainActivity
 import com.ben.periodt.R
 import com.ben.periodt.data.AppDatabase
-import com.ben.periodt.ui.shared.isStillTransitioning
-import com.ben.periodt.ui.shared.predictCycle
+import com.ben.periodt.prediction.isStillTransitioning
+import com.ben.periodt.prediction.predictCycle
 import com.ben.periodt.viewmodel.PeriodViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
