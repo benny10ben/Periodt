@@ -1,4 +1,4 @@
-package com.ben.periodt.ui.overview
+package com.ben.periodt.ui.overview.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
