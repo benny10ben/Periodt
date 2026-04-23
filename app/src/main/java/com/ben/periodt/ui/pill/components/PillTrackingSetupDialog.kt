@@ -1,4 +1,4 @@
-package com.ben.periodt.ui.pill
+package com.ben.periodt.ui.pill.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
