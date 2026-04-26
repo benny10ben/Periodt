@@ -115,6 +115,7 @@ dependencies {
     implementation("nl.dionsegijn:konfetti-compose:2.0.4")
     implementation("dev.chrisbanes.haze:haze:0.5.4")
     implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.77")
 
     // --- TESTING ---
     testImplementation("junit:junit:4.13.2")
