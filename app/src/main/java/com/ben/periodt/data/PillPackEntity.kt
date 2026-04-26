@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(
     tableName = "pill_packs",
@@ -15,12 +16,23 @@ import androidx.room.PrimaryKey
             onDelete      = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("profileId")]
+    indices = [
+        Index("profileId"),
+        Index("syncUuid"),
+        Index(value = ["isSynced", "isDeleted"])
+    ]
 )
 data class PillPackEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val profileId: Int,
     val startDate: String,
     val pillCount: Int,
-    val endDate: String? = null
+    val endDate: String? = null,
+
+    // ── Sync tracking ─────────────────────────────────────────────────────────
+    val syncUuid: String = UUID.randomUUID().toString(),
+    val serverVersion: Long? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isSynced: Boolean = false,
+    val isDeleted: Boolean = false
 )
