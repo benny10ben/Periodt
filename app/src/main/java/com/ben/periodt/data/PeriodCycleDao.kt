@@ -169,6 +169,15 @@ interface PeriodCycleDao {
     @Query("SELECT id FROM period_cycles WHERE syncUuid = :uuid LIMIT 1")
     suspend fun getCycleLocalIdByUuid(uuid: String): Int?
 
+    @Query("SELECT profileId FROM period_cycles WHERE syncUuid = :uuid LIMIT 1")
+    suspend fun getCycleProfileIdByUuid(uuid: String): Int?
+
+    @Query("SELECT profileId FROM pill_packs WHERE syncUuid = :uuid LIMIT 1")
+    suspend fun getPillPackProfileIdByUuid(uuid: String): Int?
+
+    @Query("SELECT profileUuid FROM profiles WHERE id = :id LIMIT 1")
+    suspend fun getProfileUuidById(id: Int): String?
+
     // 3. STATE UPDATES (Marking as Clean after Sync)
     @Query("UPDATE period_cycles SET isSynced = 1, serverVersion = :version WHERE syncUuid = :uuid")
     suspend fun markCycleSynced(uuid: String, version: Long)
@@ -210,4 +219,7 @@ interface PeriodCycleDao {
 
     @Query("UPDATE daily_cycle_logs SET isDeleted = 1, isSynced = 0, updatedAt = :updatedAt WHERE cycleId = :cycleId")
     suspend fun softDeleteDailyLogsForCycle(cycleId: Int, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT syncUuid FROM period_cycles WHERE id = :id LIMIT 1")
+    suspend fun getCycleSyncUuidById(id: Int): String?
 }
