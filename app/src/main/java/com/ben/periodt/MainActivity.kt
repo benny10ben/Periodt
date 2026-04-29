@@ -7,7 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.*
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -19,11 +21,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.core.content.ContextCompat
-import com.ben.periodt.ui.theme.PeriodTTheme
+import androidx.work.*
+import com.ben.periodt.network.ApiClient
+import com.ben.periodt.network.PeriodtNetworkRepository
+import com.ben.periodt.security.TokenManager
+import com.ben.periodt.sync.PeriodtSyncWorker
 import com.ben.periodt.ui.MainScreen
 import com.ben.periodt.ui.onboarding.OnboardingNavigator
-import androidx.activity.enableEdgeToEdge
-import androidx.annotation.RequiresApi
+import com.ben.periodt.ui.theme.PeriodTTheme
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
 
@@ -59,6 +65,40 @@ class MainActivity : ComponentActivity() {
         System.loadLibrary("sqlcipher")
 
         enableEdgeToEdge()
+
+        // ── 1. Network & Security Initialization ──
+        val tokenManager = TokenManager(applicationContext)
+        val apiClient = ApiClient(tokenManager)
+        val repository = PeriodtNetworkRepository(apiClient)
+
+        // ── 2. Background Sync Scheduling (Heartbeat + Kick) ──
+        val syncConstraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // The Heartbeat: 15-minute background loop (KEEP prevents resetting the timer)
+        val syncWorkRequest = PeriodicWorkRequestBuilder<PeriodtSyncWorker>(
+            15, TimeUnit.MINUTES
+        )
+            .setConstraints(syncConstraints)
+            .build()
+
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "PeriodtBackgroundSync",
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncWorkRequest
+        )
+
+        // The Kick: Instant sync triggered every time the app starts
+        val immediateSyncRequest = OneTimeWorkRequestBuilder<PeriodtSyncWorker>()
+            .setConstraints(syncConstraints)
+            .build()
+
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "PeriodtImmediateSync",
+            ExistingWorkPolicy.REPLACE,
+            immediateSyncRequest
+        )
 
         setContent {
             PeriodTTheme {
