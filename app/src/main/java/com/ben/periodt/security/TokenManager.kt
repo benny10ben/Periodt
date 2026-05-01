@@ -35,6 +35,14 @@ class TokenManager(context: Context) {
         return sharedPreferences.getString(KEY_JWT_TOKEN, null)
     }
 
+    /**
+     * Specifically removes the JWT token.
+     * Fixes the 'Unresolved reference: clearToken' error in AuthViewModel.
+     */
+    fun clearToken() {
+        sharedPreferences.edit().remove(KEY_JWT_TOKEN).apply()
+    }
+
     // --- User ID ---
     fun saveUserId(userId: Long) {
         sharedPreferences.edit().putLong(KEY_USER_ID, userId).apply()

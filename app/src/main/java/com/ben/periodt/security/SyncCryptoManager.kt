@@ -12,7 +12,7 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * Handles End-to-End Encryption (E2EE) for cloud synchronization.
  * Implements the Two-Layer Key Wrapping Scheme:
- * 1. Recovery Phrase -> Argon2id -> Account Key
+ * 1. Password + Salt -> Argon2id -> Account Key
  * 2. Random Data Key -> Encrypted by Account Key (Stored on server)
  * 3. Health Data -> Encrypted by Data Key
  */
@@ -27,19 +27,28 @@ object SyncCryptoManager {
     var sessionDataKey: ByteArray? = null
 
     /**
-     * LAYER 1: Derives the 256-bit Account Key from the user's 12-word recovery phrase.
+     * Generates a secure, 16-byte random salt and encodes it to Base64 for the server.
+     */
+    fun generateSaltBase64(): String {
+        val saltBytes = ByteArray(16)
+        SecureRandom().nextBytes(saltBytes)
+        return Base64.encodeToString(saltBytes, Base64.NO_WRAP)
+    }
+
+    /**
+     * LAYER 1: Derives the 256-bit Account Key from the user's password and salt.
      * Uses Argon2id, the current industry standard for password hashing/KDF.
      */
-    fun deriveAccountKey(recoveryPhrase: String, userId: String): ByteArray {
-        val salt = "${userId}periodt-v1".toByteArray(Charsets.UTF_8)
-        val phraseBytes = recoveryPhrase.toByteArray(Charsets.UTF_8)
+    fun deriveAccountKey(password: String, saltBase64: String): ByteArray {
+        val saltBytes = Base64.decode(saltBase64, Base64.NO_WRAP)
+        val passwordBytes = password.toByteArray(Charsets.UTF_8)
 
         val parameters = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
             .withVersion(Argon2Parameters.ARGON2_VERSION_13)
             .withIterations(3)
             .withMemoryAsKB(65536) // 64 MB
             .withParallelism(4)
-            .withSalt(salt)
+            .withSalt(saltBytes)
             .build()
 
         val generator = Argon2BytesGenerator()
@@ -47,7 +56,7 @@ object SyncCryptoManager {
 
         // Generate a 32-byte (256-bit) AES key
         val accountKey = ByteArray(32)
-        generator.generateBytes(phraseBytes, accountKey, 0, accountKey.size)
+        generator.generateBytes(passwordBytes, accountKey, 0, accountKey.size)
         return accountKey
     }
 
