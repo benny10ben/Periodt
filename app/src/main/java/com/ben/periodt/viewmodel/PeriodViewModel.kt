@@ -48,7 +48,22 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val activeProfile: StateFlow<Profile?> = combine(profiles, activeProfileId) { list, id ->
-        list.firstOrNull { it.id == id }
+        // Try to find the selected profile
+        val matchedProfile = list.firstOrNull { it.id == id }
+
+        // If the selected profile was deleted (e.g., by a background sync),
+        // fall back to the first available profile and update the DataStore
+        if (matchedProfile == null && list.isNotEmpty()) {
+            val fallback = list.first()
+            viewModelScope.launch {
+                appContext.dataStore.edit { prefs ->
+                    prefs[ACTIVE_PROFILE_ID_KEY] = fallback.id
+                }
+            }
+            fallback
+        } else {
+            matchedProfile
+        }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // ── Data streams ──────────────────────────────────────────────────────────
@@ -188,9 +203,13 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 ProfileEntity(
                     profileUuid = UUID.randomUUID().toString(),
                     name        = name,
-                    avatarColor = avatarColor
+                    avatarColor = avatarColor,
+                    isSynced    = false,
+                    updatedAt   = System.currentTimeMillis()
                 )
             ).toInt()
+
+            triggerImmediateSync()
             onCreated(newId)
         }
     }
@@ -198,14 +217,24 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
     fun updateProfileName(profileId: Int, newName: String) {
         viewModelScope.launch {
             val existing = dao.getProfileById(profileId) ?: return@launch
-            dao.updateProfile(existing.copy(name = newName))
+            dao.updateProfile(existing.copy(
+                name      = newName,
+                isSynced  = false,
+                updatedAt = System.currentTimeMillis()
+            ))
+            triggerImmediateSync()
         }
     }
 
     fun updateProfileColor(profileId: Int, newColor: String) {
         viewModelScope.launch {
             val existing = dao.getProfileById(profileId) ?: return@launch
-            dao.updateProfile(existing.copy(avatarColor = newColor))
+            dao.updateProfile(existing.copy(
+                avatarColor = newColor,
+                isSynced    = false,
+                updatedAt   = System.currentTimeMillis()
+            ))
+            triggerImmediateSync()
         }
     }
 
@@ -214,7 +243,16 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             val allProfiles = dao.getAllProfilesOnce()
             if (allProfiles.size <= 1) return@launch
 
-            dao.deleteProfile(profileId)
+            val cycles = dao.getCyclesForProfileOnce(profileId)
+            cycles.forEach { cycle ->
+                dao.softDeleteDailyLogsForCycle(cycle.id)
+                dao.softDeleteCycleById(cycle.id)
+            }
+
+            val pills = dao.getPillPacksForProfileOnce(profileId)
+            pills.forEach { dao.softDeletePillPackById(it.id) }
+
+            dao.softDeleteProfileById(profileId)
 
             if (activeProfileId.value == profileId) {
                 val next = dao.getAllProfilesOnce().firstOrNull() ?: return@launch
@@ -223,6 +261,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
@@ -235,9 +274,9 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             val activePack  = pillPacks.value.firstOrNull { it.endDate == null } ?: return@launch
             val packEndDate = activePack.startDate.plusDays((activePack.pillCount - 1).toLong())
             if (LocalDate.now().isAfter(packEndDate)) {
-                // DAO update automatically sets isSynced = 0
                 dao.updatePillPackEndDate(activePack.id, packEndDate.toString())
                 CalendarWidget.refreshAll(appContext)
+                triggerImmediateSync()
             }
         }
     }
@@ -255,6 +294,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 )
             )
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
@@ -264,22 +304,21 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             val today       = LocalDate.now()
             val packEndDate = activePack.startDate.plusDays((activePack.pillCount - 1).toLong())
             val finalStop   = if (today.isAfter(packEndDate)) packEndDate else today
-
-            // DAO update automatically sets isSynced = 0
             dao.updatePillPackEndDate(activePack.id, finalStop.toString())
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
     fun deletePillPack(id: Int) {
         viewModelScope.launch {
-            // Replaced hard delete with soft delete
             dao.softDeletePillPackById(id)
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
-// ── Cycle CRUD ────────────────────────────────────────────────────────────
+    // ── Cycle CRUD ────────────────────────────────────────────────────────────
 
     fun addCycleWithDailyLogs(
         start: LocalDate,
@@ -318,6 +357,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
@@ -326,7 +366,6 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         overrides: Map<LocalDate, Triple<String, String, Int>>
     ) {
         viewModelScope.launch {
-            // FIX: Use .copy() to preserve the original syncUuid and serverVersion
             val existing = dao.getCyclesForProfileOnce(activeProfileId.value).find { it.id == cycle.id }
             if (existing != null) {
                 dao.updateCycle(
@@ -342,7 +381,6 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
 
-            // Soft-delete the old logs instead of wiping them
             dao.softDeleteDailyLogsForCycle(cycle.id)
 
             overrides.forEach { (date, triple) ->
@@ -357,17 +395,18 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
     fun deleteCycle(id: Int) = viewModelScope.launch {
-        // Replaced hard deletes with soft deletes (must delete children too!)
-        dao.softDeleteCycleById(id)
         dao.softDeleteDailyLogsForCycle(id)
+        dao.softDeleteCycleById(id)
         CalendarWidget.refreshAll(appContext)
+        triggerImmediateSync()
     }
 
-// ── Daily log CRUD ────────────────────────────────────────────────────────
+    // ── Daily log CRUD ────────────────────────────────────────────────────────
 
     fun upsertDailyLog(cycleId: Int, date: LocalDate, bleeding: String, bloodColor: String, painLevel: Int) {
         viewModelScope.launch {
@@ -395,14 +434,15 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
     fun deleteDailyLog(cycleId: Int, date: LocalDate) {
         viewModelScope.launch {
-            // Replaced hard delete with soft delete
             dao.softDeleteDailyLog(cycleId, date.toString())
             CalendarWidget.refreshAll(appContext)
+            triggerImmediateSync()
         }
     }
 
@@ -421,21 +461,21 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         return dailyLogs.value[key]?.painLevel ?: cycle.painLevel
     }
 
-    // ── Export / Import (Kept exactly as you had them) ─────────────────────────
+    // ── Export / Import ───────────────────────────────────────────────────────
 
     fun performExport(uri: Uri, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val allProfiles = dao.getAllProfilesOnce()
                 val profileBundles = allProfiles.map { profile ->
-                    val profileCycles   = dao.getCyclesForProfileOnce(profile.id)
-                    val profilePills    = dao.getPillPacksForProfileOnce(profile.id)
-                    val cycleDtos       = profileCycles.map { it.toDto() }
-                    val pillDtos        = profilePills.map { it.toDto() }
+                    val profileCycles = dao.getCyclesForProfileOnce(profile.id)
+                    val profilePills  = dao.getPillPacksForProfileOnce(profile.id)
+                    val cycleDtos     = profileCycles.map { it.toDto() }
+                    val pillDtos      = profilePills.map { it.toDto() }
 
-                    val cycleIds        = profileCycles.map { it.id }.toSet()
-                    val allLogs         = dao.getAllDailyLogsOnce()
-                    val logDtos         = allLogs
+                    val cycleIds = profileCycles.map { it.id }.toSet()
+                    val allLogs  = dao.getAllDailyLogsOnce()
+                    val logDtos  = allLogs
                         .filter { it.cycleId in cycleIds }
                         .map { it.toDto() }
 
@@ -492,6 +532,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.Main) {
                     onResult(true, "Import successful")
                     CalendarWidget.refreshAll(appContext)
+                    triggerImmediateSync()
                 }
 
             } catch (e: Exception) {
@@ -534,6 +575,7 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.Main) {
                     onResult(true, "Import successful")
                     CalendarWidget.refreshAll(appContext)
+                    triggerImmediateSync()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { onResult(false, "Error: ${e.localizedMessage}") }
@@ -606,8 +648,8 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         if (dailyLogs.isNotEmpty()) {
-            val allCycles      = dao.getCyclesForProfileOnce(profileId)
-            val startDateToId  = allCycles.associate { it.startDate to it.id }
+            val allCycles     = dao.getCyclesForProfileOnce(profileId)
+            val startDateToId = allCycles.associate { it.startDate to it.id }
 
             dailyLogs.forEach { dto ->
                 val matchingCycleStart = cycles.find { cycleDto ->
@@ -634,7 +676,8 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
                 ProfileEntity(
                     profileUuid = UUID.randomUUID().toString(),
                     name        = "Me",
-                    avatarColor = "avatar_1"
+                    avatarColor = "avatar_1",
+                    isSynced    = false
                 )
             ).toInt()
 
@@ -649,6 +692,8 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             withContext(Dispatchers.Main) {
                 CalendarWidget.refreshAll(appContext)
             }
+            // Trigger sync so the server gets the tombstone signals that everything was wiped
+            triggerImmediateSync()
         }
     }
 
@@ -692,6 +737,27 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
             @Suppress("UNCHECKED_CAST")
             return PeriodViewModel(app) as T
         }
+    }
+
+    private fun triggerImmediateSync() {
+        val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.ben.periodt.sync.PeriodtSyncWorker>()
+            .setConstraints(
+                androidx.work.Constraints.Builder()
+                    .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                    .build()
+            )
+            .setBackoffCriteria(
+                androidx.work.BackoffPolicy.EXPONENTIAL,
+                androidx.work.WorkRequest.MIN_BACKOFF_MILLIS,
+                java.util.concurrent.TimeUnit.MILLISECONDS
+            )
+            .build()
+
+        androidx.work.WorkManager.getInstance(appContext).enqueueUniqueWork(
+            "PeriodtImmediateSync",
+            androidx.work.ExistingWorkPolicy.APPEND_OR_REPLACE,
+            syncRequest
+        )
     }
 }
 

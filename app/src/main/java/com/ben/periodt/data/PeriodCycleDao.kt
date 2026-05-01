@@ -12,17 +12,17 @@ interface PeriodCycleDao {
 
     // ── PROFILES ──────────────────────────────────────────────────────────────
 
-    @Query("SELECT * FROM profiles ORDER BY createdAt ASC")
+    @Query("SELECT * FROM profiles WHERE isDeleted = 0 ORDER BY createdAt ASC")
     fun getAllProfiles(): Flow<List<ProfileEntity>>
 
-    @Query("SELECT * FROM profiles ORDER BY createdAt ASC")
+    @Query("SELECT * FROM profiles WHERE isDeleted = 0 ORDER BY createdAt ASC")
     suspend fun getAllProfilesOnce(): List<ProfileEntity>
 
-    @Query("SELECT * FROM profiles WHERE id = :id LIMIT 1")
+    @Query("SELECT * FROM profiles WHERE id = :id AND isDeleted = 0 LIMIT 1")
     suspend fun getProfileById(id: Int): ProfileEntity?
 
     @Insert
-    suspend fun insertProfile(entity: ProfileEntity): Long   // returns the new profile's id
+    suspend fun insertProfile(entity: ProfileEntity): Long
 
     @Update
     suspend fun updateProfile(entity: ProfileEntity)
@@ -32,19 +32,15 @@ interface PeriodCycleDao {
 
     // ── PERIOD CYCLES ─────────────────────────────────────────────────────────
 
-    // Profile-scoped live stream — used by the ViewModel for the active profile
     @Query("SELECT * FROM period_cycles WHERE profileId = :profileId AND isDeleted = 0 ORDER BY startDate ASC")
     fun getCyclesForProfile(profileId: Int): Flow<List<PeriodCycleEntity>>
 
-    // Profile-scoped one-shot — used by export and reminder receivers
     @Query("SELECT * FROM period_cycles WHERE profileId = :profileId AND isDeleted = 0 ORDER BY startDate ASC")
     suspend fun getCyclesForProfileOnce(profileId: Int): List<PeriodCycleEntity>
 
-    // Global one-shot — kept for export (exports ALL profiles at once)
     @Query("SELECT * FROM period_cycles WHERE isDeleted = 0 ORDER BY startDate ASC")
     suspend fun getAllCyclesOnce(): List<PeriodCycleEntity>
 
-    // Legacy global stream — kept so nothing breaks before ViewModel is updated
     @Query("SELECT * FROM period_cycles WHERE isDeleted = 0 ORDER BY startDate ASC")
     fun getAllCycles(): Flow<List<PeriodCycleEntity>>
 
@@ -65,24 +61,23 @@ interface PeriodCycleDao {
 
     // ── PILL PACKS ────────────────────────────────────────────────────────────
 
-    // Profile-scoped live stream
     @Query("SELECT * FROM pill_packs WHERE profileId = :profileId AND isDeleted = 0 ORDER BY startDate DESC")
     fun getPillPacksForProfile(profileId: Int): Flow<List<PillPackEntity>>
 
-    // Profile-scoped one-shot
     @Query("SELECT * FROM pill_packs WHERE profileId = :profileId AND isDeleted = 0 ORDER BY startDate ASC")
     suspend fun getPillPacksForProfileOnce(profileId: Int): List<PillPackEntity>
 
-    // Global one-shot — kept for export
     @Query("SELECT * FROM pill_packs WHERE isDeleted = 0 ORDER BY startDate ASC")
     suspend fun getAllPillPacksOnce(): List<PillPackEntity>
 
-    // Legacy global stream
     @Query("SELECT * FROM pill_packs WHERE isDeleted = 0 ORDER BY startDate DESC")
     fun getAllPillPacks(): Flow<List<PillPackEntity>>
 
     @Insert
     suspend fun insertPillPack(entity: PillPackEntity)
+
+    @Update
+    suspend fun updatePillPack(entity: PillPackEntity)
 
     @Query("UPDATE pill_packs SET endDate = :endDate, updatedAt = :updatedAt, isSynced = 0 WHERE id = :id")
     suspend fun updatePillPackEndDate(id: Int, endDate: String, updatedAt: Long = System.currentTimeMillis())
@@ -97,8 +92,6 @@ interface PeriodCycleDao {
     suspend fun deleteAllPillPacks()
 
     // ── DAILY CYCLE LOGS ──────────────────────────────────────────────────────
-    // daily_cycle_logs has no profileId — it inherits profile ownership through
-    // its parent cycle via CASCADE DELETE. No changes needed here.
 
     @Query("SELECT * FROM daily_cycle_logs WHERE cycleId = :cycleId AND isDeleted = 0 ORDER BY date ASC")
     fun getDailyLogsForCycle(cycleId: Int): Flow<List<DailyCycleLogEntity>>
@@ -131,28 +124,23 @@ interface PeriodCycleDao {
 
     @Transaction
     suspend fun deleteAll() {
-        deleteAllCycles()       // cascades to daily_cycle_logs automatically
+        deleteAllCycles()
         deleteAllPillPacks()
-        deleteAllDailyLogs()    // safety net in case cascade didn't catch any
+        deleteAllDailyLogs()
         deleteAllProfiles()
     }
 
     @Query("DELETE FROM profiles")
     suspend fun deleteAllProfiles()
 
-    // ── PROFILE WIPE (single profile) ────────────────────────────────────────
-
-    @Transaction
-    suspend fun deleteProfile(profileId: Int) {
-        deletePillPacksForProfile(profileId)  // pill_packs FK to profiles
-        deleteProfileById(profileId)          // cascades to period_cycles → daily_cycle_logs
-    }
-
     // ==========================================================================
     // ── SYNC ENGINE QUERIES ───────────────────────────────────────────────────
     // ==========================================================================
 
     // 1. SWEEP QUERIES (For Pushing)
+    @Query("SELECT * FROM profiles WHERE isSynced = 0")
+    suspend fun getUnsyncedProfiles(): List<ProfileEntity>
+
     @Query("SELECT * FROM period_cycles WHERE isSynced = 0")
     suspend fun getUnsyncedCycles(): List<PeriodCycleEntity>
 
@@ -162,12 +150,25 @@ interface PeriodCycleDao {
     @Query("SELECT * FROM daily_cycle_logs WHERE isSynced = 0")
     suspend fun getUnsyncedDailyLogs(): List<DailyCycleLogEntity>
 
+    // Deletes empty, unsynced profiles generated by a fresh install
+    @Query("""
+        DELETE FROM profiles 
+        WHERE serverVersion IS NULL 
+        AND isSynced = 0
+        AND (SELECT COUNT(*) FROM period_cycles WHERE profileId = profiles.id AND isDeleted = 0) = 0
+        AND (SELECT COUNT(*) FROM pill_packs    WHERE profileId = profiles.id AND isDeleted = 0) = 0
+    """)
+    suspend fun clearOfflinePlaceholders()
+
     // 2. UUID RESOLUTION (For Pulling/Merging)
     @Query("SELECT id FROM profiles WHERE profileUuid = :uuid LIMIT 1")
     suspend fun getProfileLocalIdByUuid(uuid: String): Int?
 
     @Query("SELECT id FROM period_cycles WHERE syncUuid = :uuid LIMIT 1")
     suspend fun getCycleLocalIdByUuid(uuid: String): Int?
+
+    @Query("SELECT id FROM pill_packs WHERE syncUuid = :uuid LIMIT 1")
+    suspend fun getPillPackLocalIdByUuid(uuid: String): Int?
 
     @Query("SELECT profileId FROM period_cycles WHERE syncUuid = :uuid LIMIT 1")
     suspend fun getCycleProfileIdByUuid(uuid: String): Int?
@@ -178,7 +179,22 @@ interface PeriodCycleDao {
     @Query("SELECT profileUuid FROM profiles WHERE id = :id LIMIT 1")
     suspend fun getProfileUuidById(id: Int): String?
 
+    // Returns the id of the first profile that has no cycles, no pill packs,
+    // and is not deleted. Used to clean up the default "Me" profile.
+    @Query("""
+        SELECT p.id FROM profiles p
+        WHERE p.isDeleted = 0
+        AND p.serverVersion IS NULL -- FIXED: Only target local, unsynced profiles
+        AND (SELECT COUNT(*) FROM period_cycles WHERE profileId = p.id AND isDeleted = 0) = 0
+        AND (SELECT COUNT(*) FROM pill_packs    WHERE profileId = p.id AND isDeleted = 0) = 0
+        LIMIT 1
+    """)
+    suspend fun getEmptyProfileId(): Int?
+
     // 3. STATE UPDATES (Marking as Clean after Sync)
+    @Query("UPDATE profiles SET isSynced = 1, serverVersion = :version WHERE profileUuid = :uuid")
+    suspend fun markProfileSynced(uuid: String, version: Long)
+
     @Query("UPDATE period_cycles SET isSynced = 1, serverVersion = :version WHERE syncUuid = :uuid")
     suspend fun markCycleSynced(uuid: String, version: Long)
 
@@ -189,6 +205,9 @@ interface PeriodCycleDao {
     suspend fun markDailyLogSynced(uuid: String, version: Long)
 
     // 4. TOMBSTONE CLEANUP (Janitor)
+    @Query("DELETE FROM profiles WHERE isDeleted = 1 AND isSynced = 1 AND updatedAt < :cutoffMs")
+    suspend fun hardDeleteStaleProfileTombstones(cutoffMs: Long)
+
     @Query("DELETE FROM period_cycles WHERE isDeleted = 1 AND isSynced = 1 AND updatedAt < :cutoffMs")
     suspend fun hardDeleteStaleCycleTombstones(cutoffMs: Long)
 
@@ -197,6 +216,9 @@ interface PeriodCycleDao {
 
     @Query("DELETE FROM daily_cycle_logs WHERE isDeleted = 1 AND isSynced = 1 AND updatedAt < :cutoffMs")
     suspend fun hardDeleteStaleDailyLogTombstones(cutoffMs: Long)
+
+    @Query("DELETE FROM profiles WHERE profileUuid = :uuid")
+    suspend fun deleteProfileBySyncUuid(uuid: String)
 
     @Query("DELETE FROM period_cycles WHERE syncUuid = :uuid")
     suspend fun deleteCycleBySyncUuid(uuid: String)
@@ -208,6 +230,9 @@ interface PeriodCycleDao {
     suspend fun deleteDailyLogBySyncUuid(uuid: String)
 
     // 5. SOFT DELETES (Called by ViewModel)
+    @Query("UPDATE profiles SET isDeleted = 1, isSynced = 0, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun softDeleteProfileById(id: Int, updatedAt: Long = System.currentTimeMillis())
+
     @Query("UPDATE period_cycles SET isDeleted = 1, isSynced = 0, updatedAt = :updatedAt WHERE id = :id")
     suspend fun softDeleteCycleById(id: Int, updatedAt: Long = System.currentTimeMillis())
 

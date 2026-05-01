@@ -122,20 +122,9 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         // ── NEW: Migration 5 → 6 ─────────────────────────────────────────────
-        //
-        // Goal: Add 5 sync-tracking columns to the three entity tables.
-        // ProfileEntity is excluded — it already has `profileUuid` as its
-        // stable cloud identity.
-
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
 
-                // ── Helper: the UUID generation expression ────────────────────
-                // SQLite has no UUID() function. We build one from randomblob():
-                //   randomblob(4)  → 4 random bytes → 8 hex chars  (xxxxxxxx)
-                //   randomblob(2)  → 2 random bytes → 4 hex chars  (xxxx)
-                //   The '4' prefix on the third group marks this as a v4 UUID.
-                //   'substr(...)' on the fourth group sets the variant bits.
                 val uuidExpr = """
                     lower(hex(randomblob(4))) || '-' ||
                     lower(hex(randomblob(2))) || '-' ||
@@ -145,27 +134,26 @@ abstract class AppDatabase : RoomDatabase() {
                     lower(hex(randomblob(6)))
                 """.trimIndent()
 
-                // ── period_cycles ─────────────────────────────────────────────
+                // ── profiles ──────────────────────────────────────────────────
+                db.execSQL("ALTER TABLE `profiles` ADD COLUMN `serverVersion` INTEGER")
+                db.execSQL("ALTER TABLE `profiles` ADD COLUMN `updatedAt`     INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `profiles` ADD COLUMN `isSynced`      INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `profiles` ADD COLUMN `isDeleted`     INTEGER NOT NULL DEFAULT 0")
 
-                // Step 1: Add each column individually.
-                // SQLite only supports ADD COLUMN one at a time — no multi-column ALTER.
+                // ── period_cycles ─────────────────────────────────────────────
                 db.execSQL("ALTER TABLE `period_cycles` ADD COLUMN `syncUuid`      TEXT    NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE `period_cycles` ADD COLUMN `serverVersion` INTEGER")          // nullable
+                db.execSQL("ALTER TABLE `period_cycles` ADD COLUMN `serverVersion` INTEGER")
                 db.execSQL("ALTER TABLE `period_cycles` ADD COLUMN `updatedAt`     INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `period_cycles` ADD COLUMN `isSynced`      INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `period_cycles` ADD COLUMN `isDeleted`     INTEGER NOT NULL DEFAULT 0")
 
-                // Step 2: Backfill syncUuid for all existing rows.
-                // Without this, every existing cycle would have syncUuid = '',
-                // which is useless as a cloud identity.
                 db.execSQL("UPDATE `period_cycles` SET `syncUuid` = $uuidExpr WHERE `syncUuid` = ''")
 
-                // Step 3: Add indexes for the sync engine's most frequent queries.
-                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_cycles_unsynced` ON `period_cycles` (`isSynced`, `isDeleted`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_cycles_syncuuid` ON `period_cycles` (`syncUuid`)")
+                // FIXED: Use Room's exact auto-generated index names
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_period_cycles_isSynced_isDeleted` ON `period_cycles` (`isSynced`, `isDeleted`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_period_cycles_syncUuid` ON `period_cycles` (`syncUuid`)")
 
                 // ── pill_packs ────────────────────────────────────────────────
-
                 db.execSQL("ALTER TABLE `pill_packs` ADD COLUMN `syncUuid`      TEXT    NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE `pill_packs` ADD COLUMN `serverVersion` INTEGER")
                 db.execSQL("ALTER TABLE `pill_packs` ADD COLUMN `updatedAt`     INTEGER NOT NULL DEFAULT 0")
@@ -174,11 +162,11 @@ abstract class AppDatabase : RoomDatabase() {
 
                 db.execSQL("UPDATE `pill_packs` SET `syncUuid` = $uuidExpr WHERE `syncUuid` = ''")
 
-                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_packs_unsynced` ON `pill_packs` (`isSynced`, `isDeleted`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_packs_syncuuid` ON `pill_packs` (`syncUuid`)")
+                // FIXED: Use Room's exact auto-generated index names
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pill_packs_isSynced_isDeleted` ON `pill_packs` (`isSynced`, `isDeleted`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pill_packs_syncUuid` ON `pill_packs` (`syncUuid`)")
 
                 // ── daily_cycle_logs ──────────────────────────────────────────
-
                 db.execSQL("ALTER TABLE `daily_cycle_logs` ADD COLUMN `syncUuid`      TEXT    NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE `daily_cycle_logs` ADD COLUMN `serverVersion` INTEGER")
                 db.execSQL("ALTER TABLE `daily_cycle_logs` ADD COLUMN `updatedAt`     INTEGER NOT NULL DEFAULT 0")
@@ -187,8 +175,9 @@ abstract class AppDatabase : RoomDatabase() {
 
                 db.execSQL("UPDATE `daily_cycle_logs` SET `syncUuid` = $uuidExpr WHERE `syncUuid` = ''")
 
-                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_logs_unsynced` ON `daily_cycle_logs` (`isSynced`, `isDeleted`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `idx_logs_syncuuid` ON `daily_cycle_logs` (`syncUuid`)")
+                // FIXED: Use Room's exact auto-generated index names
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_cycle_logs_isSynced_isDeleted` ON `daily_cycle_logs` (`isSynced`, `isDeleted`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_cycle_logs_syncUuid` ON `daily_cycle_logs` (`syncUuid`)")
             }
         }
 
@@ -220,9 +209,11 @@ abstract class AppDatabase : RoomDatabase() {
                         super.onCreate(db)
                         val uuid = UUID.randomUUID().toString()
                         val now = System.currentTimeMillis()
+
+                        // REVERTED: Set isSynced to 0 so it actually gets backed up
                         db.execSQL(
-                            "INSERT INTO profiles (profileUuid, name, avatarColor, createdAt) VALUES (?, 'Me', 'avatar_1', ?)",
-                            arrayOf(uuid, now)
+                            "INSERT INTO profiles (profileUuid, name, avatarColor, createdAt, updatedAt, isSynced, isDeleted) VALUES (?, 'Me', 'avatar_1', ?, ?, 0, 0)",
+                            arrayOf(uuid, now, now)
                         )
                     }
                 })

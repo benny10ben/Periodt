@@ -21,6 +21,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.*
 import com.ben.periodt.network.ApiClient
 import com.ben.periodt.network.PeriodtNetworkRepository
@@ -29,6 +31,7 @@ import com.ben.periodt.sync.PeriodtSyncWorker
 import com.ben.periodt.ui.MainScreen
 import com.ben.periodt.ui.onboarding.OnboardingNavigator
 import com.ben.periodt.ui.theme.PeriodTTheme
+import com.ben.periodt.viewmodel.AuthViewModel
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -96,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(
             "PeriodtImmediateSync",
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             immediateSyncRequest
         )
 
@@ -104,6 +107,11 @@ class MainActivity : ComponentActivity() {
             PeriodTTheme {
                 val ctx = applicationContext
                 var showOnboarding by remember { mutableStateOf(!OnboardingPrefs.isDone(ctx)) }
+
+                // Retrieve the AuthViewModel tied to the Application lifecycle
+                val authViewModel: AuthViewModel = viewModel(
+                    factory = ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+                )
 
                 Surface(color = Color.Transparent) {
                     AnimatedContent(
@@ -133,6 +141,7 @@ class MainActivity : ComponentActivity() {
                         if (isOnboarding) {
                             OnboardingNavigator(
                                 activity = this@MainActivity,
+                                viewModel = authViewModel,
                                 onFinished = {
                                     OnboardingPrefs.setDone(ctx, true)
                                     showOnboarding = false
