@@ -2,26 +2,6 @@ package com.ben.periodt.network
 
 import kotlinx.serialization.Serializable
 
-// --- Auth Payloads ---
-
-@Serializable
-data class RegisterRequest(
-    val email: String,
-    val password: String
-)
-
-@Serializable
-data class LoginRequest(
-    val email: String,
-    val password: String
-)
-
-@Serializable
-data class AuthResponse(
-    val token: String,
-    val userId: Long
-)
-
 // --- Device Payloads ---
 
 @Serializable
@@ -45,7 +25,8 @@ data class SyncItemDto(
     val entityType: String,
     val encryptedPayload: String,
     val isDeleted: Boolean,
-    val serverVersion: Long? = null
+    val serverVersion: Long? = null,
+    val clientUpdatedAt: Long
 )
 
 @Serializable
