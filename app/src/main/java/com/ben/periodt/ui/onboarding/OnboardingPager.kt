@@ -15,11 +15,18 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,26 +37,39 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.ben.periodt.R
+import com.ben.periodt.sync.PeriodtSyncWorker
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
 import com.ben.periodt.ui.theme.SetSystemBars
 import com.ben.periodt.ui.settings.components.ContentDialog
+import com.ben.periodt.viewmodel.AuthState
+import com.ben.periodt.viewmodel.AuthViewModel
 import kotlin.math.abs
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun OnboardingPager(
     step: Int,
+    viewModel: AuthViewModel,
     onNext: () -> Unit,
     onBack: () -> Unit,
     onAllow: () -> Unit
@@ -95,7 +115,8 @@ fun OnboardingPager(
             when (page) {
                 0 -> WelcomePage(onGetStarted = onNext)
                 1 -> FeaturesPage(onNext = onNext)
-                2 -> ModeSelectionPage(onStart = onAllow)
+                2 -> ModeSelectionPage(onStart = onNext)
+                3 -> AuthPage(viewModel = viewModel, onFinish = onAllow)
             }
         }
     }
@@ -386,15 +407,14 @@ fun ModeSelectionPage(onStart: () -> Unit) {
     val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
     val subTextColor = textColor.copy(alpha = 0.7f)
 
-    // Expanded to 5 cards to include Profiles and Pills
     val infoPagerState = rememberPagerState(pageCount = { 5 })
 
     val themeColor = when (infoPagerState.currentPage) {
         0 -> if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
-        1 -> Color(0xFFD89046) // Smart Predictions (Orange)
-        2 -> Color(0xFF4E1A1A) // Cycle Syncing (Maroon)
+        1 -> Color(0xFFD89046)
+        2 -> Color(0xFF4E1A1A)
         3 -> if (isDark) Color(0xFF42553f) else Color(0xFFa5bda3)
-        4 -> Color(0xFFA68E74) // Pill Tracking (Sand/Taupe)
+        4 -> Color(0xFFA68E74)
         else -> textColor
     }
 
@@ -484,7 +504,7 @@ fun ModeSelectionPage(onStart: () -> Unit) {
                 activeColor = animatedThemeColor
             )
             Spacer(Modifier.height(32.dp))
-            OnboardingButton(text = "Start Tracking", onClick = onStart)
+            OnboardingButton(text = "Secure Your Data", onClick = onStart)
         }
     }
 }
@@ -525,6 +545,175 @@ fun InfoCard(title: String, subtitle: String, icon: ImageVector, backgroundColor
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.85f),
                 lineHeight = 22.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun AuthPage(
+    viewModel: AuthViewModel,
+    onFinish: () -> Unit
+) {
+    val authState by viewModel.authState.collectAsState()
+    var isLoginMode by remember { mutableStateOf(false) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    // (Keep your existing LaunchedEffect observing authState here)
+    LaunchedEffect(authState) {
+        if (authState is AuthState.Success) {
+            onFinish()
+        }
+    }
+
+    val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
+    val subTextColor = if (isSystemInDarkTheme()) Color.LightGray else Color.DarkGray
+    val containerColor = if (isSystemInDarkTheme()) Color(0xFF1E1E1E) else Color(0xFFF7F7F7)
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .background(containerColor, RoundedCornerShape(24.dp))
+                .padding(32.dp)
+        ) {
+            Text(
+                text = if (isLoginMode) "Welcome Back" else "Create Account",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = BricolageGrotesque,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor
+                )
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = "End-to-End Encrypted Sync",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = BricolageGrotesque,
+                    color = subTextColor
+                )
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // CHANGED: Username instead of Email
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Username", fontFamily = BricolageGrotesque) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = textColor,
+                    unfocusedBorderColor = subTextColor
+                )
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password", fontFamily = BricolageGrotesque) },
+                singleLine = true,
+                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    val image = if (isPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = textColor,
+                    unfocusedBorderColor = subTextColor
+                )
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            if (authState is AuthState.Loading) {
+                CircularProgressIndicator(color = textColor)
+            } else {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        // FIXED: Pass username instead of email, and remove recovery phrase
+                        if (isLoginMode) {
+                            viewModel.login(username, password)
+                        } else {
+                            viewModel.register(username, password)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = textColor,
+                        contentColor = containerColor
+                    )
+                ) {
+                    Text(
+                        text = if (isLoginMode) "Sign In" else "Sign Up",
+                        fontFamily = BricolageGrotesque,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+            }
+
+            if (authState is AuthState.Error) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = (authState as AuthState.Error).message,
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = BricolageGrotesque)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            BasicText(
+                text = if (isLoginMode) "Don't have an account? Sign up" else "Already have an account? Sign in",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = BricolageGrotesque,
+                    color = textColor
+                ),
+                modifier = Modifier
+                    .clickable { isLoginMode = !isLoginMode }
+                    .padding(8.dp)
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            val annotatedString = buildAnnotatedString {
+                withStyle(SpanStyle(color = subTextColor)) { append("Prefer not to sync? ") }
+                withStyle(
+                    SpanStyle(
+                        color = textColor,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = TextDecoration.Underline
+                    )
+                ) { append("Continue Locally") }
+            }
+
+            BasicText(
+                text = annotatedString,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = BricolageGrotesque),
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onFinish() }
+                    .padding(8.dp)
             )
         }
     }
