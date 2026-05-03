@@ -17,7 +17,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun register(request: RegisterRequest): Result<AuthResponse> {
         return try {
-            val response = client.post("/api/auth/register") {
+            val response = client.post("/api/v1/auth/register") {
                 setBody(request)
             }
             if (response.status.isSuccess()) {
@@ -35,7 +35,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun login(request: LoginRequest): Result<AuthResponse> {
         return try {
-            val response = client.post("/api/auth/login") {
+            val response = client.post("/api/v1/auth/login") {
                 setBody(request)
             }
             if (response.status.isSuccess()) {
@@ -51,7 +51,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun changePassword(request: ChangePasswordRequest): Result<Unit> {
         return try {
-            val response = client.post("/api/auth/change-password") {
+            val response = client.post("/api/v1/auth/change-password") {
                 setBody(request)
             }
             if (response.status.isSuccess()) {
@@ -67,7 +67,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun changeUsername(request: ChangeUsernameRequest): Result<AuthResponse> {
         return try {
-            val response = client.post("/api/auth/change-username") {
+            val response = client.post("/api/v1/auth/change-username") {
                 setBody(request)
             }
             if (response.status.isSuccess()) {
@@ -86,7 +86,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun deleteAccount(): Result<Unit> {
         return try {
-            client.delete("/api/auth/delete")
+            client.delete("/api/v1/auth/delete")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Account deletion failed", e)
@@ -98,7 +98,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun registerDevice(request: DeviceRegistrationRequest): Result<Unit> {
         return try {
-            client.post("/api/devices/register") {
+            client.post("/api/v1/devices/register") {
                 setBody(request)
             }
             Result.success(Unit)
@@ -110,7 +110,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun uploadKey(request: WrappedKeyDto): Result<Unit> {
         return try {
-            client.post("/api/keys/upload") {
+            client.post("/api/v1/keys/upload") {
                 setBody(request)
             }
             Result.success(Unit)
@@ -122,7 +122,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun fetchKey(): Result<WrappedKeyDto> {
         return try {
-            val response: WrappedKeyDto = client.get("/api/keys/fetch").body()
+            val response: WrappedKeyDto = client.get("/api/v1/keys/fetch").body()
             Result.success(response)
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Key fetch failed", e)
@@ -134,7 +134,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun pushSyncData(request: SyncPushRequest): Result<Unit> {
         return try {
-            client.post("/api/sync/push") {
+            client.post("/api/v1/sync/push") {
                 setBody(request)
             }
             Result.success(Unit)
@@ -146,7 +146,7 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun pullSyncData(cursor: Long): Result<SyncPullResponse> {
         return try {
-            val response: SyncPullResponse = client.get("/api/sync/pull") {
+            val response: SyncPullResponse = client.get("/api/v1/sync/pull") {
                 parameter("cursor", cursor)
             }.body()
             Result.success(response)
