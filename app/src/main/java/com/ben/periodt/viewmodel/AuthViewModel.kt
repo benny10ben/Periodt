@@ -25,29 +25,47 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
     private val secureVault = SecureVault(application)
     private val apiClient = ApiClient(tokenManager)
+
+    // We now use the networkRepo for EVERYTHING!
     private val networkRepo = PeriodtNetworkRepository(apiClient)
 
+    // Tracks the active user for the UI
+    private val _currentUser = MutableStateFlow<String?>(tokenManager.getUsername())
+    val currentUser: StateFlow<String?> = _currentUser.asStateFlow()
+
+    // --- Main Auth State ---
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    // --- Password Change State ---
+    private val _passwordChangeState = MutableStateFlow<AuthState>(AuthState.Idle)
+    val passwordChangeState: StateFlow<AuthState> = _passwordChangeState.asStateFlow()
 
     fun register(username: String, passwordPlain: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                // 1. Generate local cryptography
-                val saltBase64 = SyncCryptoManager.generateSaltBase64()
-                val accountKey = SyncCryptoManager.deriveAccountKey(passwordPlain, saltBase64)
-                val dataKey = SyncCryptoManager.generateRandomDataKey()
-                val wrappedDataKey = SyncCryptoManager.wrapDataKey(accountKey, dataKey)
+                // MOVE TO BACKGROUND: Heavy cryptography blocks the UI thread!
+                withContext(Dispatchers.IO) {
+                    // 1. Generate local cryptography
+                    val saltBase64 = SyncCryptoManager.generateSaltBase64()
+                    val accountKey = SyncCryptoManager.deriveAccountKey(passwordPlain, saltBase64)
+                    val dataKey = SyncCryptoManager.generateRandomDataKey()
+                    val wrappedDataKey = SyncCryptoManager.wrapDataKey(accountKey, dataKey)
 
-                // 2. Send to server
-                val request = RegisterRequest(username, passwordPlain, saltBase64, wrappedDataKey)
-                val result = apiClient.register(request)
+                    // 2. Send to server
+                    val request = RegisterRequest(username, passwordPlain, saltBase64, wrappedDataKey)
 
-                result.onSuccess { response ->
-                    processSuccessfulAuth(response.token, response.userId, saltBase64, accountKey, dataKey)
-                }.onFailure { error ->
-                    _authState.value = AuthState.Error(error.message ?: "Registration Failed")
+                    // FIXED: Now pointing to networkRepo!
+                    val result = networkRepo.register(request)
+
+                    result.onSuccess { response ->
+                        processSuccessfulAuth(response.token, response.userId, saltBase64, accountKey, dataKey, username)
+                    }.onFailure { error ->
+                        withContext(Dispatchers.Main) {
+                            _authState.value = AuthState.Error(error.message ?: "Registration Failed")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 _authState.value = AuthState.Error("Cryptographic setup failed.")
@@ -60,29 +78,36 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _authState.value = AuthState.Loading
             try {
                 // 1. Authenticate and get Salt
-                val loginResult = apiClient.login(LoginRequest(username, passwordPlain))
+                // FIXED: Now pointing to networkRepo!
+                val loginResult = networkRepo.login(LoginRequest(username, passwordPlain))
 
                 loginResult.onSuccess { response ->
                     val saltBase64 = response.saltBase64 ?: throw Exception("Missing cryptographic salt.")
 
-                    // 2. We are switching to a cloud account, wipe the local guest sandbox
-                    AppDatabase.getDatabase(getApplication()).periodCycleDao().deleteAll()
+                    // MOVE TO BACKGROUND: Database queries crash the app on the Main thread!
+                    withContext(Dispatchers.IO) {
 
-                    // 3. Save auth token so we can fetch the wrapped key
-                    tokenManager.saveToken(response.token)
+                        // 2. Wipe the local guest sandbox
+                        AppDatabase.getDatabase(getApplication()).clearAllTables()
 
-                    // 4. Fetch the Wrapped Data Key from the server
-                    val keyResult = networkRepo.fetchKey()
-                    keyResult.onSuccess { keyDto ->
+                        // 3. Save auth token so we can fetch the wrapped key
+                        tokenManager.saveToken(response.token)
 
-                        // 5. Reconstruct the keys
-                        val accountKey = SyncCryptoManager.deriveAccountKey(passwordPlain, saltBase64)
-                        val dataKey = SyncCryptoManager.unwrapDataKey(accountKey, keyDto.wrappedDataKey)
+                        // 4. Fetch the Wrapped Data Key from the server
+                        val keyResult = networkRepo.fetchKey()
+                        keyResult.onSuccess { keyDto ->
 
-                        processSuccessfulAuth(response.token, response.userId, saltBase64, accountKey, dataKey)
+                            // 5. Reconstruct the keys (Heavy Math)
+                            val accountKey = SyncCryptoManager.deriveAccountKey(passwordPlain, saltBase64)
+                            val dataKey = SyncCryptoManager.unwrapDataKey(accountKey, keyDto.wrappedDataKey)
 
-                    }.onFailure {
-                        _authState.value = AuthState.Error("Failed to fetch encryption keys.")
+                            processSuccessfulAuth(response.token, response.userId, saltBase64, accountKey, dataKey, username)
+
+                        }.onFailure {
+                            withContext(Dispatchers.Main) {
+                                _authState.value = AuthState.Error("Failed to fetch encryption keys.")
+                            }
+                        }
                     }
                 }.onFailure { error ->
                     _authState.value = AuthState.Error(error.message ?: "Login Failed")
@@ -98,17 +123,20 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         userId: Long,
         saltBase64: String,
         accountKey: ByteArray,
-        dataKey: ByteArray
+        dataKey: ByteArray,
+        username: String
     ) {
         withContext(Dispatchers.Default) {
             try {
                 // 1. Save standard tokens
                 tokenManager.saveToken(token)
                 tokenManager.saveUserId(userId)
+                tokenManager.saveUsername(username)
 
                 // 2. Save cryptographic material to memory and the secure hardware vault
                 SyncCryptoManager.sessionDataKey = dataKey
-                secureVault.saveAesKey(SecretKeySpec(accountKey, "AES"))
+                secureVault.saveAesKey(SecretKeySpec(dataKey, "AES"))
+
                 secureVault.saveSalt(Base64.decode(saltBase64, Base64.NO_WRAP))
 
                 // 3. Trigger initial sync
@@ -123,21 +151,157 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     syncRequest
                 )
 
-                _authState.value = AuthState.Success
+                // Update UI state safely on the Main thread
+                withContext(Dispatchers.Main) {
+                    _currentUser.value = username
+                    _authState.value = AuthState.Success
+                }
             } catch (e: Exception) {
-                _authState.value = AuthState.Error("Failed to initialize cryptographic vault.")
+                withContext(Dispatchers.Main) {
+                    _authState.value = AuthState.Error("Failed to initialize cryptographic vault.")
+                }
             }
         }
     }
 
     fun logout() {
         viewModelScope.launch(Dispatchers.IO) {
-            AppDatabase.getDatabase(getApplication()).periodCycleDao().deleteAll()
+            AppDatabase.getDatabase(getApplication()).clearAllTables()
+
             withContext(Dispatchers.Main) {
                 tokenManager.clearAll()
                 secureVault.clearVault()
                 SyncCryptoManager.clearSession()
+                _currentUser.value = null
                 _authState.value = AuthState.Idle
+            }
+        }
+    }
+
+    fun resetPasswordChangeState() {
+        _passwordChangeState.value = AuthState.Idle
+    }
+
+    fun changePassword(oldPasswordPlain: String, newPasswordPlain: String) {
+        viewModelScope.launch {
+            _passwordChangeState.value = AuthState.Loading
+            try {
+                // We need the active Data Key to re-wrap it. If it's null, they aren't fully logged in.
+                val currentDataKey = SyncCryptoManager.sessionDataKey
+                if (currentDataKey == null) {
+                    _passwordChangeState.value = AuthState.Error("Session expired. Please log in again.")
+                    return@launch
+                }
+
+                // MOVE TO BACKGROUND: Heavy Argon2 Cryptography
+                withContext(Dispatchers.IO) {
+                    // 1. Generate new cryptographic material
+                    val newSaltBase64 = SyncCryptoManager.generateSaltBase64()
+                    val newAccountKey = SyncCryptoManager.deriveAccountKey(newPasswordPlain, newSaltBase64)
+
+                    // 2. Re-wrap the existing data key with the new account key
+                    val newWrappedDataKey = SyncCryptoManager.wrapDataKey(newAccountKey, currentDataKey)
+
+                    // 3. Send to server
+                    val request = com.ben.periodt.network.ChangePasswordRequest(
+                        oldPasswordPlain = oldPasswordPlain,
+                        newPasswordPlain = newPasswordPlain,
+                        newSaltBase64 = newSaltBase64,
+                        newWrappedDataKey = newWrappedDataKey
+                    )
+
+                    // FIXED: Now pointing to networkRepo!
+                    val result = networkRepo.changePassword(request)
+
+                    result.onSuccess {
+                        // 4. Update the local hardware vault with the new salt!
+                        secureVault.saveSalt(Base64.decode(newSaltBase64, Base64.NO_WRAP))
+
+                        withContext(Dispatchers.Main) {
+                            _passwordChangeState.value = AuthState.Success
+                        }
+                    }.onFailure { error ->
+                        withContext(Dispatchers.Main) {
+                            _passwordChangeState.value = AuthState.Error(error.message ?: "Failed to change password.")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _passwordChangeState.value = AuthState.Error("Cryptographic error occurred.")
+            }
+        }
+    }
+
+    // --- Username Change State ---
+    private val _usernameChangeState = MutableStateFlow<AuthState>(AuthState.Idle)
+    val usernameChangeState: StateFlow<AuthState> = _usernameChangeState.asStateFlow()
+
+    fun resetUsernameChangeState() {
+        _usernameChangeState.value = AuthState.Idle
+    }
+
+    fun changeUsername(newUsername: String) {
+        viewModelScope.launch {
+            _usernameChangeState.value = AuthState.Loading
+            try {
+                val request = com.ben.periodt.network.ChangeUsernameRequest(newUsername)
+                val result = networkRepo.changeUsername(request)
+
+                result.onSuccess { response ->
+                    withContext(Dispatchers.IO) {
+                        // 1. Save the fresh JWT token and new username to hardware memory
+                        tokenManager.saveToken(response.token)
+                        tokenManager.saveUsername(response.username)
+
+                        withContext(Dispatchers.Main) {
+                            // 2. Instantly update the UI!
+                            _currentUser.value = response.username
+                            _usernameChangeState.value = AuthState.Success
+                        }
+                    }
+                }.onFailure { error ->
+                    _usernameChangeState.value = AuthState.Error(error.message ?: "Failed to change username.")
+                }
+            } catch (e: Exception) {
+                _usernameChangeState.value = AuthState.Error("Network error occurred.")
+            }
+        }
+    }
+
+    // --- Delete Account State ---
+    private val _deleteAccountState = MutableStateFlow<AuthState>(AuthState.Idle)
+    val deleteAccountState: StateFlow<AuthState> = _deleteAccountState.asStateFlow()
+
+    fun resetDeleteAccountState() {
+        _deleteAccountState.value = AuthState.Idle
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _deleteAccountState.value = AuthState.Loading
+            try {
+                // Pointing to networkRepo for the deletion call
+                val result = networkRepo.deleteAccount()
+
+                result.onSuccess {
+                    // Wipe local database & logout
+                    withContext(Dispatchers.IO) {
+                        AppDatabase.getDatabase(getApplication()).clearAllTables()
+
+                        withContext(Dispatchers.Main) {
+                            tokenManager.clearAll()
+                            secureVault.clearVault()
+                            SyncCryptoManager.clearSession()
+                            _currentUser.value = null
+                            _deleteAccountState.value = AuthState.Success
+                            _authState.value = AuthState.Idle
+                        }
+                    }
+                }.onFailure { error ->
+                    _deleteAccountState.value = AuthState.Error(error.message ?: "Failed to delete account.")
+                }
+            } catch (e: Exception) {
+                _deleteAccountState.value = AuthState.Error("Network error occurred.")
             }
         }
     }

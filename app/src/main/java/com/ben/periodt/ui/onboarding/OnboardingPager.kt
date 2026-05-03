@@ -555,166 +555,105 @@ fun AuthPage(
     viewModel: AuthViewModel,
     onFinish: () -> Unit
 ) {
-    val authState by viewModel.authState.collectAsState()
-    var isLoginMode by remember { mutableStateOf(false) }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var isPasswordVisible by remember { mutableStateOf(false) }
+    // null = hidden, true = Login, false = Register
+    var authSheetMode by remember { mutableStateOf<Boolean?>(null) }
 
-    // (Keep your existing LaunchedEffect observing authState here)
-    LaunchedEffect(authState) {
-        if (authState is AuthState.Success) {
-            onFinish()
+    val isDark = isSystemInDarkTheme()
+    val textColor = if (isDark) Color.White else Color(0xFF1B1B1B)
+    val subTextColor = if (isDark) Color.White.copy(alpha = 0.6f) else Color(0xFF1b1b1b).copy(alpha = 0.6f)
+    val accentColor = if (isDark) Color(0xFFD89046) else Color(0xFFa5bda3)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp)
+            .navigationBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Spacer(Modifier.weight(1f))
+
+        Icon(
+            imageVector = Icons.Rounded.CloudSync,
+            contentDescription = null,
+            tint = accentColor,
+            modifier = Modifier.size(80.dp)
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(
+            text = "Secure Your Data",
+            fontFamily = BricolageGrotesque,
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "Create an end-to-end encrypted cloud account to back up your history securely.",
+            fontFamily = BricolageGrotesque,
+            style = MaterialTheme.typography.bodyLarge,
+            color = subTextColor,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(Modifier.weight(1f))
+
+        // Button 1: Create Account
+        androidx.compose.material3.Button(
+            onClick = { authSheetMode = false },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = accentColor,
+                contentColor = Color.White
+            )
+        ) {
+            Text("Create Account", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Button 2: Sign In
+        androidx.compose.material3.Button(
+            onClick = { authSheetMode = true },
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                containerColor = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
+                contentColor = textColor
+            ),
+            elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(0.dp)
+        ) {
+            Text("Sign In", fontFamily = BricolageGrotesque, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Button 3: Continue Locally
+        BasicText(
+            text = "Prefer not to sync? Continue Locally",
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = BricolageGrotesque,
+                color = subTextColor,
+                textDecoration = TextDecoration.Underline
+            ),
+            modifier = Modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onFinish() }
+                .padding(8.dp)
+        )
+        Spacer(Modifier.height(32.dp))
     }
 
-    val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
-    val subTextColor = if (isSystemInDarkTheme()) Color.LightGray else Color.DarkGray
-    val containerColor = if (isSystemInDarkTheme()) Color(0xFF1E1E1E) else Color(0xFFF7F7F7)
-
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .background(containerColor, RoundedCornerShape(24.dp))
-                .padding(32.dp)
-        ) {
-            Text(
-                text = if (isLoginMode) "Welcome Back" else "Create Account",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontFamily = BricolageGrotesque,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
-                )
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = "End-to-End Encrypted Sync",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontFamily = BricolageGrotesque,
-                    color = subTextColor
-                )
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // CHANGED: Username instead of Email
-            OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username", fontFamily = BricolageGrotesque) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = textColor,
-                    unfocusedBorderColor = subTextColor
-                )
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password", fontFamily = BricolageGrotesque) },
-                singleLine = true,
-                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                trailingIcon = {
-                    val image = if (isPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                        Icon(imageVector = image, contentDescription = "Toggle password visibility")
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = textColor,
-                    unfocusedBorderColor = subTextColor
-                )
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            if (authState is AuthState.Loading) {
-                CircularProgressIndicator(color = textColor)
-            } else {
-                androidx.compose.material3.Button(
-                    onClick = {
-                        // FIXED: Pass username instead of email, and remove recovery phrase
-                        if (isLoginMode) {
-                            viewModel.login(username, password)
-                        } else {
-                            viewModel.register(username, password)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = textColor,
-                        contentColor = containerColor
-                    )
-                ) {
-                    Text(
-                        text = if (isLoginMode) "Sign In" else "Sign Up",
-                        fontFamily = BricolageGrotesque,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-            }
-
-            if (authState is AuthState.Error) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = (authState as AuthState.Error).message,
-                    color = Color.Red,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = BricolageGrotesque)
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            BasicText(
-                text = if (isLoginMode) "Don't have an account? Sign up" else "Already have an account? Sign in",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = BricolageGrotesque,
-                    color = textColor
-                ),
-                modifier = Modifier
-                    .clickable { isLoginMode = !isLoginMode }
-                    .padding(8.dp)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            val annotatedString = buildAnnotatedString {
-                withStyle(SpanStyle(color = subTextColor)) { append("Prefer not to sync? ") }
-                withStyle(
-                    SpanStyle(
-                        color = textColor,
-                        fontWeight = FontWeight.SemiBold,
-                        textDecoration = TextDecoration.Underline
-                    )
-                ) { append("Continue Locally") }
-            }
-
-            BasicText(
-                text = annotatedString,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = BricolageGrotesque),
-                modifier = Modifier
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { onFinish() }
-                    .padding(8.dp)
-            )
-        }
+    if (authSheetMode != null) {
+        com.ben.periodt.ui.settings.components.AuthBottomSheet(
+            viewModel = viewModel,
+            initialIsLogin = authSheetMode!!,
+            onSuccess = onFinish,
+            onDismiss = { authSheetMode = null }
+        )
     }
 }

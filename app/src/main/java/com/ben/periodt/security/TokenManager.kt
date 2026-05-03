@@ -24,6 +24,7 @@ class TokenManager(context: Context) {
         private const val KEY_JWT_TOKEN = "jwt_token"
         private const val KEY_USER_ID = "user_id"
         private const val KEY_SYNC_CURSOR = "sync_cursor"
+        private const val KEY_USERNAME = "username"
     }
 
     // --- JWT Token ---
@@ -50,6 +51,14 @@ class TokenManager(context: Context) {
 
     fun getUserId(): Long {
         return sharedPreferences.getLong(KEY_USER_ID, -1L)
+    }
+
+    fun saveUsername(username: String) {
+        sharedPreferences.edit().putString(KEY_USERNAME, username).apply()
+    }
+
+    fun getUsername(): String? {
+        return sharedPreferences.getString(KEY_USERNAME, null)
     }
 
     // --- Nuke the Vault (for Logout/Delete) ---

@@ -6,6 +6,8 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.request.delete
+import io.ktor.http.isSuccess
 
 class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
@@ -15,11 +17,16 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun register(request: RegisterRequest): Result<AuthResponse> {
         return try {
-            // Makes a POST request to http://localhost:8080/api/auth/register
-            val response: AuthResponse = client.post("/api/auth/register") {
+            val response = client.post("/api/auth/register") {
                 setBody(request)
-            }.body()
-            Result.success(response)
+            }
+            if (response.status.isSuccess()) {
+                Result.success(response.body())
+            } else if (response.status.value == 400 || response.status.value == 409) {
+                Result.failure(Exception("This username is already taken."))
+            } else {
+                Result.failure(Exception("Registration failed: ${response.status.description}"))
+            }
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Registration failed", e)
             Result.failure(e)
@@ -28,12 +35,61 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun login(request: LoginRequest): Result<AuthResponse> {
         return try {
-            val response: AuthResponse = client.post("/api/auth/login") {
+            val response = client.post("/api/auth/login") {
                 setBody(request)
-            }.body()
-            Result.success(response)
+            }
+            if (response.status.isSuccess()) {
+                Result.success(response.body())
+            } else {
+                Result.failure(Exception("Login failed: Invalid username or password"))
+            }
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Login failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun changePassword(request: ChangePasswordRequest): Result<Unit> {
+        return try {
+            val response = client.post("/api/auth/change-password") {
+                setBody(request)
+            }
+            if (response.status.isSuccess()) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Failed to change password. Ensure your old password is correct."))
+            }
+        } catch (e: Exception) {
+            Log.e("NetworkRepo", "Password change failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun changeUsername(request: ChangeUsernameRequest): Result<AuthResponse> {
+        return try {
+            val response = client.post("/api/auth/change-username") {
+                setBody(request)
+            }
+            if (response.status.isSuccess()) {
+                // If successful, the server sends back a fresh JWT token!
+                Result.success(response.body())
+            } else if (response.status.value == 409) {
+                Result.failure(Exception("This username is already taken."))
+            } else {
+                Result.failure(Exception("Failed to change username."))
+            }
+        } catch (e: Exception) {
+            Log.e("NetworkRepo", "Username change failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteAccount(): Result<Unit> {
+        return try {
+            client.delete("/api/auth/delete")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("NetworkRepo", "Account deletion failed", e)
             Result.failure(e)
         }
     }
@@ -45,7 +101,6 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
             client.post("/api/devices/register") {
                 setBody(request)
             }
-            // If it doesn't throw an exception, it was a 200 OK success
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Device registration failed", e)
@@ -92,7 +147,6 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
     suspend fun pullSyncData(cursor: Long): Result<SyncPullResponse> {
         return try {
             val response: SyncPullResponse = client.get("/api/sync/pull") {
-                // This appends ?cursor=123 to the URL automatically
                 parameter("cursor", cursor)
             }.body()
             Result.success(response)

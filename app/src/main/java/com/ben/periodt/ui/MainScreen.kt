@@ -66,6 +66,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.ben.periodt.viewmodel.AuthViewModel
 
 // ── Dimensions System ──
 
@@ -264,6 +265,7 @@ private fun MainScreenContent(isDark: Boolean) {
 
     val navController = rememberNavController()
     val viewModel: PeriodViewModel = viewModel(factory = PeriodViewModel.Factory(context.applicationContext as Application))
+    val authViewModel: AuthViewModel = viewModel(factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(context.applicationContext as Application))
     val screens = listOf(Screen.Calendar, Screen.Pill, Screen.Overview)
 
     val activeProfile by viewModel.activeProfile.collectAsState()
@@ -294,7 +296,11 @@ private fun MainScreenContent(isDark: Boolean) {
                 route = Screen.Settings.route,
                 enterTransition = { slideIntoContainer(towards = AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(400)) },
                 popExitTransition = { slideOutOfContainer(towards = AnimatedContentTransitionScope.SlideDirection.Right, animationSpec = tween(400)) }
-            ) { SettingsScreen(onBack = { navController.popBackStack() }, viewModel = viewModel) }
+            ) { SettingsScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = viewModel,
+                authViewModel = authViewModel
+            ) }
         }
 
         AnimatedVisibility(

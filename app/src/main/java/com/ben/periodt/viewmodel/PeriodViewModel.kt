@@ -17,6 +17,7 @@ import com.ben.periodt.reminder.dataStore
 import com.ben.periodt.prediction.CycleRegularity
 import com.ben.periodt.prediction.getPostPillState
 import com.ben.periodt.prediction.predictCycle
+import com.ben.periodt.security.TokenManager
 import com.ben.periodt.widget.CalendarWidget
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,9 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
 
     private val dao        = AppDatabase.getDatabase(application).periodCycleDao()
     private val appContext = application.applicationContext
+
+    // NEW: We need this to check if they are a cloud user
+    private val tokenManager = TokenManager(application)
 
     // ── Active profile ────────────────────────────────────────────────────────
 
@@ -740,6 +744,10 @@ class PeriodViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun triggerImmediateSync() {
+        // FAST FAIL: If there is no token, they are a local user.
+        // Do not wake up the WorkManager. Do not pass go. Save battery!
+        if (tokenManager.getToken() == null) return
+
         val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.ben.periodt.sync.PeriodtSyncWorker>()
             .setConstraints(
                 androidx.work.Constraints.Builder()

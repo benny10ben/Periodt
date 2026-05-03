@@ -22,6 +22,12 @@ data class LoginRequest(
 
 @Keep
 @Serializable
+data class ChangeUsernameRequest(
+    val newUsername: String
+)
+
+@Keep
+@Serializable
 data class ChangePasswordRequest(
     @SerialName("oldPassword") val oldPasswordPlain: String,
     @SerialName("newPassword") val newPasswordPlain: String,

@@ -30,7 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.edit
 import com.ben.periodt.reminder.dataStore
+import com.ben.periodt.ui.onboarding.AuthPage
 import com.ben.periodt.ui.profiles.components.LegacyImportDialog
+import com.ben.periodt.ui.settings.components.AccountDialog
 import com.ben.periodt.ui.settings.components.AlgoRegularityTable
 import com.ben.periodt.ui.settings.components.AlgoStep
 import com.ben.periodt.ui.settings.components.AppearanceDialog
@@ -46,6 +48,7 @@ import com.ben.periodt.ui.settings.components.WhatsNewDialog
 import com.ben.periodt.ui.settings.components.rainConfetti
 import com.ben.periodt.ui.theme.BricolageGrotesque
 import com.ben.periodt.ui.theme.LocalAppIsDark
+import com.ben.periodt.viewmodel.AuthState
 import com.ben.periodt.viewmodel.PeriodViewModel
 import com.ben.periodt.widget.CalendarWidget
 import kotlinx.coroutines.launch
@@ -54,6 +57,7 @@ import nl.dionsegijn.konfetti.compose.OnParticleSystemUpdateListener
 import nl.dionsegijn.konfetti.core.PartySystem
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import com.ben.periodt.viewmodel.AuthViewModel
 
 const val GITHUB_REPO_URL = "https://github.com/benny10ben/Periodt/"
 
@@ -65,12 +69,26 @@ private val SIZE_LG = 15.sp
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: PeriodViewModel
+    viewModel: PeriodViewModel,
+    authViewModel: AuthViewModel
 ) {
     val context        = LocalContext.current
     val uriHandler     = LocalUriHandler.current
     val scrollState    = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
+
+    val currentUser by authViewModel.currentUser.collectAsState()
+    var showAccountDialog by remember { mutableStateOf(false) }
+    var showAuthSheet by remember { mutableStateOf<Boolean?>(null) }
+
+    var showPasswordSheet by remember { mutableStateOf(false) }
+    var showPasswordSuccess by remember { mutableStateOf(false) }
+
+    var showUsernameSheet by remember { mutableStateOf(false) }
+    var showUsernameSuccess by remember { mutableStateOf(false) }
+
+    var showDeleteAccountConfirm by remember { mutableStateOf(false) }
+    val deleteAccountState by authViewModel.deleteAccountState.collectAsState()
 
     // Observe ViewModel States for Legacy Import
     val pendingLegacy by viewModel.pendingLegacyImport.collectAsState()
@@ -212,7 +230,20 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // 1. DATA & BACKUP
+                // ACCOUNT
+                SettingsSection(title = "Account", surfaceColor) {
+                    SettingsItem(
+                        icon = Icons.Rounded.AccountCircle,
+                        title = currentUser ?: "Not Signed In",
+                        subtitle = if (currentUser != null) "Cloud sync active" else "Tap to sign in or create an account",
+                        tint = accentColor,
+                        onClick = { showAccountDialog = true }
+                    )
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // DATA & BACKUP
                 SettingsSection(title = "Data & Backup", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Upload,
@@ -244,7 +275,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // 2. CUSTOMIZE
+                // CUSTOMIZE
                 SettingsSection(title = "Customize", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Widgets,
@@ -268,7 +299,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // 3. HELP CENTER
+                // HELP CENTER
                 SettingsSection(title = "Help Center", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Calculate,
@@ -306,7 +337,7 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // 4. MORE
+                // MORE
                 SettingsSection(title = "More", surfaceColor) {
                     SettingsItem(
                         icon = Icons.Rounded.Info,
@@ -335,6 +366,105 @@ fun SettingsScreen(
             }
         }
     }
+
+// --- Account & Auth Dialogs ---
+    if (showAccountDialog) {
+        AccountDialog(
+            currentUser = currentUser,
+            onLoginClick = {
+                showAccountDialog = false
+                showAuthSheet = true
+            },
+            onLogoutClick = {
+                showAccountDialog = false
+                authViewModel.logout()
+            },
+            onChangeUsernameClick = {
+                showAccountDialog = false
+                showUsernameSheet = true
+            },
+            onChangePasswordClick = {
+                showAccountDialog = false
+                showPasswordSheet = true
+            },
+            onDeleteAccountClick = {
+                showAccountDialog = false
+                showDeleteAccountConfirm = true
+            },
+
+            onDismiss = { showAccountDialog = false }
+        )
+    }
+
+    if (showUsernameSheet) {
+        com.ben.periodt.ui.settings.components.ChangeUsernameSheet(
+            viewModel = authViewModel,
+            onSuccess = {
+                showUsernameSheet = false
+                showUsernameSuccess = true
+            },
+            onDismiss = { showUsernameSheet = false }
+        )
+    }
+
+    if (showUsernameSuccess) {
+        SuccessFeedbackDialog(
+            title = "Username Updated",
+            message = "Your username has been successfully changed.",
+            onDismiss = { showUsernameSuccess = false }
+        )
+    }
+
+    if (showAuthSheet != null) {
+        com.ben.periodt.ui.settings.components.AuthBottomSheet(
+            viewModel = authViewModel,
+            initialIsLogin = showAuthSheet!!,
+            onSuccess = { showAuthSheet = null },
+            onDismiss = { showAuthSheet = null }
+        )
+    }
+    if (showPasswordSheet) {
+        com.ben.periodt.ui.settings.components.ChangePasswordSheet(
+            viewModel = authViewModel,
+            onSuccess = {
+                showPasswordSheet = false
+                showPasswordSuccess = true
+            },
+            onDismiss = { showPasswordSheet = false }
+        )
+    }
+
+    if (showPasswordSuccess) {
+        SuccessFeedbackDialog(
+            title = "Password Updated",
+            message = "Your encryption keys have been successfully rotated.",
+            onDismiss = { showPasswordSuccess = false }
+        )
+    }
+
+    if (showDeleteAccountConfirm) {
+        DestructiveConfirmationDialog(
+            title = "Delete Cloud Account?",
+            message = "This will permanently delete your account, cloud backups, and ALL local data on this device. This cannot be undone.",
+            onConfirm = {
+                showDeleteAccountConfirm = false
+                authViewModel.deleteAccount()
+            },
+            onDismiss = { showDeleteAccountConfirm = false }
+        )
+    }
+
+    // Listen for the result and reuse your existing "Fresh Start" popup!
+    LaunchedEffect(deleteAccountState) {
+        if (deleteAccountState is AuthState.Success) {
+            authViewModel.resetDeleteAccountState()
+            showClearSuccess = true
+        } else if (deleteAccountState is AuthState.Error) {
+            Toast.makeText(context, (deleteAccountState as AuthState.Error).message, Toast.LENGTH_LONG).show()
+            authViewModel.resetDeleteAccountState()
+        }
+    }
+
 
     // --- SHEET TRIGGERS ---
     if (showAppearance) {
