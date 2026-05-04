@@ -39,7 +39,20 @@ data class ChangePasswordRequest(
 @Serializable
 data class AuthResponse(
     val token: String,
+    val refreshToken: String,
     val userId: Long,
     val username: String,
-    val saltBase64: String // Critical for reconstructing the key on login
+    val saltBase64: String
+)
+
+@Keep
+@Serializable
+data class RefreshTokenRequest(
+    val refreshToken: String
+)
+
+@Keep
+@Serializable
+data class RefreshTokenResponse(
+    val accessToken: String
 )
