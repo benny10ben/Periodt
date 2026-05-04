@@ -25,19 +25,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val tokenManager = TokenManager(application)
     private val secureVault = SecureVault(application)
     private val apiClient = ApiClient(tokenManager)
-
-    // We now use the networkRepo for EVERYTHING!
     private val networkRepo = PeriodtNetworkRepository(apiClient)
 
-    // Tracks the active user for the UI
     private val _currentUser = MutableStateFlow<String?>(tokenManager.getUsername())
     val currentUser: StateFlow<String?> = _currentUser.asStateFlow()
 
-    // --- Main Auth State ---
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    // --- Password Change State ---
     private val _passwordChangeState = MutableStateFlow<AuthState>(AuthState.Idle)
     val passwordChangeState: StateFlow<AuthState> = _passwordChangeState.asStateFlow()
 
@@ -45,22 +40,25 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                // MOVE TO BACKGROUND: Heavy cryptography blocks the UI thread!
                 withContext(Dispatchers.IO) {
-                    // 1. Generate local cryptography
                     val saltBase64 = SyncCryptoManager.generateSaltBase64()
                     val accountKey = SyncCryptoManager.deriveAccountKey(passwordPlain, saltBase64)
                     val dataKey = SyncCryptoManager.generateRandomDataKey()
                     val wrappedDataKey = SyncCryptoManager.wrapDataKey(accountKey, dataKey)
 
-                    // 2. Send to server
                     val request = RegisterRequest(username, passwordPlain, saltBase64, wrappedDataKey)
-
-                    // FIXED: Now pointing to networkRepo!
                     val result = networkRepo.register(request)
 
                     result.onSuccess { response ->
-                        processSuccessfulAuth(response.token, response.userId, saltBase64, accountKey, dataKey, username)
+                        processSuccessfulAuth(
+                            response.token,
+                            response.refreshToken, // NEW
+                            response.userId,
+                            saltBase64,
+                            accountKey,
+                            dataKey,
+                            username
+                        )
                     }.onFailure { error ->
                         withContext(Dispatchers.Main) {
                             _authState.value = AuthState.Error(error.message ?: "Registration Failed")
@@ -77,32 +75,32 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
-                // 1. Authenticate and get Salt
-                // FIXED: Now pointing to networkRepo!
                 val loginResult = networkRepo.login(LoginRequest(username, passwordPlain))
 
                 loginResult.onSuccess { response ->
                     val saltBase64 = response.saltBase64 ?: throw Exception("Missing cryptographic salt.")
 
-                    // MOVE TO BACKGROUND: Database queries crash the app on the Main thread!
                     withContext(Dispatchers.IO) {
-
-                        // 2. Wipe the local guest sandbox
                         AppDatabase.getDatabase(getApplication()).clearAllTables()
 
-                        // 3. Save auth token so we can fetch the wrapped key
+                        // Save tokens early so fetchKey() works!
                         tokenManager.saveToken(response.token)
+                        tokenManager.saveRefreshToken(response.refreshToken)
 
-                        // 4. Fetch the Wrapped Data Key from the server
                         val keyResult = networkRepo.fetchKey()
                         keyResult.onSuccess { keyDto ->
-
-                            // 5. Reconstruct the keys (Heavy Math)
                             val accountKey = SyncCryptoManager.deriveAccountKey(passwordPlain, saltBase64)
                             val dataKey = SyncCryptoManager.unwrapDataKey(accountKey, keyDto.wrappedDataKey)
 
-                            processSuccessfulAuth(response.token, response.userId, saltBase64, accountKey, dataKey, username)
-
+                            processSuccessfulAuth(
+                                response.token,
+                                response.refreshToken, // NEW
+                                response.userId,
+                                saltBase64,
+                                accountKey,
+                                dataKey,
+                                username
+                            )
                         }.onFailure {
                             withContext(Dispatchers.Main) {
                                 _authState.value = AuthState.Error("Failed to fetch encryption keys.")
@@ -120,6 +118,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun processSuccessfulAuth(
         token: String,
+        refreshToken: String, // NEW
         userId: Long,
         saltBase64: String,
         accountKey: ByteArray,
@@ -128,18 +127,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         withContext(Dispatchers.Default) {
             try {
-                // 1. Save standard tokens
                 tokenManager.saveToken(token)
+                tokenManager.saveRefreshToken(refreshToken) // NEW
                 tokenManager.saveUserId(userId)
                 tokenManager.saveUsername(username)
 
-                // 2. Save cryptographic material to memory and the secure hardware vault
                 SyncCryptoManager.sessionDataKey = dataKey
                 secureVault.saveAesKey(SecretKeySpec(dataKey, "AES"))
-
                 secureVault.saveSalt(Base64.decode(saltBase64, Base64.NO_WRAP))
 
-                // 3. Trigger initial sync
                 val syncRequest = androidx.work.OneTimeWorkRequestBuilder<com.ben.periodt.sync.PeriodtSyncWorker>()
                     .setConstraints(androidx.work.Constraints.Builder().setRequiredNetworkType(androidx.work.NetworkType.CONNECTED).build())
                     .setBackoffCriteria(androidx.work.BackoffPolicy.EXPONENTIAL, androidx.work.WorkRequest.MIN_BACKOFF_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS)
@@ -151,7 +147,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     syncRequest
                 )
 
-                // Update UI state safely on the Main thread
                 withContext(Dispatchers.Main) {
                     _currentUser.value = username
                     _authState.value = AuthState.Success
@@ -166,9 +161,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     fun logout() {
         viewModelScope.launch(Dispatchers.IO) {
+            // 1. Invalidate refresh token on server
+            tokenManager.getRefreshToken()?.let { networkRepo.logout(it) }
+
+            // 2. Wipe local database
             AppDatabase.getDatabase(getApplication()).clearAllTables()
 
             withContext(Dispatchers.Main) {
+                // 4. Clear local vault
                 tokenManager.clearAll()
                 secureVault.clearVault()
                 SyncCryptoManager.clearSession()
@@ -186,23 +186,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _passwordChangeState.value = AuthState.Loading
             try {
-                // We need the active Data Key to re-wrap it. If it's null, they aren't fully logged in.
                 val currentDataKey = SyncCryptoManager.sessionDataKey
                 if (currentDataKey == null) {
                     _passwordChangeState.value = AuthState.Error("Session expired. Please log in again.")
                     return@launch
                 }
 
-                // MOVE TO BACKGROUND: Heavy Argon2 Cryptography
                 withContext(Dispatchers.IO) {
-                    // 1. Generate new cryptographic material
                     val newSaltBase64 = SyncCryptoManager.generateSaltBase64()
                     val newAccountKey = SyncCryptoManager.deriveAccountKey(newPasswordPlain, newSaltBase64)
-
-                    // 2. Re-wrap the existing data key with the new account key
                     val newWrappedDataKey = SyncCryptoManager.wrapDataKey(newAccountKey, currentDataKey)
 
-                    // 3. Send to server
                     val request = com.ben.periodt.network.ChangePasswordRequest(
                         oldPasswordPlain = oldPasswordPlain,
                         newPasswordPlain = newPasswordPlain,
@@ -210,11 +204,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         newWrappedDataKey = newWrappedDataKey
                     )
 
-                    // FIXED: Now pointing to networkRepo!
                     val result = networkRepo.changePassword(request)
 
                     result.onSuccess {
-                        // 4. Update the local hardware vault with the new salt!
                         secureVault.saveSalt(Base64.decode(newSaltBase64, Base64.NO_WRAP))
 
                         withContext(Dispatchers.Main) {
@@ -232,7 +224,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Username Change State ---
     private val _usernameChangeState = MutableStateFlow<AuthState>(AuthState.Idle)
     val usernameChangeState: StateFlow<AuthState> = _usernameChangeState.asStateFlow()
 
@@ -249,12 +240,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
                 result.onSuccess { response ->
                     withContext(Dispatchers.IO) {
-                        // 1. Save the fresh JWT token and new username to hardware memory
+                        // Save both tokens returned from a successful username change!
                         tokenManager.saveToken(response.token)
+                        tokenManager.saveRefreshToken(response.refreshToken)
                         tokenManager.saveUsername(response.username)
 
                         withContext(Dispatchers.Main) {
-                            // 2. Instantly update the UI!
                             _currentUser.value = response.username
                             _usernameChangeState.value = AuthState.Success
                         }
@@ -268,7 +259,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Delete Account State ---
     private val _deleteAccountState = MutableStateFlow<AuthState>(AuthState.Idle)
     val deleteAccountState: StateFlow<AuthState> = _deleteAccountState.asStateFlow()
 
@@ -280,11 +270,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _deleteAccountState.value = AuthState.Loading
             try {
-                // Pointing to networkRepo for the deletion call
                 val result = networkRepo.deleteAccount()
 
                 result.onSuccess {
-                    // Wipe local database & logout
                     withContext(Dispatchers.IO) {
                         AppDatabase.getDatabase(getApplication()).clearAllTables()
 
