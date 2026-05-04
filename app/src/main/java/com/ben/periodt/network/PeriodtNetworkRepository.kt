@@ -49,6 +49,18 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
         }
     }
 
+    suspend fun logout(refreshToken: String): Result<Unit> {
+        return try {
+            client.post("/api/v1/auth/logout") {
+                setBody(RefreshTokenRequest(refreshToken))
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("NetworkRepo", "Logout failed on server", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun changePassword(request: ChangePasswordRequest): Result<Unit> {
         return try {
             val response = client.post("/api/v1/auth/change-password") {
@@ -71,7 +83,6 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
                 setBody(request)
             }
             if (response.status.isSuccess()) {
-                // If successful, the server sends back a fresh JWT token!
                 Result.success(response.body())
             } else if (response.status.value == 409) {
                 Result.failure(Exception("This username is already taken."))
@@ -122,8 +133,12 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun fetchKey(): Result<WrappedKeyDto> {
         return try {
-            val response: WrappedKeyDto = client.get("/api/v1/keys/fetch").body()
-            Result.success(response)
+            val response = client.get("/api/v1/keys/fetch")
+            if (response.status.isSuccess()) {
+                Result.success(response.body())
+            } else {
+                Result.failure(Exception("Server returned status: ${response.status.value}"))
+            }
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Key fetch failed", e)
             Result.failure(e)
@@ -134,10 +149,14 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun pushSyncData(request: SyncPushRequest): Result<Unit> {
         return try {
-            client.post("/api/v1/sync/push") {
+            val response = client.post("/api/v1/sync/push") {
                 setBody(request)
             }
-            Result.success(Unit)
+            if (response.status.isSuccess()) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Sync Push failed with status: ${response.status.value}"))
+            }
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Sync push failed", e)
             Result.failure(e)
@@ -146,10 +165,14 @@ class PeriodtNetworkRepository(private val apiClient: ApiClient) {
 
     suspend fun pullSyncData(cursor: Long): Result<SyncPullResponse> {
         return try {
-            val response: SyncPullResponse = client.get("/api/v1/sync/pull") {
+            val response = client.get("/api/v1/sync/pull") {
                 parameter("cursor", cursor)
-            }.body()
-            Result.success(response)
+            }
+            if (response.status.isSuccess()) {
+                Result.success(response.body())
+            } else {
+                Result.failure(Exception("Sync Pull failed with status: ${response.status.value}"))
+            }
         } catch (e: Exception) {
             Log.e("NetworkRepo", "Sync pull failed", e)
             Result.failure(e)
