@@ -22,12 +22,13 @@ class TokenManager(context: Context) {
 
     companion object {
         private const val KEY_JWT_TOKEN = "jwt_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_USER_ID = "user_id"
         private const val KEY_SYNC_CURSOR = "sync_cursor"
         private const val KEY_USERNAME = "username"
     }
 
-    // --- JWT Token ---
+    // --- Access Token ---
     fun saveToken(token: String) {
         sharedPreferences.edit().putString(KEY_JWT_TOKEN, token).apply()
     }
@@ -36,15 +37,20 @@ class TokenManager(context: Context) {
         return sharedPreferences.getString(KEY_JWT_TOKEN, null)
     }
 
-    /**
-     * Specifically removes the JWT token.
-     * Fixes the 'Unresolved reference: clearToken' error in AuthViewModel.
-     */
     fun clearToken() {
         sharedPreferences.edit().remove(KEY_JWT_TOKEN).apply()
     }
 
-    // --- User ID ---
+    // --- Refresh Token ---
+    fun saveRefreshToken(token: String) {
+        sharedPreferences.edit().putString(KEY_REFRESH_TOKEN, token).apply()
+    }
+
+    fun getRefreshToken(): String? {
+        return sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
+    }
+
+    // --- User Info ---
     fun saveUserId(userId: Long) {
         sharedPreferences.edit().putLong(KEY_USER_ID, userId).apply()
     }
