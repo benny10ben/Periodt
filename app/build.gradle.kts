@@ -11,15 +11,15 @@ ksp {
 
 android {
     namespace = "com.ben.periodt"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "26.1.10909125"
 
     defaultConfig {
         applicationId = "com.ben.periodt"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 11
-        versionName = "1.2.1"
+        targetSdk = 36
+        versionCode = 12
+        versionName = "1.2.2"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86"))
